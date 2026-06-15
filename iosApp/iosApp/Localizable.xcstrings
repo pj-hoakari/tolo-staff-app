@@ -102,13 +102,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Current placement"
+            "value" : "Your placement"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在の配置場所"
+            "value" : "あなたの配置場所"
           }
         }
       }

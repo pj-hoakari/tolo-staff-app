@@ -3,7 +3,7 @@ package dev.usbharu.tolo_staff
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,7 +12,6 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Summarize
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -20,8 +19,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -33,9 +30,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
@@ -56,7 +54,6 @@ fun ToloStaffAndroidApp(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToloStaffAndroidContent(
     state: AppShellUiState,
@@ -64,30 +61,6 @@ fun ToloStaffAndroidContent(
 ) {
     MaterialTheme {
         Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = stringResource(R.string.placement_header_label),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = state.currentPlacementName,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.semantics {
-                                    contentDescription = "app_shell_placement_name"
-                                }
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-            },
             bottomBar = {
                 NavigationBar {
                     appShellTabs().forEach { item ->
@@ -139,26 +112,41 @@ private fun AppShellTabContent(
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.placement_inline_label),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = state.currentPlacementName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-            }
             Text(
                 text = stringResource(tab.descriptionRes),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            PlacementFooter(placementName = state.currentPlacementName)
+        }
+    }
+}
+
+@Composable
+private fun PlacementFooter(placementName: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.placement_header_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = placementName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics {
+                    contentDescription = "app_shell_placement_name"
+                }
             )
         }
     }

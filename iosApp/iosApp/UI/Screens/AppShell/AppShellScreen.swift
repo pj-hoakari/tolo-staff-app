@@ -87,8 +87,6 @@ private struct AppShellTabContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            placementHeader
-
             VStack(alignment: .leading, spacing: 12) {
                 Text(titleKey)
                     .font(.title)
@@ -101,6 +99,7 @@ private struct AppShellTabContentView: View {
             }
 
             Spacer()
+            placementHeader
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
