@@ -48,12 +48,7 @@ struct AppShellContentView: View {
                 systemImage: "doc.text.fill"
             )
 
-            tabPage(
-                tab: AppTab.contacts,
-                titleKey: "app_shell_contacts_title",
-                descriptionKey: "app_shell_contacts_description",
-                systemImage: "message.fill"
-            )
+            contactTabPage()
         }
     }
 
@@ -76,6 +71,16 @@ struct AppShellContentView: View {
             Label(tab.labelKey, systemImage: systemImage)
         }
         .tag(tab)
+    }
+
+    private func contactTabPage() -> some View {
+        NavigationStack {
+            ContactChatScreen()
+        }
+        .tabItem {
+            Label(AppTab.contacts.labelKey, systemImage: "message.fill")
+        }
+        .tag(AppTab.contacts)
     }
 }
 
