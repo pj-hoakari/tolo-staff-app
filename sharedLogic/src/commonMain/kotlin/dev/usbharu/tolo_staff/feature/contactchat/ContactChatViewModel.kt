@@ -19,6 +19,13 @@ class ContactChatViewModel(
         val room = currentState.rooms.firstOrNull { it.id == roomId } ?: return
         updateState {
             it.copy(
+                rooms = it.rooms.map { currentRoom ->
+                    if (currentRoom.id == roomId) {
+                        currentRoom.copy(unreadCount = 0)
+                    } else {
+                        currentRoom
+                    }
+                },
                 selectedRoomId = room.id,
                 selectedRoomTitle = room.title,
                 messages = roomMessages[room.id].orEmpty(),

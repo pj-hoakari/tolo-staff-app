@@ -46,11 +46,10 @@ struct AppShellContentView: View {
             )
         ) {
             Tab("app_shell_tab_home", systemImage: "house.fill", value: AppTab.home) {
-                tabPage(
-                    tab: AppTab.home,
-                    titleKey: "app_shell_home_title",
-                    descriptionKey: "app_shell_home_description"
-                )
+                NavigationStack {
+                    HomeTabContentView(overview: state.homeOverview)
+                        .navigationTitle("app_shell_home_title")
+                }
             }
 
             Tab("app_shell_tab_instructions", systemImage: "checklist", value: AppTab.instructions) {
@@ -155,9 +154,6 @@ private extension AppTab {
 
 #Preview {
     AppShellContentView(
-        state: AppShellUiState(
-            currentPlacementName: "東京会場",
-            selectedTab: AppTab.home
-        )
+        state: AppShellUiState.mock()
     )
 }

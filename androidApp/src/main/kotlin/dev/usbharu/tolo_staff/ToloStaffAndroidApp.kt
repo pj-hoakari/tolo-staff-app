@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
@@ -178,23 +179,159 @@ private fun AppShellTabContent(
             return@Surface
         }
 
+        if (state.selectedTab == AppTab.HOME) {
+            HomeOverviewContent(overview = state.homeOverview)
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = stringResource(tab.titleRes),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = stringResource(tab.descriptionRes),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeOverviewContent(overview: AppShellHomeOverview) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text(
+                text = stringResource(R.string.home_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+        }
+        item {
+            HomeOverviewCard(
+                title = stringResource(R.string.home_event_card_title),
+                primaryText = overview.eventName,
+                secondaryText = overview.eventTime,
+                identifier = "app_shell_home_event_card"
+            )
+        }
+        item {
+            HomePlacementMapOverviewCard(
+                overview = overview,
+                identifier = "app_shell_home_placement_map_card"
+            )
+        }
+        item {
+            HomeOverviewCard(
+                title = stringResource(R.string.home_instruction_card_title),
+                primaryText = overview.currentInstruction,
+                secondaryText = null,
+                identifier = "app_shell_home_instruction_card"
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomePlacementMapOverviewCard(
+    overview: AppShellHomeOverview,
+    identifier: String
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = identifier
+            },
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.Start
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = stringResource(tab.titleRes),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = stringResource(tab.descriptionRes),
-                style = MaterialTheme.typography.bodyLarge,
+                text = stringResource(R.string.home_placement_card_title),
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Text(
+                text = overview.placementName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = overview.placementDetail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = overview.mapState.venueName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "${overview.mapState.latitude}, ${overview.mapState.longitude}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeOverviewCard(
+    title: String,
+    primaryText: String,
+    secondaryText: String?,
+    identifier: String
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = identifier
+            },
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = primaryText,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (secondaryText != null) {
+                Text(
+                    text = secondaryText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

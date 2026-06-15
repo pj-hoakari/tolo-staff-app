@@ -13,7 +13,9 @@ final class SampleScenarioTests: XCTestCase {
         let placement = app.descendants(matching: .any)["app_shell_placement_name"]
         XCTAssertTrue(placement.waitForExistence(timeout: 5))
 
-        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_home_title"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_home_event_card"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_home_placement_map_card"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_home_instruction_card"].waitForExistence(timeout: 3))
 
         let tabBarButtons = app.tabBars.buttons
         XCTAssertGreaterThanOrEqual(tabBarButtons.count, 4)
@@ -25,9 +27,9 @@ final class SampleScenarioTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_reports_title"].waitForExistence(timeout: 3))
 
         tabBarButtons.element(boundBy: 3).tap()
-        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_contacts_title"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["contact_chat_room_list"].waitForExistence(timeout: 3))
 
         tabBarButtons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_home_title"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_home_event_card"].waitForExistence(timeout: 3))
     }
 }

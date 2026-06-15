@@ -6,10 +6,7 @@ import SharedLogic
 
 final class SampleViewTests: XCTestCase {
     func testAppShellContentViewCanBeCreated() {
-        let state = AppShellUiState(
-            currentPlacementName: "東京会場",
-            selectedTab: AppTab.home
-        )
+        let state = AppShellUiState.mock(selectedTab: AppTab.home)
 
         let view = AppShellContentView(state: state)
 
@@ -17,10 +14,7 @@ final class SampleViewTests: XCTestCase {
     }
 
     func disabled_testAppShellContentSnapshotSmoke() {
-        let state = AppShellUiState(
-            currentPlacementName: "東京会場",
-            selectedTab: AppTab.home
-        )
+        let state = AppShellUiState.mock(selectedTab: AppTab.home)
 
         assertSnapshot(
             of: AppShellContentView(state: state).frame(width: 390, height: 844),

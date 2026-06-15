@@ -33,6 +33,22 @@
         }
       }
     },
+    "app_shell_home_event_card_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Event"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベント"
+          }
+        }
+      }
+    },
     "app_shell_home_description" : {
       "localizations" : {
         "en" : {
@@ -45,6 +61,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今日の配置と確認事項を表示します。"
+          }
+        }
+      }
+    },
+    "app_shell_home_instruction_card_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your instruction"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたへの指示"
+          }
+        }
+      }
+    },
+    "app_shell_home_map_card_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Map"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マップ"
+          }
+        }
+      }
+    },
+    "app_shell_home_placement_card_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your placement"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの配置場所"
           }
         }
       }

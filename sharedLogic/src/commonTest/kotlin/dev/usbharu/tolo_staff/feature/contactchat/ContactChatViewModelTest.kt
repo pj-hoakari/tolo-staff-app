@@ -35,6 +35,19 @@ class ContactChatViewModelTest {
     }
 
     @Test
+    fun `room selection clears unread count`() = runTest {
+        val viewModel = ContactChatViewModel(UnconfinedTestDispatcher(testScheduler))
+
+        assertEquals(2, viewModel.uiState.value.rooms.first { it.id == "operations" }.unreadCount)
+
+        viewModel.onRoomSelected("operations")
+
+        assertEquals(0, viewModel.uiState.value.rooms.first { it.id == "operations" }.unreadCount)
+
+        viewModel.clear()
+    }
+
+    @Test
     fun `back to rooms clears selected room and draft`() = runTest {
         val viewModel = ContactChatViewModel(UnconfinedTestDispatcher(testScheduler))
 
