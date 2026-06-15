@@ -1,0 +1,36 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "sample_primary_action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap from SwiftUI"
+          }
+        }
+      }
+    },
+    "sample_tap_count %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap count: %lld"
+          }
+        }
+      }
+    },
+    "sample_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KMP Sample"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
