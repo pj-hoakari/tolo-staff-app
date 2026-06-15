@@ -10,8 +10,6 @@ class ContactChatViewModel(
     initialState = ContactChatUiState(rooms = initialRooms),
     coroutineContext = coroutineContext
 ) {
-    private var nextMessageId = 1
-
     private val roomMessages = initialMessages
         .groupBy { it.roomId }
         .mapValues { (_, messages) -> messages.toMutableList() }
@@ -23,7 +21,7 @@ class ContactChatViewModel(
             it.copy(
                 selectedRoomId = room.id,
                 selectedRoomTitle = room.title,
-                messages = roomMessages[room.id].orEmpty().toList(),
+                messages = roomMessages[room.id].orEmpty(),
                 draftText = ""
             )
         }
@@ -78,6 +76,8 @@ class ContactChatViewModel(
     }
 
     private companion object {
+        private var nextMessageId = 1
+
         private val initialRooms = listOf(
             ChatRoom(
                 id = "operations",

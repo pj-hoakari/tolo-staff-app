@@ -17,6 +17,16 @@ struct ContactChatScreen: View {
             onSendClicked: { wrapper.onSendClicked() }
         )
         .navigationTitle(wrapper.state.selectedRoomTitle ?? String(localized: "contact_chat_title"))
+        .toolbar {
+            if wrapper.state.selectedRoomId != nil {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("contact_chat_back", systemImage: "chevron.left") {
+                        wrapper.onBackToRooms()
+                    }
+                    .accessibilityIdentifier("contact_chat_back_button")
+                }
+            }
+        }
     }
 }
 
@@ -38,67 +48,53 @@ struct ContactChatContentView: View {
     }
 
     private var roomList: some View {
-        List(state.rooms, id: \.id) { room in
-            Button {
-                onRoomSelected(room.id)
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(room.title)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
+        List {
+            ForEach(state.rooms, id: \.id) { room in
+                Button {
+                    onRoomSelected(room.id)
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(room.title)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
 
-                        Text(room.lastMessage)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            Text(room.lastMessage)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        if room.unreadCount > 0 {
+                            Text("\(room.unreadCount)")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 24, minHeight: 24)
+                                .background(.blue)
+                                .clipShape(Circle())
+                        }
                     }
-
-                    Spacer()
-
-                    if room.unreadCount > 0 {
-                        Text("\(room.unreadCount)")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .frame(minWidth: 24, minHeight: 24)
-                            .background(.blue)
-                            .clipShape(Circle())
-                    }
+                    .padding(.vertical, 8)
                 }
-                .padding(.vertical, 8)
+                .accessibilityIdentifier("contact_chat_room_\(room.id)")
             }
-            .accessibilityIdentifier("contact_chat_room_\(room.id)")
         }
         .accessibilityIdentifier("contact_chat_room_list")
     }
 
     private var chatDetail: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button {
-                    onBackToRooms()
-                } label: {
-                    Label("contact_chat_back", systemImage: "chevron.left")
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(state.messages, id: \.id) { message in
+                    messageBubble(message)
                 }
-                .accessibilityIdentifier("contact_chat_back_button")
-
-                Spacer()
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(state.messages, id: \.id) { message in
-                        messageBubble(message)
-                    }
-                }
-                .padding()
-            }
-
-            Divider()
-
+            .padding()
+        }
+        .safeAreaInset(edge: .bottom) {
             HStack(spacing: 10) {
                 TextField(
                     String(localized: "contact_chat_message_placeholder"),
@@ -139,11 +135,11 @@ struct ContactChatContentView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .foregroundStyle(message.isFromCurrentUser ? .white : .primary)
-                    .background(message.isFromCurrentUser ? Color.blue : Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(message.isFromCurrentUser ? Color.accentColor : Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 Text(message.timeLabel)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 

@@ -13,8 +13,4 @@
     <string name="instructions_description">担当者への指示を確認します。</string>
     <string name="reports_description">作業報告を確認・作成します。</string>
     <string name="contacts_description">連絡事項とメッセージを確認します。</string>
-    <string name="contact_chat_title">連絡</string>
-    <string name="contact_chat_back">ルーム</string>
-    <string name="contact_chat_message_placeholder">メッセージ</string>
-    <string name="contact_chat_send">送信</string>
 </resources>
