@@ -9,13 +9,25 @@ final class SampleScenarioTests: XCTestCase {
         app.launch()
     }
 
-    func testTapPrimaryActionUpdatesCount() throws {
-        let button = app.descendants(matching: .any)["sample_primary_button"]
-        XCTAssertTrue(button.waitForExistence(timeout: 5))
+    func testTabNavigationShowsPlacementAndSelectedContent() throws {
+        let placement = app.descendants(matching: .any)["app_shell_placement_name"]
+        XCTAssertTrue(placement.waitForExistence(timeout: 5))
 
-        button.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_home_title"].waitForExistence(timeout: 3))
 
-        let tapCount = app.descendants(matching: .any)["sample_tap_count"]
-        XCTAssertTrue(tapCount.waitForExistence(timeout: 3))
+        let tabBarButtons = app.tabBars.buttons
+        XCTAssertGreaterThanOrEqual(tabBarButtons.count, 4)
+
+        tabBarButtons.element(boundBy: 1).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_instructions_title"].waitForExistence(timeout: 3))
+
+        tabBarButtons.element(boundBy: 2).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_reports_title"].waitForExistence(timeout: 3))
+
+        tabBarButtons.element(boundBy: 3).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_contacts_title"].waitForExistence(timeout: 3))
+
+        tabBarButtons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["app_shell_content_home_title"].waitForExistence(timeout: 3))
     }
 }
