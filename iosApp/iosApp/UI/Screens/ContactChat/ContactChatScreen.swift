@@ -78,7 +78,9 @@ struct ContactChatContentView: View {
                         }
                     }
                     .padding(.vertical, 8)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("contact_chat_room_\(room.id)")
             }
         }
