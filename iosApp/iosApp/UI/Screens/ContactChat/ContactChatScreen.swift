@@ -97,27 +97,43 @@ struct ContactChatContentView: View {
             .padding()
         }
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 12) {
                 TextField(
                     String(localized: "contact_chat_message_placeholder"),
                     text: Binding(
                         get: { state.draftText },
                         set: { onDraftChanged($0) }
-                    )
+                    ),
+                    axis: .vertical
                 )
-                .textFieldStyle(.roundedBorder)
+                .lineLimit(1 ... 4)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(Color(uiColor: .systemBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(.quaternary, lineWidth: 1)
+                )
                 .accessibilityIdentifier("contact_chat_message_input")
 
-                Button {
+                Button("Send", systemImage: "paperplane.fill") {
                     onSendClicked()
-                } label: {
-                    Image(systemName: "paperplane.fill")
                 }
-                .buttonStyle(.borderedProminent)
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+                .background(Color.accentColor, in: Circle())
+                .foregroundStyle(.white)
                 .disabled(state.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(state.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
                 .accessibilityIdentifier("contact_chat_send_button")
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+            .background(.thinMaterial)
         }
     }
 
