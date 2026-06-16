@@ -12,9 +12,12 @@ kotlin {
     }
 }
 dependencies {
-    implementation(projects.sharedLogic)
+    implementation(projects.sharedLogic) {
+        exclude(group = "io.grpc", module = "grpc-protobuf-lite")
+    }
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.grpc.okhttp)
 
     implementation(libs.compose.material3)
     implementation(libs.compose.uiToolingPreview)

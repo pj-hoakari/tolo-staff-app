@@ -1,14 +1,17 @@
 package dev.usbharu.tolo_staff.di
 
 import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
+import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
+import dev.usbharu.tolo_staff.feature.contactchat.GrpcContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatViewModel
 import dev.usbharu.tolo_staff.feature.sample.SampleViewModel
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
 val coreModule = module {
+    single<ContactChatService> { GrpcContactChatService() }
     factory { AppShellViewModel() }
-    factory { ContactChatViewModel() }
+    factory { ContactChatViewModel(service = get()) }
     factory { SampleViewModel() }
 }
 

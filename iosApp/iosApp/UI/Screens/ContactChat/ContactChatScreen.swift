@@ -48,53 +48,92 @@ struct ContactChatContentView: View {
     }
 
     private var roomList: some View {
-        List {
-            ForEach(state.rooms, id: \.id) { room in
-                Button {
-                    onRoomSelected(room.id)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(room.title)
-                                .font(.headline)
-                                .foregroundStyle(.primary)
-
-                            Text(room.lastMessage)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer()
-
-                        if room.unreadCount > 0 {
-                            Text("\(room.unreadCount)")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.white)
-                                .frame(minWidth: 24, minHeight: 24)
-                                .background(.blue)
-                                .clipShape(Circle())
-                        }
+        Group {
+            if state.isLoading && state.rooms.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if state.rooms.isEmpty {
+                ContentUnavailableView(
+                    "参加中のスレッドはありません",
+                    systemImage: "message"
+                )
+            } else {
+                List {
+                    if let errorMessage = state.errorMessage {
+                        Text(errorMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.red)
                     }
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
+
+                    ForEach(state.rooms, id: \.id) { room in
+                        Button {
+                            onRoomSelected(room.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(room.title)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+
+                                    Text(room.lastMessage ?? "メッセージはまだありません")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer()
+
+                                if room.unreadCount > 0 {
+                                    Text("\(room.unreadCount)")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.white)
+                                        .frame(minWidth: 24, minHeight: 24)
+                                        .background(.blue)
+                                        .clipShape(Circle())
+                                }
+                            }
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("contact_chat_room_\(room.id)")
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("contact_chat_room_\(room.id)")
             }
         }
         .accessibilityIdentifier("contact_chat_room_list")
     }
 
     private var chatDetail: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(state.messages, id: \.id) { message in
-                    messageBubble(message)
+        Group {
+            if state.isLoading && state.messages.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if let errorMessage = state.errorMessage {
+                            Text(errorMessage)
+                                .font(.subheadline)
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        if state.messages.isEmpty {
+                            ContentUnavailableView(
+                                "このスレッドにはまだメッセージがありません",
+                                systemImage: "bubble.left.and.bubble.right"
+                            )
+                        } else {
+                            ForEach(state.messages, id: \.id) { message in
+                                messageBubble(message)
+                            }
+                        }
+                    }
+                    .padding()
                 }
             }
-            .padding()
         }
         .safeAreaInset(edge: .bottom) {
             HStack(alignment: .bottom, spacing: 12) {
@@ -126,8 +165,8 @@ struct ContactChatContentView: View {
                 .frame(width: 44, height: 44)
                 .background(Color.accentColor, in: Circle())
                 .foregroundStyle(.white)
-                .disabled(state.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(state.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
+                .disabled(state.isSending || state.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(state.isSending || state.draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
                 .accessibilityIdentifier("contact_chat_send_button")
             }
             .padding(.horizontal)
@@ -152,11 +191,19 @@ struct ContactChatContentView: View {
                     .font(.body)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .foregroundStyle(message.isFromCurrentUser ? .white : .primary)
+                    .foregroundStyle(
+                        message.isSystemEvent
+                            ? AnyShapeStyle(.secondary)
+                            : message.isFromCurrentUser
+                            ? AnyShapeStyle(.white)
+                            : AnyShapeStyle(.primary)
+                    )
                     .background {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(
-                                message.isFromCurrentUser
+                                message.isSystemEvent
+                                    ? AnyShapeStyle(Color.secondary.opacity(0.12))
+                                    : message.isFromCurrentUser
                                     ? AnyShapeStyle(Color.accentColor)
                                     : AnyShapeStyle(Color.blue.opacity(0.12))
                             )
@@ -168,9 +215,11 @@ struct ContactChatContentView: View {
                             }
                     }
 
-                Text(message.timeLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let timeLabel = message.timeLabel {
+                    Text(timeLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if !message.isFromCurrentUser {
@@ -190,7 +239,11 @@ struct ContactChatContentView: View {
             selectedRoomId: nil,
             selectedRoomTitle: nil,
             messages: [],
-            draftText: ""
+            draftText: "",
+            isLoading: false,
+            isRefreshing: false,
+            isSending: false,
+            errorMessage: nil
         )
     )
 }

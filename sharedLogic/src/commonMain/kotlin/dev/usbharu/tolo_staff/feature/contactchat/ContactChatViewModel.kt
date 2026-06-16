@@ -2,36 +2,38 @@ package dev.usbharu.tolo_staff.feature.contactchat
 
 import dev.usbharu.tolo_staff.viewmodel.StateEffectViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
 class ContactChatViewModel(
-    coroutineContext: CoroutineContext = Dispatchers.Default
+    private val service: ContactChatService = GrpcContactChatService(),
+    coroutineContext: CoroutineContext = Dispatchers.Default,
+    private val pollIntervalMillis: Long = 5_000L,
 ) : StateEffectViewModel<ContactChatUiState, Unit>(
-    initialState = ContactChatUiState(rooms = initialRooms),
+    initialState = ContactChatUiState(isLoading = true),
     coroutineContext = coroutineContext
 ) {
-    private val roomMessages = initialMessages
-        .groupBy { it.roomId }
-        .mapValues { (_, messages) -> messages.toMutableList() }
-        .toMutableMap()
+    private var pollJob: Job? = null
+
+    init {
+        loadInitialState()
+        startPolling()
+    }
 
     fun onRoomSelected(roomId: String) {
         val room = currentState.rooms.firstOrNull { it.id == roomId } ?: return
         updateState {
             it.copy(
-                rooms = it.rooms.map { currentRoom ->
-                    if (currentRoom.id == roomId) {
-                        currentRoom.copy(unreadCount = 0)
-                    } else {
-                        currentRoom
-                    }
-                },
                 selectedRoomId = room.id,
                 selectedRoomTitle = room.title,
-                messages = roomMessages[room.id].orEmpty(),
-                draftText = ""
+                messages = emptyList(),
+                errorMessage = null,
+                isLoading = true,
             )
         }
+        refreshSelectedRoom()
     }
 
     fun onBackToRooms() {
@@ -40,7 +42,9 @@ class ContactChatViewModel(
                 selectedRoomId = null,
                 selectedRoomTitle = null,
                 messages = emptyList(),
-                draftText = ""
+                draftText = "",
+                errorMessage = null,
+                isLoading = false,
             )
         }
     }
@@ -50,91 +54,146 @@ class ContactChatViewModel(
     }
 
     fun onSendClicked() {
-        val trimmedText = currentState.draftText.trim()
-        val roomId = currentState.selectedRoomId
-        if (trimmedText.isEmpty() || roomId == null) {
+        val roomId = currentState.selectedRoomId ?: return
+        val text = currentState.draftText.trim()
+        if (text.isEmpty() || currentState.isSending) {
             return
         }
 
-        val message = ChatMessage(
-            id = "sent-${roomId}-${nextMessageId++}",
+        val optimisticMessage = ChatMessage(
+            id = "local-${nextLocalMessageId++}",
             roomId = roomId,
-            senderName = "あなた",
-            body = trimmedText,
-            timeLabel = "今",
-            isFromCurrentUser = true
+            senderName = CURRENT_STAFF_ID,
+            body = text,
+            timeLabel = null,
+            isFromCurrentUser = true,
         )
-        val messages = roomMessages.getOrPut(roomId) { mutableListOf() }
-        messages += message
 
         updateState {
             it.copy(
+                messages = it.messages + optimisticMessage,
+                draftText = "",
+                isSending = true,
+                errorMessage = null,
                 rooms = it.rooms.map { room ->
-                    if (room.id == roomId) {
-                        room.copy(lastMessage = trimmedText, unreadCount = 0)
-                    } else {
-                        room
-                    }
-                },
-                messages = messages.toList(),
-                draftText = ""
+                    if (room.id == roomId) room.copy(lastMessage = text) else room
+                }
             )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                service.sendSimpleMessage(roomId, CURRENT_STAFF_ID, text)
+                refreshAll(isRefreshing = false)
+            }.onFailure { throwable ->
+                updateState { state ->
+                    state.copy(
+                        isSending = false,
+                        errorMessage = throwable.message ?: "メッセージ送信に失敗しました",
+                        messages = state.messages.filterNot { it.id == optimisticMessage.id },
+                    )
+                }
+            }
         }
     }
 
+    private fun loadInitialState() {
+        viewModelScope.launch {
+            refreshAll(showLoading = true)
+        }
+    }
+
+    private fun startPolling() {
+        pollJob?.cancel()
+        pollJob = viewModelScope.launch {
+            while (true) {
+                delay(pollIntervalMillis)
+                refreshAll(isRefreshing = true)
+            }
+        }
+    }
+
+    private fun refreshSelectedRoom() {
+        val roomId = currentState.selectedRoomId ?: return
+        viewModelScope.launch {
+            runCatching {
+                val messages = service.listMessages(roomId, CURRENT_STAFF_ID)
+                updateState {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isSending = false,
+                        errorMessage = null,
+                        messages = messages,
+                    )
+                }
+            }.onFailure { throwable ->
+                updateState {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isSending = false,
+                        errorMessage = throwable.message ?: "チャットの読み込みに失敗しました",
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshAll(
+        showLoading: Boolean = false,
+        isRefreshing: Boolean = false,
+    ) {
+        updateState {
+            it.copy(
+                isLoading = showLoading,
+                isRefreshing = isRefreshing,
+                errorMessage = null,
+            )
+        }
+
+        runCatching {
+            val rooms = service.listRooms(CURRENT_STAFF_ID)
+            val selectedRoomId = currentState.selectedRoomId?.takeIf { roomId ->
+                rooms.any { it.id == roomId }
+            }
+            val messages = if (selectedRoomId != null) {
+                service.listMessages(selectedRoomId, CURRENT_STAFF_ID)
+            } else {
+                emptyList()
+            }
+
+            updateState {
+                it.copy(
+                    rooms = rooms,
+                    selectedRoomId = selectedRoomId,
+                    selectedRoomTitle = rooms.firstOrNull { room -> room.id == selectedRoomId }?.title,
+                    messages = messages,
+                    isLoading = false,
+                    isRefreshing = false,
+                    isSending = false,
+                    errorMessage = null,
+                )
+            }
+        }.onFailure { throwable ->
+            updateState {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    isSending = false,
+                    errorMessage = throwable.message ?: "チャットの更新に失敗しました",
+                )
+            }
+        }
+    }
+
+    override fun clear() {
+        pollJob?.cancel()
+        super.clear()
+    }
+
     private companion object {
-        private var nextMessageId = 1
-
-        private val initialRooms = listOf(
-            ChatRoom(
-                id = "operations",
-                title = "運営本部",
-                lastMessage = "巡回前に配置表を確認してください。",
-                unreadCount = 2
-            ),
-            ChatRoom(
-                id = "security",
-                title = "警備チーム",
-                lastMessage = "西ゲートの導線を調整しました。",
-                unreadCount = 0
-            ),
-            ChatRoom(
-                id = "reception",
-                title = "受付チーム",
-                lastMessage = "予備の名札を受付横に置きました。",
-                unreadCount = 1
-            )
-        )
-
-        private val initialMessages = listOf(
-            ChatMessage(
-                id = "operations-1",
-                roomId = "operations",
-                senderName = "運営本部",
-                body = "巡回前に配置表を確認してください。",
-                timeLabel = "09:10"
-            ),
-            ChatMessage(
-                id = "operations-2",
-                roomId = "operations",
-                senderName = "運営本部",
-                body = "変更点があればこのチャットで共有します。",
-                timeLabel = "09:12"
-            ),
-            ChatMessage(
-                id = "security-1",
-                roomId = "security",
-                senderName = "警備チーム",
-                body = "西ゲートの導線を調整しました。",
-                timeLabel = "08:55"
-            ),
-            ChatMessage(
-                id = "reception-1",
-                roomId = "reception",
-                senderName = "受付チーム",
-                body = "予備の名札を受付横に置きました。",
-                timeLabel = "08:40"
-            )
-        )
+        const val CURRENT_STAFF_ID = "tanaka"
+        var nextLocalMessageId = 1L
     }
 }

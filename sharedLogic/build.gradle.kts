@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.skie)
+    alias(libs.plugins.kotlinxRpc)
 }
 
 kotlin {
@@ -40,10 +41,20 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.koin.core)
             implementation(libs.kotlinx.coroutines.core)
+            api(libs.kotlinx.rpc.grpc.core)
+            api(libs.kotlinx.rpc.protobuf.core)
+            implementation(libs.kotlinx.rpc.grpc.client)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+        jvmMain.dependencies {
+            implementation(libs.grpc.netty)
+        }
     }
+}
+
+rpc {
+    protoc()
 }

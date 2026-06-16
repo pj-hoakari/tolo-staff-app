@@ -5,5 +5,9 @@ data class ContactChatUiState(
     val selectedRoomId: String? = null,
     val selectedRoomTitle: String? = null,
     val messages: List<ChatMessage> = emptyList(),
-    val draftText: String = ""
+    val draftText: String = "",
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val isSending: Boolean = false,
+    val errorMessage: String? = null
 )

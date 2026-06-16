@@ -14,7 +14,11 @@ final class ContactChatViewModelWrapper: ObservableObject {
             selectedRoomId: nil,
             selectedRoomTitle: nil,
             messages: [],
-            draftText: ""
+            draftText: "",
+            isLoading: true,
+            isRefreshing: false,
+            isSending: false,
+            errorMessage: nil
         )
 
         self.stateJob = viewModel.observeUiState { [weak self] state in

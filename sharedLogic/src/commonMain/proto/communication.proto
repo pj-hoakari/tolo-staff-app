@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.grpc";
+option java_outer_classname = "CommunicationProto";
+
+package communication;
+
+import "google/protobuf/empty.proto";
+
+message Thread {
+  string thread_id = 1;
+  repeated string member_staff_ids = 2;
+}
+
+message Point {
+  string point_id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message Instruction {
+  string instruction_id = 1;
+  repeated string point_ids = 2;
+  repeated string staff_ids = 3;
+  string title = 4;
+  string description = 5;
+  InstructionStatus status = 6;
+}
+
+enum InstructionStatus {
+  INSTRUCTION_STATUS_UNSPECIFIED = 0;
+  INSTRUCTION_STATUS_ACTIVE = 1;
+}
+
+message Report {
+  string report_id = 1;
+  string staff_id = 2;
+  string title = 3;
+  string description = 4;
+  ReportPriority priority = 5;
+}
+
+enum ReportPriority {
+  REPORT_PRIORITY_UNSPECIFIED = 0;
+  REPORT_PRIORITY_LOW = 1;
+  REPORT_PRIORITY_MEDIUM = 2;
+  REPORT_PRIORITY_HIGH = 3;
+  REPORT_PRIORITY_CRITICAL = 4;
+}
+
+message Message {
+  string message_id = 1;
+  string thread_id = 2;
+  string staff_id = 3;
+  oneof payload {
+    AssignMessagePayload assign = 4;
+    UnassignMessagePayload unassign = 5;
+    InstructionMessagePayload instruction = 6;
+    ReportMessagePayload report = 7;
+    SimpleMessagePayload simple = 8;
+  }
+}
+
+message AssignMessagePayload {}
+
+message UnassignMessagePayload {}
+
+message InstructionMessagePayload {
+  string instruction_id = 1;
+}
+
+message ReportMessagePayload {
+  string report_id = 1;
+}
+
+message SimpleMessagePayload {
+  string text = 1;
+  string reply_to = 2;
+}
+
+message ThreadIdRequest {
+  string thread_id = 1;
+}
+
+message StaffIdRequest {
+  string staff_id = 1;
+}
+
+message ListThreadsResponse {
+  repeated Thread threads = 1;
+}
+
+message CreateThreadRequest {
+  Thread thread = 1;
+}
+
+message UpdateThreadRequest {
+  Thread thread = 1;
+}
+
+message MessageIdRequest {
+  string message_id = 1;
+}
+
+message ListMessagesResponse {
+  repeated Message messages = 1;
+}
+
+message CreateMessageRequest {
+  Message message = 1;
+}
+
+message UpdateMessageRequest {
+  Message message = 1;
+}
+
+message InstructionIdRequest {
+  string instruction_id = 1;
+}
+
+message ListInstructionsResponse {
+  repeated Instruction instructions = 1;
+}
+
+message CreateInstructionRequest {
+  Instruction instruction = 1;
+}
+
+message UpdateInstructionRequest {
+  Instruction instruction = 1;
+}
+
+message ReportIdRequest {
+  string report_id = 1;
+}
+
+message ListReportsResponse {
+  repeated Report reports = 1;
+}
+
+message CreateReportRequest {
+  Report report = 1;
+}
+
+message UpdateReportRequest {
+  Report report = 1;
+}
+
+service ThreadRpc {
+  rpc ListThreads(google.protobuf.Empty) returns (ListThreadsResponse);
+  rpc GetThread(ThreadIdRequest) returns (Thread);
+  rpc ListThreadMessages(ThreadIdRequest) returns (ListMessagesResponse);
+  rpc CreateThread(CreateThreadRequest) returns (Thread);
+  rpc UpdateThread(UpdateThreadRequest) returns (Thread);
+  rpc DeleteThread(ThreadIdRequest) returns (google.protobuf.Empty);
+}
+
+service MessageRpc {
+  rpc ListMessages(google.protobuf.Empty) returns (ListMessagesResponse);
+  rpc GetMessage(MessageIdRequest) returns (Message);
+  rpc CreateMessage(CreateMessageRequest) returns (Message);
+  rpc UpdateMessage(UpdateMessageRequest) returns (Message);
+  rpc DeleteMessage(MessageIdRequest) returns (google.protobuf.Empty);
+}
+
+service InstructionRpc {
+  rpc ListInstructions(google.protobuf.Empty) returns (ListInstructionsResponse);
+  rpc GetInstruction(InstructionIdRequest) returns (Instruction);
+  rpc ListRelevantInstructions(StaffIdRequest) returns (ListInstructionsResponse);
+  rpc CreateInstruction(CreateInstructionRequest) returns (Instruction);
+  rpc UpdateInstruction(UpdateInstructionRequest) returns (Instruction);
+  rpc DeleteInstruction(InstructionIdRequest) returns (google.protobuf.Empty);
+}
+
+service ReportRpc {
+  rpc ListReports(google.protobuf.Empty) returns (ListReportsResponse);
+  rpc GetReport(ReportIdRequest) returns (Report);
+  rpc ListRelevantReports(StaffIdRequest) returns (ListReportsResponse);
+  rpc CreateReport(CreateReportRequest) returns (Report);
+  rpc UpdateReport(UpdateReportRequest) returns (Report);
+  rpc DeleteReport(ReportIdRequest) returns (google.protobuf.Empty);
+}

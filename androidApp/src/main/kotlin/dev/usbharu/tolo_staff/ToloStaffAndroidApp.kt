@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Summarize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -411,6 +412,16 @@ private fun ContactRoomList(
     state: ContactChatUiState,
     onRoomSelected: (String) -> Unit
 ) {
+    if (state.isLoading && state.rooms.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = 16.dp)
@@ -422,6 +433,28 @@ private fun ContactRoomList(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
             )
+        }
+
+        state.errorMessage?.let { errorMessage ->
+            item {
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        if (state.rooms.isEmpty()) {
+            item {
+                Text(
+                    text = "参加中のスレッドはありません",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)
+                )
+            }
         }
 
         items(state.rooms, key = { it.id }) { room ->
@@ -447,7 +480,7 @@ private fun ContactRoomList(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = room.lastMessage,
+                        text = room.lastMessage ?: "メッセージはまだありません",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -517,19 +550,51 @@ private fun ContactChatDetail(
             ContactMessageInput(
                 draftText = state.draftText,
                 onDraftChanged = onDraftChanged,
-                onSendClicked = onSendClicked
+                onSendClicked = onSendClicked,
+                isSending = state.isSending
             )
         }
     ) { chatPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(chatPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(state.messages, key = { it.id }) { message ->
-                MessageBubble(message = message)
+        if (state.isLoading && state.messages.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(chatPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(chatPadding),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                state.errorMessage?.let { errorMessage ->
+                    item {
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                if (state.messages.isEmpty()) {
+                    item {
+                        Text(
+                            text = "このスレッドにはまだメッセージがありません",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                items(state.messages, key = { it.id }) { message ->
+                    MessageBubble(message = message)
+                }
             }
         }
     }
@@ -557,7 +622,9 @@ private fun MessageBubble(message: ChatMessage) {
             )
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (message.isFromCurrentUser) {
+                color = if (message.isSystemEvent) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else if (message.isFromCurrentUser) {
                     MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.surfaceContainerHighest
@@ -567,18 +634,22 @@ private fun MessageBubble(message: ChatMessage) {
                     text = message.body,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (message.isFromCurrentUser) {
+                    color = if (message.isSystemEvent) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else if (message.isFromCurrentUser) {
                         MaterialTheme.colorScheme.onPrimary
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     }
                 )
             }
-            Text(
-                text = message.timeLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            message.timeLabel?.let { timeLabel ->
+                Text(
+                    text = timeLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -587,7 +658,8 @@ private fun MessageBubble(message: ChatMessage) {
 private fun ContactMessageInput(
     draftText: String,
     onDraftChanged: (String) -> Unit,
-    onSendClicked: () -> Unit
+    onSendClicked: () -> Unit,
+    isSending: Boolean
 ) {
     Surface(
         tonalElevation = 2.dp,
@@ -634,17 +706,25 @@ private fun ContactMessageInput(
             }
             FilledIconButton(
                 onClick = onSendClicked,
-                enabled = draftText.trim().isNotEmpty(),
+                enabled = draftText.trim().isNotEmpty() && !isSending,
                 modifier = Modifier
                     .size(48.dp)
                     .semantics {
                         contentDescription = "contact_chat_send_button"
                     }
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = null
-                )
+                if (isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null
+                    )
+                }
             }
         }
     }
