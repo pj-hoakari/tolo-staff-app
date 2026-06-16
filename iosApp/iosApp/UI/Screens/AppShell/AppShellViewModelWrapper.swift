@@ -9,10 +9,7 @@ final class AppShellViewModelWrapper: ObservableObject {
 
     init(viewModel: AppShellViewModel = KoinHelper().getAppShellViewModel()) {
         self.viewModel = viewModel
-        self.state = viewModel.uiState.value ?? AppShellUiState(
-            currentPlacementName: "東京会場",
-            selectedTab: AppTab.home
-        )
+        self.state = viewModel.uiState.value ?? AppShellUiState.mock()
 
         self.stateJob = viewModel.observeUiState { [weak self] state in
             guard let state else { return }

@@ -21,105 +21,102 @@ struct AppShellContentView: View {
     var onTabSelected: (AppTab) -> Void = { _ in }
 
     var body: some View {
+        if #available(iOS 26.1, *) {
+            appTabs
+                .tabViewBottomAccessory(isEnabled: state.selectedTab != AppTab.contacts) {
+                    PlacementBar(placementName: state.currentPlacementName)
+                }
+        } else if #available(iOS 26.0, *) {
+            appTabs
+                .tabViewBottomAccessory {
+                    if state.selectedTab != AppTab.contacts {
+                        PlacementBar(placementName: state.currentPlacementName)
+                    }
+                }
+        } else {
+            appTabs
+        }
+    }
+
+    private var appTabs: some View {
         TabView(
             selection: Binding(
                 get: { state.selectedTab },
                 set: { onTabSelected($0) }
             )
         ) {
-            tabPage(
-                tab: AppTab.home,
-                titleKey: "app_shell_home_title",
-                descriptionKey: "app_shell_home_description",
-                systemImage: "house.fill"
-            )
+            Tab("app_shell_tab_home", systemImage: "house.fill", value: AppTab.home) {
+                NavigationStack {
+                    HomeTabContentView(overview: state.homeOverview)
+                        .navigationTitle("app_shell_home_title")
+                }
+            }
 
-            tabPage(
-                tab: AppTab.instructions,
-                titleKey: "app_shell_instructions_title",
-                descriptionKey: "app_shell_instructions_description",
-                systemImage: "checklist"
-            )
+            Tab("app_shell_tab_instructions", systemImage: "checklist", value: AppTab.instructions) {
+                tabPage(
+                    tab: AppTab.instructions,
+                    titleKey: "app_shell_instructions_title",
+                    descriptionKey: "app_shell_instructions_description"
+                )
+            }
 
-            tabPage(
-                tab: AppTab.reports,
-                titleKey: "app_shell_reports_title",
-                descriptionKey: "app_shell_reports_description",
-                systemImage: "doc.text.fill"
-            )
+            Tab("app_shell_tab_reports", systemImage: "doc.text.fill", value: AppTab.reports) {
+                tabPage(
+                    tab: AppTab.reports,
+                    titleKey: "app_shell_reports_title",
+                    descriptionKey: "app_shell_reports_description"
+                )
+            }
 
-            tabPage(
-                tab: AppTab.contacts,
-                titleKey: "app_shell_contacts_title",
-                descriptionKey: "app_shell_contacts_description",
-                systemImage: "message.fill"
-            )
+            Tab("app_shell_tab_contacts", systemImage: "message.fill", value: AppTab.contacts) {
+                NavigationStack {
+                    ContactChatScreen()
+                }
+            }
         }
     }
 
     private func tabPage(
         tab: AppTab,
         titleKey: LocalizedStringKey,
-        descriptionKey: LocalizedStringKey,
-        systemImage: String
+        descriptionKey: LocalizedStringKey
     ) -> some View {
         NavigationStack {
             AppShellTabContentView(
-                placementName: state.currentPlacementName,
-                titleKey: titleKey,
                 descriptionKey: descriptionKey,
                 selectedTab: tab
             )
             .navigationTitle(titleKey)
         }
-        .tabItem {
-            Label(tab.labelKey, systemImage: systemImage)
-        }
-        .tag(tab)
     }
 }
 
 private struct AppShellTabContentView: View {
-    let placementName: String
-    let titleKey: LocalizedStringKey
     let descriptionKey: LocalizedStringKey
     let selectedTab: AppTab
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(titleKey)
-                    .font(.title)
-                    .fontWeight(.semibold)
-                    .accessibilityIdentifier(selectedTab.contentTitleIdentifier)
-
+        List {
+            Section {
                 Text(descriptionKey)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(selectedTab.contentTitleIdentifier)
             }
-
-            Spacer()
-            placementHeader
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
     }
+}
 
-    private var placementHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("app_shell_placement_header")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+struct PlacementBar: View {
+    let placementName: String
 
+    var body: some View {
+        LabeledContent("app_shell_placement_header") {
             Text(placementName)
-                .font(.title2)
                 .fontWeight(.semibold)
                 .accessibilityIdentifier("app_shell_placement_name")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(.bar)
     }
 }
 
@@ -157,9 +154,6 @@ private extension AppTab {
 
 #Preview {
     AppShellContentView(
-        state: AppShellUiState(
-            currentPlacementName: "東京会場",
-            selectedTab: AppTab.home
-        )
+        state: AppShellUiState.mock()
     )
 }
