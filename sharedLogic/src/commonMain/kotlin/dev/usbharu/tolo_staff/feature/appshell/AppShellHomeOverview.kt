@@ -2,9 +2,9 @@ package dev.usbharu.tolo_staff.feature.appshell
 
 data class AppShellHomeOverview(
     val eventName: String = "Tolo Staff Demo 2026",
-    val eventTime: String = "受付開始 09:00 / 開場 10:00",
-    val placementName: String = "物販会場",
-    val placementDetail: String = "西ホール 入口ゲート A",
-    val currentInstruction: String = "来場者導線を確保し、不明点はリーダーへ連絡してください。",
+    val eventTime: String = "Firestore Streaming Demo",
+    val placementName: String = "配置情報を読み込み中",
+    val placementDetail: String = "現在の配置情報はまだ共有されていません。",
+    val currentInstruction: String = "現在有効な指示はありません。",
     val mapState: AppShellMapState = AppShellMapState()
 )

@@ -1,6 +1,11 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
+import dev.usbharu.tolo_staff.streaming.AppShellOperationsProjection
+import dev.usbharu.tolo_staff.streaming.CurrentStaffProvider
+import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -9,29 +14,41 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppShellViewModelTest {
     @Test
-    fun `initial state shows Tokyo venue and home tab`() = runTest {
-        val viewModel = AppShellViewModel(UnconfinedTestDispatcher(testScheduler))
-
-        assertEquals("物販会場", viewModel.uiState.value.currentPlacementName)
-        assertEquals("Tolo Staff Demo 2026", viewModel.uiState.value.homeOverview.eventName)
-        assertEquals("物販会場", viewModel.uiState.value.homeOverview.placementName)
-        assertEquals("西ホール 入口ゲート A", viewModel.uiState.value.homeOverview.placementDetail)
-        assertEquals(
-            "来場者導線を確保し、不明点はリーダーへ連絡してください。",
-            viewModel.uiState.value.homeOverview.currentInstruction
+    fun `initial state reflects streamed overview`() = runTest {
+        val repository = FakeOperationsOverviewRepository(
+            AppShellOperationsProjection(
+                homeOverview = AppShellHomeOverview(
+                    eventName = "Tolo Staff Demo 2026",
+                    eventTime = "Firestore Streaming Demo",
+                    placementName = "Gate A",
+                    placementDetail = "North entrance",
+                    currentInstruction = "Shift update: Move barricades"
+                ),
+                currentPlacementName = "Gate A"
+            )
         )
-        assertEquals("東京ビッグサイト", viewModel.uiState.value.homeOverview.mapState.venueName)
-        assertEquals(35.6300, viewModel.uiState.value.homeOverview.mapState.latitude)
-        assertEquals(139.7946, viewModel.uiState.value.homeOverview.mapState.longitude)
-        assertEquals(0.01, viewModel.uiState.value.homeOverview.mapState.latitudeDelta)
-        assertEquals(0.01, viewModel.uiState.value.homeOverview.mapState.longitudeDelta)
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            currentStaffProvider = FixedCurrentStaffProviderForTest(),
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+        )
+
+        assertEquals("Gate A", viewModel.uiState.value.currentPlacementName)
+        assertEquals("Tolo Staff Demo 2026", viewModel.uiState.value.homeOverview.eventName)
+        assertEquals("North entrance", viewModel.uiState.value.homeOverview.placementDetail)
+        assertEquals("Shift update: Move barricades", viewModel.uiState.value.homeOverview.currentInstruction)
         assertEquals(AppTab.HOME, viewModel.uiState.value.selectedTab)
+        assertEquals(false, viewModel.uiState.value.isLoading)
         viewModel.clear()
     }
 
     @Test
     fun `tab selection updates selected tab`() = runTest {
-        val viewModel = AppShellViewModel(UnconfinedTestDispatcher(testScheduler))
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            currentStaffProvider = FixedCurrentStaffProviderForTest(),
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+        )
 
         listOf(
             AppTab.INSTRUCTIONS,
@@ -45,4 +62,19 @@ class AppShellViewModelTest {
 
         viewModel.clear()
     }
+}
+
+private class FakeOperationsOverviewRepository(
+    initialProjection: AppShellOperationsProjection = AppShellOperationsProjection(
+        homeOverview = AppShellHomeOverview(),
+        currentPlacementName = "未配属"
+    )
+) : OperationsOverviewRepository {
+    private val projectionFlow = MutableStateFlow(initialProjection)
+
+    override fun observeOverview(currentStaffId: String): Flow<AppShellOperationsProjection> = projectionFlow
+}
+
+private class FixedCurrentStaffProviderForTest : CurrentStaffProvider {
+    override val currentStaffId: String = "tanaka"
 }

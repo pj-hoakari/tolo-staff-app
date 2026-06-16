@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
+    alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.skie)
     alias(libs.plugins.kotlinxRpc)
 }
@@ -27,7 +28,7 @@ kotlin {
        minSdk = libs.versions.android.minSdk.get().toInt()
     
        compilerOptions {
-           jvmTarget = JvmTarget.JVM_11
+           jvmTarget = JvmTarget.JVM_17
        }
        androidResources {
            enable = true
@@ -38,9 +39,15 @@ kotlin {
     }
     
     sourceSets {
+        androidMain.dependencies {
+            implementation(libs.firebase.android.common)
+            implementation(libs.firebase.android.firestore)
+        }
         commonMain.dependencies {
             implementation(libs.koin.core)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.gitlive.firebase.firestore)
             api(libs.kotlinx.rpc.grpc.core)
             api(libs.kotlinx.rpc.protobuf.core)
             implementation(libs.kotlinx.rpc.grpc.client)

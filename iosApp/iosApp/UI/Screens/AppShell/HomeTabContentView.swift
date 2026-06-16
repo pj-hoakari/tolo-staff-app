@@ -4,10 +4,26 @@ import SharedLogic
 
 struct HomeTabContentView: View {
     let overview: AppShellHomeOverview
+    var isLoading: Bool = false
+    var errorMessage: String? = nil
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("app_shell_home_loading")
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("app_shell_home_error")
+                }
+
                 HomeTextCard(
                     titleKey: "app_shell_home_event_card_title",
                     systemImage: "calendar",

@@ -47,7 +47,11 @@ struct AppShellContentView: View {
         ) {
             Tab("app_shell_tab_home", systemImage: "house.fill", value: AppTab.home) {
                 NavigationStack {
-                    HomeTabContentView(overview: state.homeOverview)
+                    HomeTabContentView(
+                        overview: state.homeOverview,
+                        isLoading: state.isLoading,
+                        errorMessage: state.errorMessage
+                    )
                         .navigationTitle("app_shell_home_title")
                 }
             }
@@ -131,8 +135,6 @@ private extension AppTab {
             return "app_shell_tab_reports"
         case .contacts:
             return "app_shell_tab_contacts"
-        default:
-            return "app_shell_tab_home"
         }
     }
 
@@ -146,8 +148,6 @@ private extension AppTab {
             return "app_shell_content_reports_title"
         case .contacts:
             return "app_shell_content_contacts_title"
-        default:
-            return "app_shell_content_home_title"
         }
     }
 }
