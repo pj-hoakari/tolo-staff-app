@@ -153,8 +153,20 @@ struct ContactChatContentView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .foregroundStyle(message.isFromCurrentUser ? .white : .primary)
-                    .background(message.isFromCurrentUser ? Color.accentColor : Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                message.isFromCurrentUser
+                                    ? AnyShapeStyle(Color.accentColor)
+                                    : AnyShapeStyle(Color.blue.opacity(0.12))
+                            )
+                            .overlay {
+                                if !message.isFromCurrentUser {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(Color.blue.opacity(0.18), lineWidth: 1)
+                                }
+                            }
+                    }
 
                 Text(message.timeLabel)
                     .font(.caption)
