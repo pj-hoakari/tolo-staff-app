@@ -32,9 +32,7 @@ extension AppShellUiState {
         return AppShellUiState(
             homeOverview: overview,
             currentPlacementName: overview.placementName,
-            selectedTab: selectedTab,
-            isLoading: false,
-            errorMessage: nil
+            selectedTab: selectedTab
         )
     }
 }

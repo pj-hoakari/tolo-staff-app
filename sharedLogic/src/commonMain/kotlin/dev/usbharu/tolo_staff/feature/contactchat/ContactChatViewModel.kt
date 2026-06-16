@@ -3,24 +3,23 @@ package dev.usbharu.tolo_staff.feature.contactchat
 import dev.usbharu.tolo_staff.viewmodel.StateEffectViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
 class ContactChatViewModel(
-    private val service: ContactChatService,
+    private val service: ContactChatService = GrpcContactChatService(),
     coroutineContext: CoroutineContext = Dispatchers.Default,
+    private val pollIntervalMillis: Long = 5_000L,
 ) : StateEffectViewModel<ContactChatUiState, Unit>(
     initialState = ContactChatUiState(isLoading = true),
     coroutineContext = coroutineContext
 ) {
-    private var roomsJob: Job? = null
-    private var selectedRoomJob: Job? = null
+    private var pollJob: Job? = null
 
     init {
-        observeRooms()
+        loadInitialState()
+        startPolling()
     }
 
     fun onRoomSelected(roomId: String) {
@@ -34,7 +33,7 @@ class ContactChatViewModel(
                 isLoading = true,
             )
         }
-        observeSelectedRoom(room.id)
+        refreshSelectedRoom()
     }
 
     fun onBackToRooms() {
@@ -48,7 +47,6 @@ class ContactChatViewModel(
                 isLoading = false,
             )
         }
-        selectedRoomJob?.cancel()
     }
 
     fun onDraftChanged(text: String) {
@@ -86,7 +84,7 @@ class ContactChatViewModel(
         viewModelScope.launch {
             runCatching {
                 service.sendSimpleMessage(roomId, CURRENT_STAFF_ID, text)
-                updateState { it.copy(isSending = false, errorMessage = null) }
+                refreshAll(isRefreshing = false)
             }.onFailure { throwable ->
                 updateState { state ->
                     state.copy(
@@ -99,45 +97,27 @@ class ContactChatViewModel(
         }
     }
 
-    private fun observeRooms() {
-        roomsJob?.cancel()
-        roomsJob = service.observeRooms(CURRENT_STAFF_ID)
-            .onEach { rooms ->
-                val selectedRoomId = currentState.selectedRoomId?.takeIf { roomId ->
-                    rooms.any { it.id == roomId }
-                }
-                updateState {
-                    it.copy(
-                        rooms = rooms,
-                        selectedRoomId = selectedRoomId,
-                        selectedRoomTitle = rooms.firstOrNull { room -> room.id == selectedRoomId }?.title,
-                        messages = if (selectedRoomId == null) emptyList() else it.messages,
-                        isLoading = selectedRoomId != null && it.messages.isEmpty(),
-                        isRefreshing = false,
-                        errorMessage = null,
-                    )
-                }
-                if (selectedRoomId == null) {
-                    selectedRoomJob?.cancel()
-                    updateState { it.copy(messages = emptyList(), isLoading = false) }
-                }
-            }
-            .catch { throwable ->
-                updateState {
-                    it.copy(
-                        isLoading = false,
-                        isRefreshing = false,
-                        errorMessage = throwable.message ?: "チャット一覧の購読に失敗しました",
-                    )
-                }
-            }
-            .launchIn(viewModelScope)
+    private fun loadInitialState() {
+        viewModelScope.launch {
+            refreshAll(showLoading = true)
+        }
     }
 
-    private fun observeSelectedRoom(roomId: String) {
-        selectedRoomJob?.cancel()
-        selectedRoomJob = service.observeMessages(roomId, CURRENT_STAFF_ID)
-            .onEach { messages ->
+    private fun startPolling() {
+        pollJob?.cancel()
+        pollJob = viewModelScope.launch {
+            while (true) {
+                delay(pollIntervalMillis)
+                refreshAll(isRefreshing = true)
+            }
+        }
+    }
+
+    private fun refreshSelectedRoom() {
+        val roomId = currentState.selectedRoomId ?: return
+        viewModelScope.launch {
+            runCatching {
+                val messages = service.listMessages(roomId, CURRENT_STAFF_ID)
                 updateState {
                     it.copy(
                         isLoading = false,
@@ -147,8 +127,7 @@ class ContactChatViewModel(
                         messages = messages,
                     )
                 }
-            }
-            .catch { throwable ->
+            }.onFailure { throwable ->
                 updateState {
                     it.copy(
                         isLoading = false,
@@ -158,12 +137,58 @@ class ContactChatViewModel(
                     )
                 }
             }
-            .launchIn(viewModelScope)
+        }
+    }
+
+    private suspend fun refreshAll(
+        showLoading: Boolean = false,
+        isRefreshing: Boolean = false,
+    ) {
+        updateState {
+            it.copy(
+                isLoading = showLoading,
+                isRefreshing = isRefreshing,
+                errorMessage = null,
+            )
+        }
+
+        runCatching {
+            val rooms = service.listRooms(CURRENT_STAFF_ID)
+            val selectedRoomId = currentState.selectedRoomId?.takeIf { roomId ->
+                rooms.any { it.id == roomId }
+            }
+            val messages = if (selectedRoomId != null) {
+                service.listMessages(selectedRoomId, CURRENT_STAFF_ID)
+            } else {
+                emptyList()
+            }
+
+            updateState {
+                it.copy(
+                    rooms = rooms,
+                    selectedRoomId = selectedRoomId,
+                    selectedRoomTitle = rooms.firstOrNull { room -> room.id == selectedRoomId }?.title,
+                    messages = messages,
+                    isLoading = false,
+                    isRefreshing = false,
+                    isSending = false,
+                    errorMessage = null,
+                )
+            }
+        }.onFailure { throwable ->
+            updateState {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    isSending = false,
+                    errorMessage = throwable.message ?: "チャットの更新に失敗しました",
+                )
+            }
+        }
     }
 
     override fun clear() {
-        roomsJob?.cancel()
-        selectedRoomJob?.cancel()
+        pollJob?.cancel()
         super.clear()
     }
 

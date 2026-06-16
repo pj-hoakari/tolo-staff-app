@@ -15,7 +15,7 @@ kotlin {
        minSdk = libs.versions.android.minSdk.get().toInt()
     
        compilerOptions {
-           jvmTarget = JvmTarget.JVM_17
+           jvmTarget = JvmTarget.JVM_11
        }
        androidResources {
            enable = true
