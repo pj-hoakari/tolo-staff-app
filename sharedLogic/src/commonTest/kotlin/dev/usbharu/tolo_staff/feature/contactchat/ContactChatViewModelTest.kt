@@ -1,6 +1,9 @@
 package dev.usbharu.tolo_staff.feature.contactchat
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -14,7 +17,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ContactChatViewModelTest {
     @Test
-    fun `initial load shows rooms from service`() = runTest {
+    fun `initial load shows streamed rooms from service`() = runTest {
         val service = FakeContactChatService(
             rooms = listOf(ChatRoom(id = "thread-1", title = "sato", lastMessage = "hello"))
         )
@@ -30,22 +33,10 @@ class ContactChatViewModelTest {
     }
 
     @Test
-    fun `initial load supports empty state`() = runTest {
-        val viewModel = createViewModel(FakeContactChatService(), StandardTestDispatcher(testScheduler))
-        advanceUntilIdle()
-
-        assertFalse(viewModel.uiState.value.isLoading)
-        assertTrue(viewModel.uiState.value.rooms.isEmpty())
-        assertNull(viewModel.uiState.value.selectedRoomId)
-
-        viewModel.clear()
-    }
-
-    @Test
-    fun `room selection loads messages`() = runTest {
+    fun `room selection subscribes to room messages`() = runTest {
         val service = FakeContactChatService(
             rooms = listOf(ChatRoom(id = "thread-1", title = "sato")),
-            messagesByRoom = mutableMapOf(
+            initialMessagesByRoom = mutableMapOf(
                 "thread-1" to listOf(
                     ChatMessage(
                         id = "m-1",
@@ -66,6 +57,18 @@ class ContactChatViewModelTest {
         assertEquals("sato", viewModel.uiState.value.selectedRoomTitle)
         assertEquals(1, viewModel.uiState.value.messages.size)
 
+        service.messagesByRoom["thread-1"] = listOf(
+            ChatMessage(
+                id = "m-2",
+                roomId = "thread-1",
+                senderName = "sato",
+                body = "更新されました"
+            )
+        )
+        service.emitMessages()
+        advanceUntilIdle()
+
+        assertEquals("m-2", viewModel.uiState.value.messages.single().id)
         viewModel.clear()
     }
 
@@ -93,7 +96,7 @@ class ContactChatViewModelTest {
     fun `send adds optimistic message then reconciles on success`() = runTest {
         val service = FakeContactChatService(
             rooms = listOf(ChatRoom(id = "thread-1", title = "sato")),
-            messagesByRoom = mutableMapOf("thread-1" to emptyList())
+            initialMessagesByRoom = mutableMapOf("thread-1" to emptyList())
         )
 
         val viewModel = createViewModel(service, StandardTestDispatcher(testScheduler))
@@ -130,7 +133,7 @@ class ContactChatViewModelTest {
     fun `send rolls back optimistic message on failure`() = runTest {
         val service = FakeContactChatService(
             rooms = listOf(ChatRoom(id = "thread-1", title = "sato")),
-            messagesByRoom = mutableMapOf("thread-1" to emptyList()),
+            initialMessagesByRoom = mutableMapOf("thread-1" to emptyList()),
             sendShouldFail = true
         )
 
@@ -150,20 +153,10 @@ class ContactChatViewModelTest {
     }
 
     @Test
-    fun `non simple payloads stay as system events`() = runTest {
+    fun `room stream removal clears selected room`() = runTest {
         val service = FakeContactChatService(
             rooms = listOf(ChatRoom(id = "thread-1", title = "sato")),
-            messagesByRoom = mutableMapOf(
-                "thread-1" to listOf(
-                    ChatMessage(
-                        id = "event-1",
-                        roomId = "thread-1",
-                        senderName = "system",
-                        body = "指示が共有されました: inst-1",
-                        isSystemEvent = true
-                    )
-                )
-            )
+            initialMessagesByRoom = mutableMapOf("thread-1" to emptyList())
         )
 
         val viewModel = createViewModel(service, StandardTestDispatcher(testScheduler))
@@ -171,8 +164,11 @@ class ContactChatViewModelTest {
         viewModel.onRoomSelected("thread-1")
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.messages.single().isSystemEvent)
+        service.roomsFlow.value = emptyList()
+        advanceUntilIdle()
 
+        assertNull(viewModel.uiState.value.selectedRoomId)
+        assertTrue(viewModel.uiState.value.messages.isEmpty())
         viewModel.clear()
     }
 
@@ -183,22 +179,25 @@ class ContactChatViewModelTest {
         return ContactChatViewModel(
             service = service,
             coroutineContext = dispatcher,
-            pollIntervalMillis = 60_000L
         )
     }
 }
 
 private class FakeContactChatService(
-    private var rooms: List<ChatRoom> = emptyList(),
-    private val messagesByRoom: MutableMap<String, List<ChatMessage>> = mutableMapOf(),
+    rooms: List<ChatRoom> = emptyList(),
+    initialMessagesByRoom: MutableMap<String, List<ChatMessage>> = mutableMapOf(),
     private val sendShouldFail: Boolean = false,
 ) : ContactChatService {
+    val roomsFlow = MutableStateFlow(rooms)
+    val messagesByRoom = initialMessagesByRoom
+    private val messagesFlow = MutableStateFlow(initialMessagesByRoom.toMap())
+
     var afterSendMessages: List<ChatMessage>? = null
 
-    override suspend fun listRooms(currentStaffId: String): List<ChatRoom> = rooms
+    override fun observeRooms(currentStaffId: String): Flow<List<ChatRoom>> = roomsFlow
 
-    override suspend fun listMessages(roomId: String, currentStaffId: String): List<ChatMessage> {
-        return messagesByRoom[roomId].orEmpty()
+    override fun observeMessages(roomId: String, currentStaffId: String): Flow<List<ChatMessage>> {
+        return messagesFlow.map { it[roomId].orEmpty() }
     }
 
     override suspend fun sendSimpleMessage(roomId: String, currentStaffId: String, text: String) {
@@ -216,8 +215,13 @@ private class FakeContactChatService(
             )
         )
         messagesByRoom[roomId] = serverMessages
-        rooms = rooms.map { room ->
+        messagesFlow.value = messagesByRoom.toMap()
+        roomsFlow.value = roomsFlow.value.map { room ->
             if (room.id == roomId) room.copy(lastMessage = text) else room
         }
+    }
+
+    fun emitMessages() {
+        messagesFlow.value = messagesByRoom.toMap()
     }
 }

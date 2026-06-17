@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.usbharu.tolo_staff.di.KoinHelper
 import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
@@ -68,8 +69,8 @@ import dev.usbharu.tolo_staff.feature.contactchat.ContactChatViewModel
 
 @Composable
 fun ToloStaffAndroidApp(
-    viewModel: AppShellViewModel = remember { AppShellViewModel() },
-    contactChatViewModel: ContactChatViewModel = remember { ContactChatViewModel() }
+    viewModel: AppShellViewModel = remember { KoinHelper().getAppShellViewModel() },
+    contactChatViewModel: ContactChatViewModel = remember { KoinHelper().getContactChatViewModel() }
 ) {
     val state by viewModel.uiState.collectAsState()
     val contactChatState by contactChatViewModel.uiState.collectAsState()
