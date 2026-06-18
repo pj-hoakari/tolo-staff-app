@@ -6,7 +6,6 @@ struct InstructionsTabRootView: View {
     var onInstructionSelected: (String) -> Void = { _ in }
     var onThreadOpened: () -> Void = {}
     var onDetailClosed: () -> Void = {}
-    var onThreadClosed: () -> Void = {}
     var onStatusUpdated: (InstructionProgressStatus) -> Void = { _ in }
 
     var body: some View {
@@ -34,20 +33,6 @@ struct InstructionsTabRootView: View {
                     )
                     .navigationTitle("指示詳細")
                     .navigationBarTitleDisplayMode(.inline)
-                    .navigationDestination(
-                        isPresented: Binding(
-                            get: { state.isShowingThread },
-                            set: { isPresented in
-                                if !isPresented {
-                                    onThreadClosed()
-                                }
-                            }
-                        )
-                    ) {
-                        InstructionThreadView(instruction: selectedInstruction)
-                            .navigationTitle("指示スレッド")
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
                 }
             }
         }
@@ -178,21 +163,5 @@ private struct InstructionDetailView: View {
         }
         .buttonStyle(.bordered)
         .frame(maxWidth: .infinity)
-    }
-}
-
-private struct InstructionThreadView: View {
-    let instruction: InstructionDetailUiModel
-
-    var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(instruction.thread, id: \.id) { message in
-                    ThreadMessageBubble(message: message)
-                }
-            }
-            .padding()
-        }
-        .accessibilityIdentifier("instruction_thread")
     }
 }

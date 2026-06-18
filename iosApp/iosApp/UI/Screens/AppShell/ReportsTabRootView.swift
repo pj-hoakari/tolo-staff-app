@@ -2,6 +2,12 @@ import SwiftUI
 import SharedLogic
 
 struct ReportsTabRootView: View {
+    private enum ReportRoute: Hashable {
+        case draft
+        case placeSelection
+        case thread
+    }
+
     let state: ReportsTabUiState
     var onTypeSelected: (String) -> Void = { _ in }
     var onCommentChanged: (String) -> Void = { _ in }
@@ -14,51 +20,50 @@ struct ReportsTabRootView: View {
     var onBack: () -> Void = {}
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: navigationPath) {
             reportTypeSelection
                 .navigationTitle("app_shell_reports_title")
-                .navigationDestination(
-                    isPresented: Binding(
-                        get: { state.step != .typeSelection },
-                        set: { isPresented in
-                            if !isPresented {
-                                onBack()
-                            }
-                        }
-                    )
-                ) {
-                    reportDraftInput
-                        .navigationTitle("報告内容入力")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .navigationDestination(
-                            isPresented: Binding(
-                                get: { state.step == .placeSelection || state.step == .thread },
-                                set: { isPresented in
-                                    if !isPresented {
-                                        onBack()
-                                    }
-                                }
-                            )
-                        ) {
-                            reportPlaceSelection
-                                .navigationTitle("対象場所")
-                                .navigationBarTitleDisplayMode(.inline)
-                                .navigationDestination(
-                                    isPresented: Binding(
-                                        get: { state.step == .thread },
-                                        set: { isPresented in
-                                            if !isPresented {
-                                                onBack()
-                                            }
-                                        }
-                                    )
-                                ) {
-                                    reportThread
-                                        .navigationTitle("報告スレッド")
-                                        .navigationBarTitleDisplayMode(.inline)
-                                }
-                        }
+                .navigationDestination(for: ReportRoute.self) { route in
+                    switch route {
+                    case .draft:
+                        reportDraftInput
+                            .navigationTitle("報告内容入力")
+                            .navigationBarTitleDisplayMode(.inline)
+                    case .placeSelection:
+                        reportPlaceSelection
+                            .navigationTitle("対象場所")
+                            .navigationBarTitleDisplayMode(.inline)
+                    case .thread:
+                        reportThread
+                            .navigationTitle("報告スレッド")
+                            .navigationBarTitleDisplayMode(.inline)
+                    }
                 }
+        }
+    }
+
+    private var navigationPath: Binding<[ReportRoute]> {
+        Binding(
+            get: { navigationRoutes },
+            set: { newValue in
+                guard newValue.count < navigationRoutes.count else { return }
+                for _ in 0..<(navigationRoutes.count - newValue.count) {
+                    onBack()
+                }
+            }
+        )
+    }
+
+    private var navigationRoutes: [ReportRoute] {
+        switch state.step {
+        case .typeSelection:
+            []
+        case .draftInput:
+            [.draft]
+        case .placeSelection:
+            [.draft, .placeSelection]
+        case .thread:
+            [.draft, .placeSelection, .thread]
         }
     }
 

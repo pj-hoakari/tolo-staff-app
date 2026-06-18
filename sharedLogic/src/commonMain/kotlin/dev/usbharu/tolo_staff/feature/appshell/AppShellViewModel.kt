@@ -86,9 +86,30 @@ class AppShellViewModel(
     }
 
     fun onInstructionThreadOpened() {
-        updateState {
-            it.copy(
-                instructionsTab = it.instructionsTab.copy(isShowingThread = true)
+        val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
+        val threadSummary = contactSummaryForInstruction(selectedInstruction)
+        val threadDetail = contactDetailFor(threadSummary)
+        updateState { state ->
+            state.copy(
+                selectedTab = AppTab.CONTACTS,
+                instructionsTab = state.instructionsTab.copy(isShowingThread = false),
+                homeOverview = state.homeOverview.copy(unreadContactCount = 0),
+                contactsTab = state.contactsTab.copy(
+                    selectedThread = threadDetail,
+                    isChoosingTargetType = false,
+                    selectedTargetType = null,
+                    shouldReturnToInstructionOnBack = true,
+                    threads = mergeContactSummary(
+                        current = state.contactsTab.threads,
+                        threadId = threadSummary.id,
+                        title = threadSummary.title,
+                        target = threadSummary.target,
+                        preview = threadSummary.lastMessagePreview,
+                        isFormerAssignment = threadSummary.isFormerAssignment,
+                    ).map { summary ->
+                        if (summary.id == threadSummary.id) summary.copy(unreadCount = 0) else summary
+                    }
+                )
             )
         }
     }
@@ -100,14 +121,6 @@ class AppShellViewModel(
                     selectedInstruction = null,
                     isShowingThread = false,
                 )
-            )
-        }
-    }
-
-    fun onInstructionThreadClosed() {
-        updateState {
-            it.copy(
-                instructionsTab = it.instructionsTab.copy(isShowingThread = false)
             )
         }
     }
@@ -286,6 +299,7 @@ class AppShellViewModel(
                     selectedThread = contactDetailFor(summary),
                     isChoosingTargetType = false,
                     selectedTargetType = null,
+                    shouldReturnToInstructionOnBack = false,
                     threads = it.contactsTab.threads.map { thread ->
                         if (thread.id == threadId) thread.copy(unreadCount = 0) else thread
                     }
@@ -295,12 +309,15 @@ class AppShellViewModel(
     }
 
     fun onContactBackToList() {
-        updateState {
-            it.copy(
-                contactsTab = it.contactsTab.copy(
+        updateState { state ->
+            val shouldReturnToInstruction = state.contactsTab.shouldReturnToInstructionOnBack
+            state.copy(
+                selectedTab = if (shouldReturnToInstruction) AppTab.INSTRUCTIONS else state.selectedTab,
+                contactsTab = state.contactsTab.copy(
                     selectedThread = null,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
+                    shouldReturnToInstructionOnBack = false,
                 )
             )
         }
@@ -313,6 +330,7 @@ class AppShellViewModel(
                     selectedThread = null,
                     isChoosingTargetType = true,
                     selectedTargetType = null,
+                    shouldReturnToInstructionOnBack = false,
                 )
             )
         }
@@ -336,6 +354,7 @@ class AppShellViewModel(
             it.copy(
                 contactsTab = it.contactsTab.copy(
                     isChoosingTargetType = false,
+                    shouldReturnToInstructionOnBack = false,
                     selectedThread = ContactThreadDetailUiModel(
                         id = "draft-${target.id}",
                         title = target.displayName,
@@ -461,6 +480,23 @@ class AppShellViewModel(
                 )
             }
         )
+
+    private fun contactSummaryForInstruction(
+        instruction: InstructionDetailUiModel
+    ): ContactThreadSummaryUiModel {
+        val existingThread = currentState.contactsTab.threads.firstOrNull { summary ->
+            summary.target.id == instruction.target.id
+        }
+        if (existingThread != null) {
+            return existingThread
+        }
+        return ContactThreadSummaryUiModel(
+            id = "instruction-thread-${instruction.target.id}",
+            title = instruction.target.displayName,
+            target = instruction.target,
+            lastMessagePreview = instruction.body,
+        )
+    }
 
     private companion object {
         fun initialInstructionsState(): InstructionsTabUiState {

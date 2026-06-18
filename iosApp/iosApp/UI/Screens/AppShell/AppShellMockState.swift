@@ -86,7 +86,8 @@ extension AppShellUiState {
                 availableTargets: [],
                 selectedTargetType: nil,
                 isChoosingTargetType: false,
-                formerAssignments: []
+                formerAssignments: [],
+                shouldReturnToInstructionOnBack: false
             ),
             isLoading: false,
             errorMessage: nil

@@ -39,10 +39,6 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onInstructionDetailClosed()
     }
 
-    func onInstructionThreadClosed() {
-        viewModel.onInstructionThreadClosed()
-    }
-
     func onInstructionStatusUpdated(_ status: InstructionProgressStatus) {
         viewModel.onInstructionStatusUpdated(status: status)
     }

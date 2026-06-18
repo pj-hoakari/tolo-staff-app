@@ -85,6 +85,41 @@ class AppShellViewModelTest {
     }
 
     @Test
+    fun `opening instruction thread switches to contacts tab with linked thread selected`() = runTest {
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            currentStaffProvider = FixedCurrentStaffProviderForTest(),
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+        )
+
+        viewModel.onInstructionSelected("instruction-gate-a")
+        viewModel.onInstructionThreadOpened()
+
+        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
+        assertEquals("contact-gate-a", viewModel.uiState.value.contactsTab.selectedThread?.id)
+        assertEquals(false, viewModel.uiState.value.instructionsTab.isShowingThread)
+        viewModel.clear()
+    }
+
+    @Test
+    fun `closing contact thread opened from instruction returns to instruction tab`() = runTest {
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            currentStaffProvider = FixedCurrentStaffProviderForTest(),
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+        )
+
+        viewModel.onInstructionSelected("instruction-gate-a")
+        viewModel.onInstructionThreadOpened()
+        viewModel.onContactBackToList()
+
+        assertEquals(AppTab.INSTRUCTIONS, viewModel.uiState.value.selectedTab)
+        assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.selectedInstruction?.id)
+        assertEquals(null, viewModel.uiState.value.contactsTab.selectedThread)
+        viewModel.clear()
+    }
+
+    @Test
     fun `report flow advances to submitted thread`() = runTest {
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),

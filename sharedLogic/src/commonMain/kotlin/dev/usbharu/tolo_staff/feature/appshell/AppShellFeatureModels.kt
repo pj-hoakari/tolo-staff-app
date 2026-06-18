@@ -140,4 +140,5 @@ data class ContactsTabUiState(
     val selectedTargetType: ContactTargetType? = null,
     val isChoosingTargetType: Boolean = false,
     val formerAssignments: List<FormerAssignmentUiModel> = emptyList(),
+    val shouldReturnToInstructionOnBack: Boolean = false,
 )

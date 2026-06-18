@@ -18,7 +18,6 @@ struct AppShellScreen: View {
             onInstructionSelected: wrapper.onInstructionSelected,
             onInstructionThreadOpened: wrapper.onInstructionThreadOpened,
             onInstructionDetailClosed: wrapper.onInstructionDetailClosed,
-            onInstructionThreadClosed: wrapper.onInstructionThreadClosed,
             onInstructionStatusUpdated: wrapper.onInstructionStatusUpdated,
             onReportTypeSelected: wrapper.onReportTypeSelected,
             onReportCommentChanged: wrapper.onReportCommentChanged,
@@ -49,7 +48,6 @@ struct AppShellContentView: View {
     var onInstructionSelected: (String) -> Void = { _ in }
     var onInstructionThreadOpened: () -> Void = {}
     var onInstructionDetailClosed: () -> Void = {}
-    var onInstructionThreadClosed: () -> Void = {}
     var onInstructionStatusUpdated: (InstructionProgressStatus) -> Void = { _ in }
     var onReportTypeSelected: (String) -> Void = { _ in }
     var onReportCommentChanged: (String) -> Void = { _ in }
@@ -112,7 +110,6 @@ struct AppShellContentView: View {
                     onInstructionSelected: onInstructionSelected,
                     onThreadOpened: onInstructionThreadOpened,
                     onDetailClosed: onInstructionDetailClosed,
-                    onThreadClosed: onInstructionThreadClosed,
                     onStatusUpdated: onInstructionStatusUpdated
                 )
             }
