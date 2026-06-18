@@ -11,6 +11,8 @@ interface OperationsStreamDataSource {
 
     fun observeInstructions(): Flow<List<OperationInstruction>>
 
+    fun observeRelevantInstructions(currentStaffId: String): Flow<List<OperationInstruction>> = observeInstructions()
+
     fun observeThreads(): Flow<List<OperationThread>>
 
     fun observeMessages(): Flow<List<OperationMessage>>

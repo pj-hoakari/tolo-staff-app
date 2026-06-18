@@ -22,7 +22,7 @@ class OperationsOverviewRepositoryImpl(
         return combine(
             dataSource.observePoints(),
             dataSource.observeAssignments(),
-            dataSource.observeInstructions(),
+            dataSource.observeRelevantInstructions(currentStaffId),
         ) { points, assignments, instructions ->
             buildProjection(
                 currentStaffId = currentStaffId,

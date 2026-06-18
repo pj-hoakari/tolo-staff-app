@@ -13,6 +13,30 @@ final class SampleViewTests: XCTestCase {
         XCTAssertNotNil(view)
     }
 
+    func testInstructionsTabCanBeCreated() {
+        let state = AppShellUiState.mock(selectedTab: AppTab.instructions)
+
+        let view = AppShellContentView(state: state)
+
+        XCTAssertNotNil(view)
+    }
+
+    func testReportsTabCanBeCreated() {
+        let state = AppShellUiState.mock(selectedTab: AppTab.reports)
+
+        let view = AppShellContentView(state: state)
+
+        XCTAssertNotNil(view)
+    }
+
+    func testContactsTabCanBeCreated() {
+        let state = AppShellUiState.mock(selectedTab: AppTab.contacts)
+
+        let view = AppShellContentView(state: state)
+
+        XCTAssertNotNil(view)
+    }
+
     func disabled_testAppShellContentSnapshotSmoke() {
         let state = AppShellUiState.mock(selectedTab: AppTab.home)
 

@@ -11,7 +11,31 @@ struct AppShellScreen: View {
     var body: some View {
         AppShellContentView(
             state: wrapper.state,
-            onTabSelected: { wrapper.onTabSelected($0) }
+            onTabSelected: wrapper.onTabSelected,
+            onHomeInstructionSelected: wrapper.onHomeInstructionSelected,
+            onOpenReportFromHome: { wrapper.onTabSelected(.reports) },
+            onOpenContactsFromHome: { wrapper.onTabSelected(.contacts) },
+            onInstructionSelected: wrapper.onInstructionSelected,
+            onInstructionThreadOpened: wrapper.onInstructionThreadOpened,
+            onInstructionDetailClosed: wrapper.onInstructionDetailClosed,
+            onInstructionThreadClosed: wrapper.onInstructionThreadClosed,
+            onInstructionStatusUpdated: wrapper.onInstructionStatusUpdated,
+            onReportTypeSelected: wrapper.onReportTypeSelected,
+            onReportCommentChanged: wrapper.onReportCommentChanged,
+            onReportUrgencySelected: wrapper.onReportUrgencySelected,
+            onReportImageToggleChanged: wrapper.onReportImageToggleChanged,
+            onReportLocationToggleChanged: wrapper.onReportLocationToggleChanged,
+            onReportContinueToPlaceSelection: wrapper.onReportContinueToPlaceSelection,
+            onReportPlaceSelected: wrapper.onReportPlaceSelected,
+            onReportSubmitted: wrapper.onReportSubmitted,
+            onReportBack: wrapper.onReportBack,
+            onContactThreadSelected: wrapper.onContactThreadSelected,
+            onContactBackToList: wrapper.onContactBackToList,
+            onContactNewThreadStarted: wrapper.onContactNewThreadStarted,
+            onContactTargetTypeSelected: wrapper.onContactTargetTypeSelected,
+            onContactTargetSelected: wrapper.onContactTargetSelected,
+            onContactDraftChanged: wrapper.onContactDraftChanged,
+            onContactSendClicked: wrapper.onContactSendClicked
         )
     }
 }
@@ -19,26 +43,50 @@ struct AppShellScreen: View {
 struct AppShellContentView: View {
     let state: AppShellUiState
     var onTabSelected: (AppTab) -> Void = { _ in }
+    var onHomeInstructionSelected: () -> Void = {}
+    var onOpenReportFromHome: () -> Void = {}
+    var onOpenContactsFromHome: () -> Void = {}
+    var onInstructionSelected: (String) -> Void = { _ in }
+    var onInstructionThreadOpened: () -> Void = {}
+    var onInstructionDetailClosed: () -> Void = {}
+    var onInstructionThreadClosed: () -> Void = {}
+    var onInstructionStatusUpdated: (InstructionProgressStatus) -> Void = { _ in }
+    var onReportTypeSelected: (String) -> Void = { _ in }
+    var onReportCommentChanged: (String) -> Void = { _ in }
+    var onReportUrgencySelected: (String) -> Void = { _ in }
+    var onReportImageToggleChanged: (Bool) -> Void = { _ in }
+    var onReportLocationToggleChanged: (Bool) -> Void = { _ in }
+    var onReportContinueToPlaceSelection: () -> Void = {}
+    var onReportPlaceSelected: (String) -> Void = { _ in }
+    var onReportSubmitted: () -> Void = {}
+    var onReportBack: () -> Void = {}
+    var onContactThreadSelected: (String) -> Void = { _ in }
+    var onContactBackToList: () -> Void = {}
+    var onContactNewThreadStarted: () -> Void = {}
+    var onContactTargetTypeSelected: (ContactTargetType) -> Void = { _ in }
+    var onContactTargetSelected: (String) -> Void = { _ in }
+    var onContactDraftChanged: (String) -> Void = { _ in }
+    var onContactSendClicked: () -> Void = {}
 
     var body: some View {
         if #available(iOS 26.1, *) {
-            appTabs
+            tabs
                 .tabViewBottomAccessory(isEnabled: state.selectedTab != AppTab.contacts) {
                     PlacementBar(placementName: state.currentPlacementName)
                 }
         } else if #available(iOS 26.0, *) {
-            appTabs
+            tabs
                 .tabViewBottomAccessory {
                     if state.selectedTab != AppTab.contacts {
                         PlacementBar(placementName: state.currentPlacementName)
                     }
                 }
         } else {
-            appTabs
+            tabs
         }
     }
 
-    private var appTabs: some View {
+    private var tabs: some View {
         TabView(
             selection: Binding(
                 get: { state.selectedTab },
@@ -49,61 +97,52 @@ struct AppShellContentView: View {
                 NavigationStack {
                     HomeTabContentView(
                         overview: state.homeOverview,
-                        isLoading: state.isLoading,
-                        errorMessage: state.errorMessage
+                        errorMessage: state.errorMessage,
+                        onOpenInstruction: onHomeInstructionSelected,
+                        onOpenReport: onOpenReportFromHome,
+                        onOpenContacts: onOpenContactsFromHome
                     )
-                        .navigationTitle("app_shell_home_title")
+                    .navigationTitle("app_shell_home_title")
                 }
             }
 
             Tab("app_shell_tab_instructions", systemImage: "checklist", value: AppTab.instructions) {
-                tabPage(
-                    tab: AppTab.instructions,
-                    titleKey: "app_shell_instructions_title",
-                    descriptionKey: "app_shell_instructions_description"
+                InstructionsTabRootView(
+                    state: state.instructionsTab,
+                    onInstructionSelected: onInstructionSelected,
+                    onThreadOpened: onInstructionThreadOpened,
+                    onDetailClosed: onInstructionDetailClosed,
+                    onThreadClosed: onInstructionThreadClosed,
+                    onStatusUpdated: onInstructionStatusUpdated
                 )
             }
 
             Tab("app_shell_tab_reports", systemImage: "doc.text.fill", value: AppTab.reports) {
-                tabPage(
-                    tab: AppTab.reports,
-                    titleKey: "app_shell_reports_title",
-                    descriptionKey: "app_shell_reports_description"
+                ReportsTabRootView(
+                    state: state.reportsTab,
+                    onTypeSelected: onReportTypeSelected,
+                    onCommentChanged: onReportCommentChanged,
+                    onUrgencySelected: onReportUrgencySelected,
+                    onImageToggleChanged: onReportImageToggleChanged,
+                    onLocationToggleChanged: onReportLocationToggleChanged,
+                    onContinueToPlaceSelection: onReportContinueToPlaceSelection,
+                    onPlaceSelected: onReportPlaceSelected,
+                    onSubmitted: onReportSubmitted,
+                    onBack: onReportBack
                 )
             }
 
             Tab("app_shell_tab_contacts", systemImage: "message.fill", value: AppTab.contacts) {
-                NavigationStack {
-                    ContactChatScreen()
-                }
-            }
-        }
-    }
-
-    private func tabPage(
-        tab: AppTab,
-        titleKey: LocalizedStringKey,
-        descriptionKey: LocalizedStringKey
-    ) -> some View {
-        NavigationStack {
-            AppShellTabContentView(
-                descriptionKey: descriptionKey,
-                selectedTab: tab
-            )
-            .navigationTitle(titleKey)
-        }
-    }
-}
-
-private struct AppShellTabContentView: View {
-    let descriptionKey: LocalizedStringKey
-    let selectedTab: AppTab
-
-    var body: some View {
-        List {
-            Section {
-                Text(descriptionKey)
-                    .accessibilityIdentifier(selectedTab.contentTitleIdentifier)
+                ContactsTabRootView(
+                    state: state.contactsTab,
+                    onThreadSelected: onContactThreadSelected,
+                    onBackToList: onContactBackToList,
+                    onNewThreadStarted: onContactNewThreadStarted,
+                    onTargetTypeSelected: onContactTargetTypeSelected,
+                    onTargetSelected: onContactTargetSelected,
+                    onDraftChanged: onContactDraftChanged,
+                    onSendClicked: onContactSendClicked
+                )
             }
         }
     }
@@ -121,34 +160,6 @@ struct PlacementBar: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.bar)
-    }
-}
-
-private extension AppTab {
-    var labelKey: LocalizedStringKey {
-        switch self {
-        case .home:
-            return "app_shell_tab_home"
-        case .instructions:
-            return "app_shell_tab_instructions"
-        case .reports:
-            return "app_shell_tab_reports"
-        case .contacts:
-            return "app_shell_tab_contacts"
-        }
-    }
-
-    var contentTitleIdentifier: String {
-        switch self {
-        case .home:
-            return "app_shell_content_home_title"
-        case .instructions:
-            return "app_shell_content_instructions_title"
-        case .reports:
-            return "app_shell_content_reports_title"
-        case .contacts:
-            return "app_shell_content_contacts_title"
-        }
     }
 }
 

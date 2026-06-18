@@ -42,12 +42,12 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.firebase.android.common)
             implementation(libs.firebase.android.firestore)
+            implementation(libs.gitlive.firebase.firestore)
         }
         commonMain.dependencies {
             implementation(libs.koin.core)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
-            implementation(libs.gitlive.firebase.firestore)
             api(libs.kotlinx.rpc.grpc.core)
             api(libs.kotlinx.rpc.protobuf.core)
             implementation(libs.kotlinx.rpc.grpc.client)

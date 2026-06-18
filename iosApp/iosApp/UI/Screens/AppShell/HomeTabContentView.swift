@@ -4,18 +4,14 @@ import SharedLogic
 
 struct HomeTabContentView: View {
     let overview: AppShellHomeOverview
-    var isLoading: Bool = false
     var errorMessage: String? = nil
+    var onOpenInstruction: () -> Void = {}
+    var onOpenReport: () -> Void = {}
+    var onOpenContacts: () -> Void = {}
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityIdentifier("app_shell_home_loading")
-                }
-
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.subheadline)
@@ -39,9 +35,18 @@ struct HomeTabContentView: View {
                     titleKey: "app_shell_home_instruction_card_title",
                     systemImage: "checklist",
                     primaryText: overview.currentInstruction,
-                    secondaryText: nil
+                    secondaryText: nil,
+                    action: onOpenInstruction
                 )
                 .accessibilityIdentifier("app_shell_home_instruction_card")
+
+                HomeQuickActionsCard(
+                    unreadContactCount: Int(overview.unreadContactCount),
+                    pendingReportLabel: overview.pendingReportLabel,
+                    onOpenReport: onOpenReport,
+                    onOpenContacts: onOpenContacts
+                )
+                .accessibilityIdentifier("app_shell_home_quick_actions")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -50,13 +55,80 @@ struct HomeTabContentView: View {
     }
 }
 
+private struct HomeQuickActionsCard: View {
+    let unreadContactCount: Int
+    let pendingReportLabel: String
+    let onOpenReport: () -> Void
+    let onOpenContacts: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                quickActionButton(
+                    title: "報告する",
+                    systemImage: "doc.badge.plus",
+                    action: onOpenReport
+                )
+                quickActionButton(
+                    title: unreadContactCount > 0 ? "未読 \(unreadContactCount)" : "連絡を見る",
+                    systemImage: "message.badge",
+                    action: onOpenContacts
+                )
+            }
+
+            Text(pendingReportLabel)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func quickActionButton(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.title3)
+                Text(title)
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.bordered)
+    }
+}
+
 private struct HomeTextCard: View {
     let titleKey: LocalizedStringKey
     let systemImage: String
     let primaryText: String
     let secondaryText: String?
+    var action: (() -> Void)? = nil
 
     var body: some View {
+        Group {
+            if let action {
+                Button(action: action) {
+                    content
+                }
+                .buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(titleKey, systemImage: systemImage)
                 .font(.headline)
@@ -73,9 +145,6 @@ private struct HomeTextCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 

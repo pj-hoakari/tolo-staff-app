@@ -19,6 +19,26 @@ message Point {
   string description = 3;
 }
 
+message Staff {
+  string staff_id = 1;
+  string name = 2;
+  repeated string roles = 3;
+}
+
+message Assignment {
+  string assign_id = 1;
+  string point_id = 2;
+  string staff_id = 3;
+  AssignmentStatus status = 4;
+}
+
+enum AssignmentStatus {
+  ASSIGNMENT_STATUS_UNSPECIFIED = 0;
+  ASSIGNMENT_STATUS_ACTIVE = 1;
+  ASSIGNMENT_STATUS_EN_ROUTE = 2;
+  ASSIGNMENT_STATUS_PENDING = 3;
+}
+
 message Instruction {
   string instruction_id = 1;
   repeated string point_ids = 2;
@@ -76,7 +96,7 @@ message ReportMessagePayload {
 
 message SimpleMessagePayload {
   string text = 1;
-  string reply_to = 2;
+  optional string reply_to = 2;
 }
 
 message ThreadIdRequest {
@@ -85,6 +105,18 @@ message ThreadIdRequest {
 
 message StaffIdRequest {
   string staff_id = 1;
+}
+
+message ListPointsResponse {
+  repeated Point points = 1;
+}
+
+message ListStaffResponse {
+  repeated Staff staff = 1;
+}
+
+message ListAssignmentsResponse {
+  repeated Assignment assignments = 1;
 }
 
 message ListThreadsResponse {
@@ -154,6 +186,18 @@ service ThreadRpc {
   rpc CreateThread(CreateThreadRequest) returns (Thread);
   rpc UpdateThread(UpdateThreadRequest) returns (Thread);
   rpc DeleteThread(ThreadIdRequest) returns (google.protobuf.Empty);
+}
+
+service PointRpc {
+  rpc ListPoints(google.protobuf.Empty) returns (ListPointsResponse);
+}
+
+service StaffRpc {
+  rpc ListStaff(google.protobuf.Empty) returns (ListStaffResponse);
+}
+
+service AssignmentRpc {
+  rpc ListAssignments(google.protobuf.Empty) returns (ListAssignmentsResponse);
 }
 
 service MessageRpc {
