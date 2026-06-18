@@ -35,6 +35,15 @@ extension AppShellUiState {
         return AppShellUiState(
             homeOverview: overview,
             currentPlacementName: overview.placementName,
+            currentStaff: CurrentStaffUiModel(
+                staffId: "tanaka",
+                displayName: "田中",
+                roleLabel: "Aゲート担当"
+            ),
+            availableStaff: [
+                CurrentStaffUiModel(staffId: "tanaka", displayName: "田中", roleLabel: "Aゲート担当"),
+                CurrentStaffUiModel(staffId: "sato", displayName: "佐藤", roleLabel: "巡回担当")
+            ],
             selectedTab: selectedTab,
             instructionsTab: InstructionsTabUiState(
                 instructions: [

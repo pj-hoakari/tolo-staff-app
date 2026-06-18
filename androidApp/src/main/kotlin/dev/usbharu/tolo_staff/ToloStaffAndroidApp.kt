@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddComment
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Message
@@ -44,6 +45,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -66,6 +69,7 @@ import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetType
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetUiModel
+import dev.usbharu.tolo_staff.feature.appshell.CurrentStaffUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ContactThreadDetailUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ContactThreadSummaryUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ContactsTabUiState
@@ -145,6 +149,20 @@ fun ToloStaffAndroidContent(
 ) {
     MaterialTheme {
         Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(appShellTitle(state.selectedTab)) },
+                    navigationIcon = {
+                        CurrentStaffHeaderIcon(
+                            currentStaff = state.currentStaff,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            },
             bottomBar = {
                 Column {
                     if (state.selectedTab != AppTab.CONTACTS) {
@@ -212,6 +230,29 @@ fun ToloStaffAndroidContent(
         }
     }
 }
+
+@Composable
+private fun CurrentStaffHeaderIcon(
+    currentStaff: CurrentStaffUiModel,
+    modifier: Modifier = Modifier,
+) {
+    Icon(
+        imageVector = Icons.Default.AccountCircle,
+        contentDescription = "current_mock_staff_${currentStaff.staffId}",
+        modifier = modifier
+            .size(28.dp)
+            .semantics { contentDescription = "current_mock_staff_${currentStaff.staffId}" },
+        tint = MaterialTheme.colorScheme.primary
+    )
+}
+
+private fun appShellTitle(tab: AppTab): String =
+    when (tab) {
+        AppTab.HOME -> "ホーム"
+        AppTab.INSTRUCTIONS -> "指示"
+        AppTab.REPORTS -> "報告"
+        AppTab.CONTACTS -> "連絡"
+    }
 
 @Composable
 private fun HomeOverviewContent(

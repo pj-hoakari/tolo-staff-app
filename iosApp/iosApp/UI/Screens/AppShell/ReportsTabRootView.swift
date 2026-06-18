@@ -9,6 +9,7 @@ struct ReportsTabRootView: View {
     }
 
     let state: ReportsTabUiState
+    let currentStaff: CurrentStaffUiModel
     var onTypeSelected: (String) -> Void = { _ in }
     var onCommentChanged: (String) -> Void = { _ in }
     var onUrgencySelected: (String) -> Void = { _ in }
@@ -23,6 +24,11 @@ struct ReportsTabRootView: View {
         NavigationStack(path: navigationPath) {
             reportTypeSelection
                 .navigationTitle("app_shell_reports_title")
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        CurrentStaffHeaderIconView(currentStaff: currentStaff)
+                    }
+                }
                 .navigationDestination(for: ReportRoute.self) { route in
                     switch route {
                     case .draft:

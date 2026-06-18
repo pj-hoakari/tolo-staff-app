@@ -28,6 +28,12 @@ data class ContactTargetUiModel(
     val subtitle: String? = null,
 )
 
+data class CurrentStaffUiModel(
+    val staffId: String,
+    val displayName: String,
+    val roleLabel: String? = null,
+)
+
 data class ThreadMessageUiModel(
     val id: String,
     val senderName: String,

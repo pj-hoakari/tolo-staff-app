@@ -101,12 +101,18 @@ struct AppShellContentView: View {
                         onOpenContacts: onOpenContactsFromHome
                     )
                     .navigationTitle("app_shell_home_title")
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            CurrentStaffHeaderIconView(currentStaff: state.currentStaff)
+                        }
+                    }
                 }
             }
 
             Tab("app_shell_tab_instructions", systemImage: "checklist", value: AppTab.instructions) {
                 InstructionsTabRootView(
                     state: state.instructionsTab,
+                    currentStaff: state.currentStaff,
                     onInstructionSelected: onInstructionSelected,
                     onThreadOpened: onInstructionThreadOpened,
                     onDetailClosed: onInstructionDetailClosed,
@@ -117,6 +123,7 @@ struct AppShellContentView: View {
             Tab("app_shell_tab_reports", systemImage: "doc.text.fill", value: AppTab.reports) {
                 ReportsTabRootView(
                     state: state.reportsTab,
+                    currentStaff: state.currentStaff,
                     onTypeSelected: onReportTypeSelected,
                     onCommentChanged: onReportCommentChanged,
                     onUrgencySelected: onReportUrgencySelected,
@@ -132,6 +139,7 @@ struct AppShellContentView: View {
             Tab("app_shell_tab_contacts", systemImage: "message.fill", value: AppTab.contacts) {
                 ContactsTabRootView(
                     state: state.contactsTab,
+                    currentStaff: state.currentStaff,
                     onThreadSelected: onContactThreadSelected,
                     onBackToList: onContactBackToList,
                     onNewThreadStarted: onContactNewThreadStarted,
@@ -157,6 +165,18 @@ struct PlacementBar: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.bar)
+    }
+}
+
+struct CurrentStaffHeaderIconView: View {
+    let currentStaff: CurrentStaffUiModel
+
+    var body: some View {
+        Image(systemName: "person.crop.circle")
+            .font(.title3)
+            .foregroundStyle(Color.accentColor)
+            .accessibilityIdentifier("current_mock_staff_\(currentStaff.staffId)")
+            .accessibilityLabel("current_mock_staff_\(currentStaff.staffId)")
     }
 }
 

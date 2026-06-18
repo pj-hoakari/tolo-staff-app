@@ -3,6 +3,7 @@ import SharedLogic
 
 struct InstructionsTabRootView: View {
     let state: InstructionsTabUiState
+    let currentStaff: CurrentStaffUiModel
     var onInstructionSelected: (String) -> Void = { _ in }
     var onThreadOpened: () -> Void = {}
     var onDetailClosed: () -> Void = {}
@@ -15,6 +16,11 @@ struct InstructionsTabRootView: View {
                 onInstructionSelected: onInstructionSelected
             )
             .navigationTitle("app_shell_instructions_title")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    CurrentStaffHeaderIconView(currentStaff: currentStaff)
+                }
+            }
             .navigationDestination(
                 isPresented: Binding(
                     get: { state.selectedInstruction != nil },

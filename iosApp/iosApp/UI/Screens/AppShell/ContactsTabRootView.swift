@@ -3,6 +3,7 @@ import SharedLogic
 
 struct ContactsTabRootView: View {
     let state: ContactsTabUiState
+    let currentStaff: CurrentStaffUiModel
     var onThreadSelected: (String) -> Void = { _ in }
     var onBackToList: () -> Void = {}
     var onNewThreadStarted: () -> Void = {}
@@ -19,6 +20,11 @@ struct ContactsTabRootView: View {
                 onNewThreadStarted: onNewThreadStarted
             )
             .navigationTitle("app_shell_contacts_title")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    CurrentStaffHeaderIconView(currentStaff: currentStaff)
+                }
+            }
             .navigationDestination(
                 isPresented: Binding(
                     get: { state.isChoosingTargetType },

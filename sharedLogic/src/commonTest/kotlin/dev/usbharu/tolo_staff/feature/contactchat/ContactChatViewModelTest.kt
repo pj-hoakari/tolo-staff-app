@@ -1,5 +1,8 @@
 package dev.usbharu.tolo_staff.feature.contactchat
 
+import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.defaultMockStaffMembers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -178,9 +181,50 @@ class ContactChatViewModelTest {
     ): ContactChatViewModel {
         return ContactChatViewModel(
             service = service,
+            currentStaffSession = createSession(dispatcher),
             coroutineContext = dispatcher,
         )
     }
+
+    @Test
+    fun `current staff session drives room observation and send sender id`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val service = FakeContactChatService(
+            rooms = listOf(ChatRoom(id = "thread-1", title = "sato")),
+            initialMessagesByRoom = mutableMapOf("thread-1" to emptyList())
+        )
+        val session = createSession(dispatcher)
+        val viewModel = ContactChatViewModel(
+            service = service,
+            currentStaffSession = session,
+            coroutineContext = dispatcher,
+        )
+
+        advanceUntilIdle()
+        assertEquals(listOf("tanaka"), service.observedRoomStaffIds)
+
+        session.selectStaff("sato")
+        advanceUntilIdle()
+
+        assertEquals(listOf("tanaka", "sato"), service.observedRoomStaffIds)
+
+        viewModel.onRoomSelected("thread-1")
+        advanceUntilIdle()
+        viewModel.onDraftChanged("確認します")
+        viewModel.onSendClicked()
+        assertEquals("佐藤", viewModel.uiState.value.messages.single().senderName)
+        advanceUntilIdle()
+
+        assertEquals("sato", service.lastSentStaffId)
+
+        viewModel.clear()
+    }
+
+    private fun createSession(dispatcher: CoroutineContext): CurrentStaffSession =
+        MockCurrentStaffSession(
+            initialStaff = defaultMockStaffMembers(),
+            coroutineContext = dispatcher
+        )
 }
 
 private class FakeContactChatService(
@@ -191,16 +235,24 @@ private class FakeContactChatService(
     val roomsFlow = MutableStateFlow(rooms)
     val messagesByRoom = initialMessagesByRoom
     private val messagesFlow = MutableStateFlow(initialMessagesByRoom.toMap())
+    val observedRoomStaffIds = mutableListOf<String>()
+    val observedMessageStaffIds = mutableListOf<String>()
+    var lastSentStaffId: String? = null
 
     var afterSendMessages: List<ChatMessage>? = null
 
-    override fun observeRooms(currentStaffId: String): Flow<List<ChatRoom>> = roomsFlow
+    override fun observeRooms(currentStaffId: String): Flow<List<ChatRoom>> {
+        observedRoomStaffIds += currentStaffId
+        return roomsFlow
+    }
 
     override fun observeMessages(roomId: String, currentStaffId: String): Flow<List<ChatMessage>> {
+        observedMessageStaffIds += currentStaffId
         return messagesFlow.map { it[roomId].orEmpty() }
     }
 
     override suspend fun sendSimpleMessage(roomId: String, currentStaffId: String, text: String) {
+        lastSentStaffId = currentStaffId
         if (sendShouldFail) {
             throw IllegalStateException("メッセージ送信に失敗しました")
         }

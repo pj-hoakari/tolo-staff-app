@@ -1,6 +1,8 @@
 package dev.usbharu.tolo_staff.feature.contactchat
 
-import dev.usbharu.tolo_staff.viewmodel.StateEffectViewModel
+import dev.usbharu.tolo_staff.streaming.CurrentStaffMember
+import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
@@ -11,16 +13,32 @@ import kotlin.coroutines.CoroutineContext
 
 class ContactChatViewModel(
     private val service: ContactChatService,
+    private val currentStaffSession: CurrentStaffSession = MockCurrentStaffSession(),
     coroutineContext: CoroutineContext = Dispatchers.Default,
-) : StateEffectViewModel<ContactChatUiState, Unit>(
+) : dev.usbharu.tolo_staff.viewmodel.StateEffectViewModel<ContactChatUiState, Unit>(
     initialState = ContactChatUiState(isLoading = true),
     coroutineContext = coroutineContext
 ) {
+    private var currentStaffJob: Job? = null
     private var roomsJob: Job? = null
     private var selectedRoomJob: Job? = null
+    private var currentStaff: CurrentStaffMember = currentStaffSession.currentStaffSnapshot
+    private var observedStaffId: String? = null
 
     init {
-        observeRooms()
+        currentStaffJob = currentStaffSession.currentStaff
+            .onEach { nextStaff ->
+                val didChange = observedStaffId != nextStaff.staffId
+                observedStaffId = nextStaff.staffId
+                currentStaff = nextStaff
+                if (didChange) {
+                    updateState {
+                        ContactChatUiState(isLoading = true)
+                    }
+                    observeRooms()
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     fun onRoomSelected(roomId: String) {
@@ -65,7 +83,7 @@ class ContactChatViewModel(
         val optimisticMessage = ChatMessage(
             id = "local-${nextLocalMessageId++}",
             roomId = roomId,
-            senderName = CURRENT_STAFF_ID,
+            senderName = currentStaff.displayName,
             body = text,
             timeLabel = null,
             isFromCurrentUser = true,
@@ -85,7 +103,7 @@ class ContactChatViewModel(
 
         viewModelScope.launch {
             runCatching {
-                service.sendSimpleMessage(roomId, CURRENT_STAFF_ID, text)
+                service.sendSimpleMessage(roomId, currentStaff.staffId, text)
                 updateState { it.copy(isSending = false, errorMessage = null) }
             }.onFailure { throwable ->
                 updateState { state ->
@@ -101,7 +119,8 @@ class ContactChatViewModel(
 
     private fun observeRooms() {
         roomsJob?.cancel()
-        roomsJob = service.observeRooms(CURRENT_STAFF_ID)
+        selectedRoomJob?.cancel()
+        roomsJob = service.observeRooms(currentStaff.staffId)
             .onEach { rooms ->
                 val selectedRoomId = currentState.selectedRoomId?.takeIf { roomId ->
                     rooms.any { it.id == roomId }
@@ -120,6 +139,8 @@ class ContactChatViewModel(
                 if (selectedRoomId == null) {
                     selectedRoomJob?.cancel()
                     updateState { it.copy(messages = emptyList(), isLoading = false) }
+                } else {
+                    observeSelectedRoom(selectedRoomId)
                 }
             }
             .catch { throwable ->
@@ -136,7 +157,7 @@ class ContactChatViewModel(
 
     private fun observeSelectedRoom(roomId: String) {
         selectedRoomJob?.cancel()
-        selectedRoomJob = service.observeMessages(roomId, CURRENT_STAFF_ID)
+        selectedRoomJob = service.observeMessages(roomId, currentStaff.staffId)
             .onEach { messages ->
                 updateState {
                     it.copy(
@@ -162,13 +183,13 @@ class ContactChatViewModel(
     }
 
     override fun clear() {
+        currentStaffJob?.cancel()
         roomsJob?.cancel()
         selectedRoomJob?.cancel()
         super.clear()
     }
 
     private companion object {
-        const val CURRENT_STAFF_ID = "tanaka"
         var nextLocalMessageId = 1L
     }
 }

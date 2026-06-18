@@ -1,14 +1,16 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
-import dev.usbharu.tolo_staff.streaming.CurrentStaffProvider
-import dev.usbharu.tolo_staff.streaming.FixedCurrentStaffProvider
+import dev.usbharu.tolo_staff.streaming.CurrentStaffMember
+import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.NoOpOperationsStreamDataSource
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepositoryImpl
-import dev.usbharu.tolo_staff.streaming.NoOpOperationsStreamDataSource
 import dev.usbharu.tolo_staff.viewmodel.StateEffectViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlin.coroutines.CoroutineContext
@@ -17,41 +19,54 @@ class AppShellViewModel(
     private val overviewRepository: OperationsOverviewRepository = OperationsOverviewRepositoryImpl(
         dataSource = NoOpOperationsStreamDataSource()
     ),
-    private val currentStaffProvider: CurrentStaffProvider = FixedCurrentStaffProvider(),
+    private val currentStaffSession: CurrentStaffSession = MockCurrentStaffSession(),
     coroutineContext: CoroutineContext = Dispatchers.Default
 ) : StateEffectViewModel<AppShellUiState, Unit>(
-    initialState = AppShellUiState(
-        instructionsTab = initialInstructionsState(),
-        reportsTab = initialReportsState(),
-        contactsTab = initialContactsState(),
-        isLoading = true
+    initialState = initialState(
+        currentStaff = currentStaffSession.currentStaffSnapshot,
+        availableStaff = currentStaffSession.availableStaff.value,
     ),
     coroutineContext = coroutineContext
 ) {
     private var overviewJob: Job? = null
+    private var staffSessionJob: Job? = null
     private var nextContactMessageId = 1L
+    private var observedStaffId: String? = null
 
     init {
-        overviewJob = overviewRepository.observeOverview(currentStaffProvider.currentStaffId)
-            .onEach { projection ->
-                updateState {
-                    it.copy(
-                        homeOverview = projection.homeOverview,
-                        currentPlacementName = projection.currentPlacementName,
-                        isLoading = false,
-                        errorMessage = null,
-                    )
+        staffSessionJob = combine(
+            currentStaffSession.currentStaff,
+            currentStaffSession.availableStaff,
+        ) { currentStaff, availableStaff ->
+            currentStaff to availableStaff
+        }
+            .onEach { (currentStaff, availableStaff) ->
+                val didChange = observedStaffId != currentStaff.staffId
+                observedStaffId = currentStaff.staffId
+
+                updateState { state ->
+                    if (didChange) {
+                        initialState(
+                            currentStaff = currentStaff,
+                            availableStaff = availableStaff,
+                        ).copy(selectedTab = state.selectedTab)
+                    } else {
+                        state.copy(
+                            currentStaff = currentStaff.toUiModel(),
+                            availableStaff = availableStaff.map { it.toUiModel() },
+                        )
+                    }
                 }
-            }
-            .catch { throwable ->
-                updateState {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = throwable.message ?: "ホーム情報の購読に失敗しました",
-                    )
+
+                if (didChange) {
+                    observeOverview(currentStaff.staffId)
                 }
             }
             .launchIn(viewModelScope)
+    }
+
+    fun onCurrentStaffSelected(staffId: String) {
+        currentStaffSession.selectStaff(staffId)
     }
 
     fun onTabSelected(tab: AppTab) {
@@ -238,6 +253,7 @@ class AppShellViewModel(
         val draft = currentState.reportsTab.draft
         val selectedType = currentState.reportsTab.reportTypes.firstOrNull { it.id == draft.selectedTypeId }
         val placeName = draft.selectedPlaceName ?: return
+        val currentStaff = currentState.currentStaff
         updateState { state ->
             state.copy(
                 homeOverview = state.homeOverview.copy(
@@ -253,8 +269,8 @@ class AppShellViewModel(
                         messages = listOf(
                             ThreadMessageUiModel(
                                 id = "report-1",
-                                senderName = "田中",
-                                senderRoleLabel = "Aゲート担当",
+                                senderName = currentStaff.displayName,
+                                senderRoleLabel = currentStaff.roleLabel ?: state.currentPlacementName,
                                 body = draft.comment.ifBlank { draft.templateText },
                                 timeLabel = "たった今",
                                 isCurrentUser = true,
@@ -391,10 +407,11 @@ class AppShellViewModel(
         if (draftMessage.isEmpty()) {
             return
         }
+        val currentStaff = currentState.currentStaff
         val message = ThreadMessageUiModel(
             id = "contact-local-${nextContactMessageId++}",
-            senderName = "田中",
-            senderRoleLabel = currentState.currentPlacementName,
+            senderName = currentStaff.displayName,
+            senderRoleLabel = currentStaff.roleLabel ?: currentState.currentPlacementName,
             body = draftMessage,
             timeLabel = "たった今",
             isCurrentUser = true,
@@ -425,12 +442,37 @@ class AppShellViewModel(
 
     override fun clear() {
         overviewJob?.cancel()
+        staffSessionJob?.cancel()
         super.clear()
+    }
+
+    private fun observeOverview(currentStaffId: String) {
+        overviewJob?.cancel()
+        overviewJob = overviewRepository.observeOverview(currentStaffId)
+            .onEach { projection ->
+                updateState {
+                    it.copy(
+                        homeOverview = projection.homeOverview,
+                        currentPlacementName = projection.currentPlacementName,
+                        isLoading = false,
+                        errorMessage = null,
+                    )
+                }
+            }
+            .catch { throwable ->
+                updateState {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = throwable.message ?: "ホーム情報の購読に失敗しました",
+                    )
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     private fun instructionDetailFor(instructionId: String?): InstructionDetailUiModel? =
         when (instructionId) {
-            "instruction-gate-a" -> primaryInstructionDetail()
+            "instruction-gate-a" -> primaryInstructionDetail(currentState.currentStaff)
             "instruction-patrol" -> secondaryInstructionDetail()
             else -> null
         }
@@ -453,8 +495,8 @@ class AppShellViewModel(
                     ),
                     ThreadMessageUiModel(
                         id = "gate-a-2",
-                        senderName = "田中",
-                        senderRoleLabel = "Aゲート担当",
+                        senderName = currentState.currentStaff.displayName,
+                        senderRoleLabel = currentState.currentStaff.roleLabel ?: "Aゲート担当",
                         body = "了解しました。カラーコーンを追加します。",
                         timeLabel = "10:17",
                         isCurrentUser = true,
@@ -499,8 +541,21 @@ class AppShellViewModel(
     }
 
     private companion object {
-        fun initialInstructionsState(): InstructionsTabUiState {
-            val detail = primaryInstructionDetail()
+        fun initialState(
+            currentStaff: CurrentStaffMember,
+            availableStaff: List<CurrentStaffMember>,
+        ): AppShellUiState =
+            AppShellUiState(
+                currentStaff = currentStaff.toUiModel(),
+                availableStaff = availableStaff.map { it.toUiModel() },
+                instructionsTab = initialInstructionsState(currentStaff.toUiModel()),
+                reportsTab = initialReportsState(),
+                contactsTab = initialContactsState(),
+                isLoading = true,
+            )
+
+        fun initialInstructionsState(currentStaff: CurrentStaffUiModel): InstructionsTabUiState {
+            val detail = primaryInstructionDetail(currentStaff)
             return InstructionsTabUiState(
                 instructions = listOf(
                     InstructionSummaryUiModel(
@@ -578,7 +633,7 @@ class AppShellViewModel(
                 )
             )
 
-        fun primaryInstructionDetail(): InstructionDetailUiModel =
+        fun primaryInstructionDetail(currentStaff: CurrentStaffUiModel): InstructionDetailUiModel =
             InstructionDetailUiModel(
                 id = "instruction-gate-a",
                 title = "Aゲート前の列を右側へ誘導",
@@ -589,7 +644,11 @@ class AppShellViewModel(
                 locationLabel = "西ホール 入口ゲート A",
                 attachmentSummary = "添付画像 1件 / 位置情報あり",
                 participants = listOf(
-                    InstructionParticipantStatusUiModel("田中", "対応中", isCurrentStaff = true),
+                    InstructionParticipantStatusUiModel(
+                        staffName = currentStaff.displayName,
+                        statusLabel = "対応中",
+                        isCurrentStaff = true,
+                    ),
                     InstructionParticipantStatusUiModel("佐藤", "了解"),
                     InstructionParticipantStatusUiModel("山田", "前担当", isFormerStaff = true),
                 ),
@@ -603,8 +662,8 @@ class AppShellViewModel(
                     ),
                     ThreadMessageUiModel(
                         id = "instruction-thread-2",
-                        senderName = "田中",
-                        senderRoleLabel = "Aゲート担当",
+                        senderName = currentStaff.displayName,
+                        senderRoleLabel = currentStaff.roleLabel ?: "Aゲート担当",
                         body = "対応を開始しました。カラーコーン追加後に再度報告します。",
                         timeLabel = "10:17",
                         isCurrentUser = true,
@@ -666,5 +725,12 @@ class AppShellViewModel(
                 listOf(updated) + current
             }
         }
+
+        fun CurrentStaffMember.toUiModel(): CurrentStaffUiModel =
+            CurrentStaffUiModel(
+                staffId = staffId,
+                displayName = displayName,
+                roleLabel = roleLabel,
+            )
     }
 }

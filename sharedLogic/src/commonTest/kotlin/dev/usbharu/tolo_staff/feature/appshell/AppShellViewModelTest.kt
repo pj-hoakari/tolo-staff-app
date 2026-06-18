@@ -1,13 +1,16 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
 import dev.usbharu.tolo_staff.streaming.AppShellOperationsProjection
-import dev.usbharu.tolo_staff.streaming.CurrentStaffProvider
+import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.defaultMockStaffMembers
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -17,24 +20,28 @@ class AppShellViewModelTest {
     @Test
     fun `initial state reflects streamed overview`() = runTest {
         val repository = FakeOperationsOverviewRepository(
-            AppShellOperationsProjection(
-                homeOverview = AppShellHomeOverview(
-                    eventName = "Tolo Staff Demo 2026",
-                    eventTime = "Firestore Streaming Demo",
-                    placementName = "Gate A",
-                    placementDetail = "North entrance",
-                    currentInstruction = "Shift update: Move barricades",
-                    currentInstructionId = "instruction-gate-a",
-                ),
-                currentPlacementName = "Gate A"
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        eventName = "Tolo Staff Demo 2026",
+                        eventTime = "Firestore Streaming Demo",
+                        placementName = "Gate A",
+                        placementDetail = "North entrance",
+                        currentInstruction = "Shift update: Move barricades",
+                        currentInstructionId = "instruction-gate-a",
+                    ),
+                    currentPlacementName = "Gate A"
+                )
             )
         )
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
             overviewRepository = repository,
-            currentStaffProvider = FixedCurrentStaffProviderForTest(),
-            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
         )
 
+        assertEquals("田中", viewModel.uiState.value.currentStaff.displayName)
         assertEquals("Gate A", viewModel.uiState.value.currentPlacementName)
         assertEquals("Tolo Staff Demo 2026", viewModel.uiState.value.homeOverview.eventName)
         assertEquals("North entrance", viewModel.uiState.value.homeOverview.placementDetail)
@@ -49,10 +56,11 @@ class AppShellViewModelTest {
 
     @Test
     fun `tab selection updates selected tab`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
-            currentStaffProvider = FixedCurrentStaffProviderForTest(),
-            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
         )
 
         listOf(
@@ -70,10 +78,11 @@ class AppShellViewModelTest {
 
     @Test
     fun `home instruction shortcut opens instruction detail`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
-            currentStaffProvider = FixedCurrentStaffProviderForTest(),
-            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
         )
 
         viewModel.onHomeInstructionSelected()
@@ -86,10 +95,11 @@ class AppShellViewModelTest {
 
     @Test
     fun `opening instruction thread switches to contacts tab with linked thread selected`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
-            currentStaffProvider = FixedCurrentStaffProviderForTest(),
-            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
         )
 
         viewModel.onInstructionSelected("instruction-gate-a")
@@ -103,10 +113,11 @@ class AppShellViewModelTest {
 
     @Test
     fun `closing contact thread opened from instruction returns to instruction tab`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
-            currentStaffProvider = FixedCurrentStaffProviderForTest(),
-            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
         )
 
         viewModel.onInstructionSelected("instruction-gate-a")
@@ -121,10 +132,11 @@ class AppShellViewModelTest {
 
     @Test
     fun `report flow advances to submitted thread`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
-            currentStaffProvider = FixedCurrentStaffProviderForTest(),
-            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
         )
 
         viewModel.onReportTypeSelected("queue")
@@ -141,10 +153,11 @@ class AppShellViewModelTest {
 
     @Test
     fun `contact flow can create new direct thread and send message`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
-            currentStaffProvider = FixedCurrentStaffProviderForTest(),
-            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
         )
 
         viewModel.onContactNewThreadStarted()
@@ -162,19 +175,69 @@ class AppShellViewModelTest {
         )
         viewModel.clear()
     }
+
+    @Test
+    fun `switching current staff refreshes overview and current user labels`() = runTest {
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        placementName = "Gate A",
+                        placementDetail = "North entrance",
+                        currentInstruction = "Tanaka instruction",
+                    ),
+                    currentPlacementName = "Gate A"
+                ),
+                "sato" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        placementName = "Patrol",
+                        placementDetail = "West hall",
+                        currentInstruction = "Sato instruction",
+                    ),
+                    currentPlacementName = "Patrol"
+                ),
+            )
+        )
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onCurrentStaffSelected("sato")
+
+        assertEquals(listOf("tanaka", "sato"), repository.observedStaffIds)
+        assertEquals("佐藤", viewModel.uiState.value.currentStaff.displayName)
+        assertEquals("Patrol", viewModel.uiState.value.currentPlacementName)
+        assertEquals(
+            "佐藤",
+            viewModel.uiState.value.instructionsTab.selectedInstruction?.participants?.first()?.staffName
+        )
+
+        viewModel.clear()
+    }
+
+    private fun createSession(dispatcher: CoroutineContext): CurrentStaffSession = MockCurrentStaffSession(
+        initialStaff = defaultMockStaffMembers(),
+        coroutineContext = dispatcher
+    )
 }
 
 private class FakeOperationsOverviewRepository(
-    initialProjection: AppShellOperationsProjection = AppShellOperationsProjection(
-        homeOverview = AppShellHomeOverview(),
-        currentPlacementName = "未配属"
+    private val projections: Map<String, AppShellOperationsProjection> = mapOf(
+        "tanaka" to AppShellOperationsProjection(
+            homeOverview = AppShellHomeOverview(),
+            currentPlacementName = "未配属"
+        )
     )
 ) : OperationsOverviewRepository {
-    private val projectionFlow = MutableStateFlow(initialProjection)
+    val observedStaffIds = mutableListOf<String>()
 
-    override fun observeOverview(currentStaffId: String): Flow<AppShellOperationsProjection> = projectionFlow
-}
-
-private class FixedCurrentStaffProviderForTest : CurrentStaffProvider {
-    override val currentStaffId: String = "tanaka"
+    override fun observeOverview(currentStaffId: String): Flow<AppShellOperationsProjection> {
+        observedStaffIds += currentStaffId
+        return flowOf(
+            projections[currentStaffId] ?: projections.getValue("tanaka")
+        )
+    }
 }
