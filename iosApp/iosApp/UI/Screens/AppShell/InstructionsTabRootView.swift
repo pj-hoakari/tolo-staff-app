@@ -85,36 +85,17 @@ private struct InstructionListView: View {
         Button {
             onInstructionSelected(instruction.id)
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("あなたへの指示", systemImage: "checklist")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-
-                Text(instruction.title)
-                    .font(.title3)
-                    .bold()
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(instruction.preview)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                InstructionMetaSummaryView(
-                    targetName: instruction.targetName,
-                    priorityLabel: instruction.priorityLabel,
-                    statusLabel: instruction.statusLabel,
-                    locationLabel: instruction.locationLabel,
-                    attachmentSummary: instruction.attachmentSummary,
-                    unreadCount: Int(instruction.unreadCount)
-                )
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            AppleInstructionHeroCard(
+                eyebrow: "あなたへの指示",
+                title: instruction.title,
+                bodyText: instruction.preview,
+                targetName: instruction.targetName,
+                priorityLabel: instruction.priorityLabel,
+                statusLabel: instruction.statusLabel,
+                locationLabel: instruction.locationLabel,
+                attachmentSummary: instruction.attachmentSummary,
+                unreadCount: Int(instruction.unreadCount)
+            )
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("featured_instruction_card")

@@ -18,6 +18,7 @@ dependencies {
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.grpc.okhttp)
+    implementation(libs.koin.core)
 
     implementation(libs.compose.material3)
     implementation(libs.compose.uiToolingPreview)

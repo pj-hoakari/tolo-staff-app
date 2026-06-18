@@ -58,35 +58,17 @@ private struct HomeInstructionCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("app_shell_home_instruction_card_title", systemImage: "checklist")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-
-                if let title = optionalText(overview.currentInstructionTitle) {
-                    Text(title)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.primary)
-                }
-
-                Text(overview.currentInstruction)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-
-                InstructionMetaSummaryView(
-                    targetName: overview.currentInstructionTargetName,
-                    priorityLabel: overview.currentInstructionPriorityLabel,
-                    statusLabel: overview.currentInstructionStatusLabel,
-                    locationLabel: overview.currentInstructionLocationLabel,
-                    attachmentSummary: overview.currentInstructionAttachmentSummary,
-                    unreadCount: Int(overview.currentInstructionUnreadCount)
-                )
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            AppleInstructionHeroCard(
+                eyebrow: "app_shell_home_instruction_card_title",
+                title: overview.currentInstructionTitle,
+                bodyText: overview.currentInstruction,
+                targetName: overview.currentInstructionTargetName,
+                priorityLabel: overview.currentInstructionPriorityLabel,
+                statusLabel: overview.currentInstructionStatusLabel,
+                locationLabel: overview.currentInstructionLocationLabel,
+                attachmentSummary: overview.currentInstructionAttachmentSummary,
+                unreadCount: Int(overview.currentInstructionUnreadCount)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -246,7 +228,10 @@ private struct HomePlacementMapCard: View {
     }
 }
 
-struct InstructionMetaSummaryView: View {
+struct AppleInstructionHeroCard: View {
+    let eyebrow: LocalizedStringKey
+    let title: String?
+    let bodyText: String
     let targetName: String?
     let priorityLabel: String?
     let statusLabel: String?
@@ -254,41 +239,129 @@ struct InstructionMetaSummaryView: View {
     let attachmentSummary: String?
     let unreadCount: Int
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if !headlineItems.isEmpty {
-                Text(headlineItems.joined(separator: "  •  "))
-                    .font(.caption)
+    var bodyView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Label(eyebrow, systemImage: "checklist")
+                    .font(.headline)
                     .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                HStack(spacing: 8) {
+                    if let priorityLabel = optionalText(priorityLabel) {
+                        InstructionStatusPill(
+                            text: priorityLabel,
+                            tint: priorityLabel == "高" ? .orange : .secondary
+                        )
+                    }
+                    if let statusLabel = optionalText(statusLabel) {
+                        InstructionStatusPill(
+                            text: statusLabel,
+                            tint: statusLabel == "対応中" ? .blue : statusLabel == "完了" ? .green : .secondary
+                        )
+                    }
+                }
             }
-            if let location = optionalText(locationLabel) {
-                Text("場所: \(location)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+            if let title = optionalText(title) {
+                Text(title)
+                    .font(.title3)
+                    .bold()
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if let attachment = optionalText(attachmentSummary) {
-                Text(attachment)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if unreadCount > 0 {
-                Text("未読メッセージ \(unreadCount) 件")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
+
+            Text(bodyText)
+                .font(.body)
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            InstructionMetaSummaryView(
+                targetName: targetName,
+                locationLabel: locationLabel,
+                attachmentSummary: attachmentSummary,
+                unreadCount: unreadCount
+            )
         }
     }
 
-    private var headlineItems: [String] {
-        [
-            optionalText(targetName).map { "対象: \($0)" },
-            optionalText(priorityLabel).map { "優先度: \($0)" },
-            optionalText(statusLabel).map { "状態: \($0)" }
-        ].compactMap { $0 }
+    var body: some View {
+        bodyView
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color(.secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: 16)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.primary.opacity(0.05), lineWidth: 1)
+            }
+    }
+}
+
+struct InstructionMetaSummaryView: View {
+    let targetName: String?
+    let locationLabel: String?
+    let attachmentSummary: String?
+    let unreadCount: Int
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+            if let targetName = optionalText(targetName) {
+                    InstructionInfoPill(text: targetName, systemImage: "person.crop.circle")
+            }
+                if let location = optionalText(locationLabel) {
+                    InstructionInfoPill(text: location, systemImage: "mappin.circle")
+                }
+                if let attachment = optionalText(attachmentSummary) {
+                    InstructionInfoPill(text: attachment, systemImage: "paperclip")
+                }
+                if unreadCount > 0 {
+                    InstructionInfoPill(text: "\(unreadCount) 件", systemImage: "envelope.badge", tint: .red)
+                }
+            }
+        }
     }
 }
 
 private func optionalText(_ text: String?) -> String? {
     guard let text, !text.isEmpty else { return nil }
     return text
+}
+
+struct InstructionStatusPill: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(tint.opacity(0.12), in: Capsule())
+    }
+}
+
+struct InstructionInfoPill: View {
+    let text: String
+    let systemImage: String
+    var tint: Color = .secondary
+
+    var body: some View {
+        Label(text, systemImage: systemImage)
+            .font(.subheadline)
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.systemBackground), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+            }
+    }
 }

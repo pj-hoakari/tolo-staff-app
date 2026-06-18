@@ -2,7 +2,10 @@ package dev.usbharu.tolo_staff
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +28,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.MarkEmailUnread
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Summarize
 import androidx.compose.material3.Button
@@ -52,8 +58,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -933,35 +943,53 @@ private fun HomeInstructionOverviewCard(
     identifier: String,
     onClick: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = identifier },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("あなたへの指示", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            overview.currentInstructionTitle?.let {
-                Text(it, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-            }
-            Text(overview.currentInstruction, color = MaterialTheme.colorScheme.onSurface)
-            InstructionMetaSummary(
-                targetName = overview.currentInstructionTargetName,
-                priorityLabel = overview.currentInstructionPriorityLabel,
-                statusLabel = overview.currentInstructionStatusLabel,
-                locationLabel = overview.currentInstructionLocationLabel,
-                attachmentSummary = overview.currentInstructionAttachmentSummary,
-                unreadCount = overview.currentInstructionUnreadCount,
-            )
-        }
-    }
+    InstructionHeroCard(
+        titleLabel = "あなたへの指示",
+        title = overview.currentInstructionTitle,
+        body = overview.currentInstruction,
+        targetName = overview.currentInstructionTargetName,
+        priorityLabel = overview.currentInstructionPriorityLabel,
+        statusLabel = overview.currentInstructionStatusLabel,
+        locationLabel = overview.currentInstructionLocationLabel,
+        attachmentSummary = overview.currentInstructionAttachmentSummary,
+        unreadCount = overview.currentInstructionUnreadCount,
+        identifier = identifier,
+        onClick = onClick,
+    )
 }
 
 @Composable
 private fun FeaturedInstructionCard(
     instruction: InstructionSummaryUiModel,
+    identifier: String,
+    onClick: () -> Unit,
+) {
+    InstructionHeroCard(
+        titleLabel = "あなたへの指示",
+        title = instruction.title,
+        body = instruction.preview,
+        targetName = instruction.targetName,
+        priorityLabel = instruction.priorityLabel,
+        statusLabel = instruction.statusLabel,
+        locationLabel = instruction.locationLabel,
+        attachmentSummary = instruction.attachmentSummary,
+        unreadCount = instruction.unreadCount,
+        identifier = identifier,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun InstructionHeroCard(
+    titleLabel: String,
+    title: String?,
+    body: String,
+    targetName: String?,
+    priorityLabel: String?,
+    statusLabel: String?,
+    locationLabel: String?,
+    attachmentSummary: String?,
+    unreadCount: Int,
     identifier: String,
     onClick: () -> Unit,
 ) {
@@ -971,19 +999,53 @@ private fun FeaturedInstructionCard(
             .clickable(onClick = onClick)
             .semantics { contentDescription = identifier },
         shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("あなたへの指示", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(instruction.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-            Text(instruction.preview, color = MaterialTheme.colorScheme.onSurface)
+        Column(
+            Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    titleLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    priorityLabel?.takeIf { it.isNotBlank() }?.let {
+                        InstructionPill(it, instructionPriorityContainerColor(it), instructionPriorityContentColor(it))
+                    }
+                    statusLabel?.takeIf { it.isNotBlank() }?.let {
+                        InstructionPill(it, instructionStatusContainerColor(it), instructionStatusContentColor(it))
+                    }
+                }
+            }
+
+            title?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    it,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            Text(
+                body,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
             InstructionMetaSummary(
-                targetName = instruction.targetName,
-                priorityLabel = instruction.priorityLabel,
-                statusLabel = instruction.statusLabel,
-                locationLabel = instruction.locationLabel,
-                attachmentSummary = instruction.attachmentSummary,
-                unreadCount = instruction.unreadCount,
+                targetName = targetName,
+                locationLabel = locationLabel,
+                attachmentSummary = attachmentSummary,
+                unreadCount = unreadCount,
             )
         }
     }
@@ -992,36 +1054,123 @@ private fun FeaturedInstructionCard(
 @Composable
 private fun InstructionMetaSummary(
     targetName: String?,
-    priorityLabel: String?,
-    statusLabel: String?,
     locationLabel: String?,
     attachmentSummary: String?,
     unreadCount: Int,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        val headline = listOfNotNull(
-            targetName?.takeIf { it.isNotBlank() }?.let { "対象: $it" },
-            priorityLabel?.takeIf { it.isNotBlank() }?.let { "優先度: $it" },
-            statusLabel?.takeIf { it.isNotBlank() }?.let { "状態: $it" },
-        )
-        if (headline.isNotEmpty()) {
-            Text(
-                headline.joinToString("  •  "),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        targetName?.takeIf { it.isNotBlank() }?.let {
+            InstructionSecondaryPill(
+                text = it,
+                icon = Icons.Default.AccountCircle,
             )
         }
         locationLabel?.takeIf { it.isNotBlank() }?.let {
-            Text("場所: $it", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            InstructionSecondaryPill(
+                text = it,
+                icon = Icons.Default.LocationOn,
+            )
         }
         attachmentSummary?.takeIf { it.isNotBlank() }?.let {
-            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            InstructionSecondaryPill(
+                text = it,
+                icon = Icons.Default.AttachFile,
+            )
         }
         if (unreadCount > 0) {
-            Text("未読メッセージ $unreadCount 件", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            InstructionSecondaryPill(
+                text = "$unreadCount 件",
+                icon = Icons.Default.MarkEmailUnread,
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            )
         }
     }
 }
+
+@Composable
+private fun InstructionPill(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = containerColor,
+        contentColor = contentColor,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
+@Composable
+private fun InstructionSecondaryPill(
+    text: String,
+    icon: ImageVector,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = containerColor,
+        contentColor = contentColor,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.10f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun instructionPriorityContainerColor(priorityLabel: String): Color =
+    when (priorityLabel) {
+        "高" -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surface
+    }
+
+@Composable
+private fun instructionPriorityContentColor(priorityLabel: String): Color =
+    when (priorityLabel) {
+        "高" -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+@Composable
+private fun instructionStatusContainerColor(statusLabel: String): Color =
+    when (statusLabel) {
+        "対応中" -> MaterialTheme.colorScheme.primaryContainer
+        "完了" -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surface
+    }
+
+@Composable
+private fun instructionStatusContentColor(statusLabel: String): Color =
+    when (statusLabel) {
+        "対応中" -> MaterialTheme.colorScheme.onPrimaryContainer
+        "完了" -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
 @Composable
 private fun QuickActionsCard(
