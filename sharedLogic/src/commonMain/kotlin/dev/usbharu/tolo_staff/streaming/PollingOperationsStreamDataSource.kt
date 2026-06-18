@@ -48,5 +48,10 @@ class PollingOperationsStreamDataSource(
     }
 }
 
-fun List<OperationMessage>.sortedOperationMessages(): List<OperationMessage> =
-    sortedWith(compareBy<OperationMessage> { it.updatedAt }.thenBy { it.messageId })
+fun List<OperationMessage>.sortedOperationMessages(): List<OperationMessage> {
+    if (none { it.updatedAt.isNotBlank() && !it.updatedAt.equals("null", ignoreCase = true) }) {
+        return toList()
+    }
+
+    return sortedWith(compareBy<OperationMessage> { it.updatedAt }.thenBy { it.messageId })
+}

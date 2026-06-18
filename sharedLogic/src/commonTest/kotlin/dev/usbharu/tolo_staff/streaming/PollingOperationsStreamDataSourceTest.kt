@@ -30,6 +30,28 @@ class PollingOperationsStreamDataSourceTest {
     }
 
     @Test
+    fun `message polling preserves backend order when timestamps are unavailable`() = runTest {
+        val dataSource = PollingOperationsStreamDataSource(
+            remoteDataSource = FakeOperationsPollingRemoteDataSource(
+                messages = listOf(
+                    operationMessage(messageId = "m-3", updatedAt = ""),
+                    operationMessage(messageId = "m-1", updatedAt = ""),
+                    operationMessage(messageId = "m-2", updatedAt = ""),
+                )
+            ),
+            config = OperationsPollingConfig(
+                host = "localhost",
+                port = 8080,
+                intervalMillis = 60_000,
+            )
+        )
+
+        val messages = dataSource.observeMessages().first()
+
+        assertEquals(listOf("m-3", "m-1", "m-2"), messages.map { it.messageId })
+    }
+
+    @Test
     fun `staff polling flow performs an independent fetch per subscriber`() = runTest {
         val remote = CountingOperationsPollingRemoteDataSource(
             staff = listOf(
