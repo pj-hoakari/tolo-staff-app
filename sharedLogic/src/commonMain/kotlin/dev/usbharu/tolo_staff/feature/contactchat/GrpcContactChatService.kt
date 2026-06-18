@@ -19,7 +19,7 @@ class GrpcContactChatService(
         dataSource.start()
         return combine(
             dataSource.observeThreads(),
-            dataSource.observeMessages(),
+            dataSource.observeMessages(currentStaffId),
             dataSource.observeStaff(),
         ) { threads, messages, staff ->
             val previewByThread = messages.toRoomPreviewByThread()
@@ -42,7 +42,7 @@ class GrpcContactChatService(
         logger.info { "observeMessages started: roomId=$roomId, currentStaffId=$currentStaffId" }
         dataSource.start()
         return combine(
-            dataSource.observeMessages(),
+            dataSource.observeMessages(currentStaffId),
             dataSource.observeStaff(),
         ) { messages, staff ->
             messages

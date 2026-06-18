@@ -80,6 +80,9 @@ enum class OperationMessageType {
     INSTRUCTION,
     REPORT,
     SIMPLE,
+    ;
+
+    companion object
 }
 
 @Serializable

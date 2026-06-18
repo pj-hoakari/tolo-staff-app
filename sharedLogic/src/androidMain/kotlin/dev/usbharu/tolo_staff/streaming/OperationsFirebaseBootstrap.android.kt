@@ -5,13 +5,18 @@ import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.apps
 import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.initialize
+import dev.usbharu.tolo_staff.logging.AppLogger
 
 actual class OperationsFirebaseBootstrap {
+    private val logger = AppLogger.withTag("OperationsFirebaseBootstrap")
+
     actual fun initialize(context: Any?) {
         if (Firebase.apps(context).isNotEmpty()) {
+            logger.debug { "Firebase initialization skipped because an app already exists" }
             return
         }
 
+        val config = OperationsFirebaseRuntime.streamingConfig
         Firebase.initialize(
             context = context,
             options = FirebaseOptions(
@@ -21,6 +26,13 @@ actual class OperationsFirebaseBootstrap {
                 gcmSenderId = "1234567890",
             )
         )
-        Firebase.firestore.useEmulator("10.0.2.2", 8081)
+        if (config.enabled) {
+            Firebase.firestore.useEmulator(config.host, config.port)
+            logger.info {
+                "Configured Firestore emulator during bootstrap: host=${config.host}, port=${config.port}"
+            }
+        } else {
+            logger.info { "Firestore emulator bootstrap skipped because streaming is disabled" }
+        }
     }
 }

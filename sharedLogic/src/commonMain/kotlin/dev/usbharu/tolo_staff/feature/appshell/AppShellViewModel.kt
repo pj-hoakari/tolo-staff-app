@@ -431,7 +431,7 @@ class AppShellViewModel(
             dataSource.observeAssignments(),
             dataSource.observeRelevantInstructions(currentStaffId),
             dataSource.observeThreads(),
-            dataSource.observeMessages(),
+            dataSource.observeMessages(currentStaffId),
         ) { values ->
             values
         }

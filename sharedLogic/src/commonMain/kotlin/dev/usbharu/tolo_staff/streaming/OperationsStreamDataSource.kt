@@ -17,6 +17,8 @@ interface OperationsStreamDataSource {
 
     fun observeMessages(): Flow<List<OperationMessage>>
 
+    fun observeMessages(currentStaffId: String): Flow<List<OperationMessage>> = observeMessages()
+
     fun start()
 
     fun stop()

@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -381,6 +382,144 @@ class AppShellViewModelTest {
         assertEquals("Sato instruction", viewModel.uiState.value.homeOverview.currentInstruction)
         assertEquals(null, viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
         assertEquals(null, viewModel.uiState.value.instructionsTab.selectedInstruction)
+
+        viewModel.clear()
+    }
+
+    @Test
+    fun `contact thread messages mark sender and current user correctly`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            staff = listOf(
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "tanaka",
+                    staffId = "tanaka",
+                    name = "田中",
+                    roles = listOf("Aゲート担当"),
+                ),
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "sato",
+                    staffId = "sato",
+                    name = "佐藤",
+                    roles = listOf("巡回担当"),
+                ),
+            ),
+            threads = listOf(
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "thread-1",
+                    threadId = "thread-1",
+                    members = listOf("tanaka", "sato"),
+                )
+            ),
+            messages = listOf(
+                OperationMessage(
+                    updatedAt = "2026-06-18T09:00:00Z",
+                    reason = "test",
+                    entityId = "message-1",
+                    messageId = "message-1",
+                    threadId = "thread-1",
+                    staffId = "sato",
+                    messageType = OperationMessageType.SIMPLE,
+                    text = "了解です",
+                ),
+                OperationMessage(
+                    updatedAt = "2026-06-18T09:01:00Z",
+                    reason = "test",
+                    entityId = "message-2",
+                    messageId = "message-2",
+                    threadId = "thread-1",
+                    staffId = "tanaka",
+                    messageType = OperationMessageType.SIMPLE,
+                    text = "こちら配置済みです",
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onContactThreadSelected("thread-1")
+
+        val initialMessages = viewModel.uiState.value.contactsTab.selectedThread?.messages.orEmpty()
+        assertEquals(listOf("佐藤", "田中"), initialMessages.map { it.senderName })
+        assertEquals(listOf(false, true), initialMessages.map { it.isCurrentUser })
+
+        viewModel.onCurrentStaffSelected("sato")
+        viewModel.onContactThreadSelected("thread-1")
+
+        val switchedMessages = viewModel.uiState.value.contactsTab.selectedThread?.messages.orEmpty()
+        assertEquals(listOf("佐藤", "田中"), switchedMessages.map { it.senderName })
+        assertEquals(listOf(true, false), switchedMessages.map { it.isCurrentUser })
+        assertFalse(switchedMessages.any { it.senderName == "null" })
+
+        viewModel.clear()
+    }
+
+    @Test
+    fun `client message id restores sender when streamed sender is null literal`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            staff = listOf(
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "tanaka",
+                    staffId = "tanaka",
+                    name = "田中",
+                    roles = listOf("Aゲート担当"),
+                ),
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "sato",
+                    staffId = "sato",
+                    name = "佐藤",
+                    roles = listOf("巡回担当"),
+                ),
+            ),
+            threads = listOf(
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "thread-gate-a",
+                    threadId = "thread-gate-a",
+                    members = listOf("tanaka", "sato"),
+                )
+            ),
+            messages = listOf(
+                OperationMessage(
+                    updatedAt = "2026-06-19T09:00:00Z",
+                    reason = "message.created",
+                    entityId = "client-tanaka-12345",
+                    messageId = "client-tanaka-12345",
+                    threadId = "thread-gate-a",
+                    staffId = "null",
+                    messageType = OperationMessageType.SIMPLE,
+                    text = "こちら配置済みです",
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onContactThreadSelected("thread-gate-a")
+
+        val message = viewModel.uiState.value.contactsTab.selectedThread?.messages?.single()
+        assertEquals("田中", message?.senderName)
+        assertEquals(true, message?.isCurrentUser)
 
         viewModel.clear()
     }

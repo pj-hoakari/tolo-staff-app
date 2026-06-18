@@ -40,6 +40,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -57,7 +59,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -126,7 +130,8 @@ fun ToloStaffAndroidApp(
         onContactTargetTypeSelected = viewModel::onContactTargetTypeSelected,
         onContactTargetSelected = viewModel::onContactTargetSelected,
         onContactDraftChanged = viewModel::onContactDraftChanged,
-        onContactSendClicked = viewModel::onContactSendClicked
+        onContactSendClicked = viewModel::onContactSendClicked,
+        onCurrentStaffSelected = viewModel::onCurrentStaffSelected,
     )
 }
 
@@ -156,6 +161,7 @@ fun ToloStaffAndroidContent(
     onContactTargetSelected: (String) -> Unit = {},
     onContactDraftChanged: (String) -> Unit = {},
     onContactSendClicked: () -> Unit = {},
+    onCurrentStaffSelected: (String) -> Unit = {},
 ) {
     MaterialTheme {
         Scaffold(
@@ -165,6 +171,8 @@ fun ToloStaffAndroidContent(
                     navigationIcon = {
                         CurrentStaffHeaderIcon(
                             currentStaff = state.currentStaff,
+                            availableStaff = state.availableStaff,
+                            onCurrentStaffSelected = onCurrentStaffSelected,
                             modifier = Modifier.padding(start = 8.dp)
                         )
                     },
@@ -244,16 +252,73 @@ fun ToloStaffAndroidContent(
 @Composable
 private fun CurrentStaffHeaderIcon(
     currentStaff: CurrentStaffUiModel,
+    availableStaff: List<CurrentStaffUiModel>,
+    onCurrentStaffSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Icon(
-        imageVector = Icons.Default.AccountCircle,
-        contentDescription = "current_staff_${currentStaff.staffId}",
-        modifier = modifier
-            .size(28.dp)
-            .semantics { contentDescription = "current_staff_${currentStaff.staffId}" },
-        tint = MaterialTheme.colorScheme.primary
-    )
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .clickable(enabled = availableStaff.isNotEmpty()) { isExpanded = true }
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics { contentDescription = "current_staff_${currentStaff.staffId}" },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccountCircle,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = currentStaff.displayName,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                currentStaff.roleLabel?.takeIf { it.isNotBlank() }?.let { roleLabel ->
+                    Text(
+                        text = roleLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        DropdownMenu(
+            expanded = isExpanded,
+            onDismissRequest = { isExpanded = false },
+        ) {
+            availableStaff.forEach { staff ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(staff.displayName)
+                            staff.roleLabel?.takeIf { it.isNotBlank() }?.let { roleLabel ->
+                                Text(
+                                    text = roleLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        isExpanded = false
+                        onCurrentStaffSelected(staff.staffId)
+                    }
+                )
+            }
+        }
+    }
 }
 
 private fun appShellTitle(tab: AppTab): String =
