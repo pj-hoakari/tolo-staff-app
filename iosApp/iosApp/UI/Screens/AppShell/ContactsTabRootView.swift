@@ -20,8 +20,9 @@ struct ContactsTabRootView: View {
                 onNewThreadStarted: onNewThreadStarted
             )
             .navigationTitle("app_shell_contacts_title")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(id: "current-staff-header", placement: .topBarLeading) {
                     CurrentStaffHeaderIconView(currentStaff: currentStaff)
                 }
             }

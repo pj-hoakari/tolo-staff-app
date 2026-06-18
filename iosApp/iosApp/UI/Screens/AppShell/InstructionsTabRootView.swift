@@ -12,12 +12,14 @@ struct InstructionsTabRootView: View {
     var body: some View {
         NavigationStack {
             InstructionListView(
-                instructions: state.instructions,
+                featuredInstruction: state.featuredInstruction,
+                otherInstructions: state.otherInstructions,
                 onInstructionSelected: onInstructionSelected
             )
             .navigationTitle("app_shell_instructions_title")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(id: "current-staff-header", placement: .topBarLeading) {
                     CurrentStaffHeaderIconView(currentStaff: currentStaff)
                 }
             }
@@ -46,49 +48,99 @@ struct InstructionsTabRootView: View {
 }
 
 private struct InstructionListView: View {
-    let instructions: [InstructionSummaryUiModel]
+    let featuredInstruction: InstructionSummaryUiModel?
+    let otherInstructions: [InstructionSummaryUiModel]
     let onInstructionSelected: (String) -> Void
 
     var body: some View {
-        List(instructions, id: \.id) { instruction in
-            Button {
-                onInstructionSelected(instruction.id)
-            } label: {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(instruction.title)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                if let featuredInstruction {
+                    homeStyleInstructionCard(featuredInstruction)
+                        .padding(.horizontal, 16)
+                }
+
+                if !otherInstructions.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("その他の指示")
                             .font(.headline)
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Text(instruction.priorityLabel)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                    Text(instruction.targetName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(instruction.preview)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                    HStack {
-                        Text(instruction.statusLabel)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.blue.opacity(0.1), in: Capsule())
-                        if instruction.unreadCount > 0 {
-                            Text("未読 \(instruction.unreadCount)")
-                                .font(.caption)
-                                .foregroundStyle(.red)
+                            .foregroundStyle(.secondary)
+
+                        VStack(spacing: 10) {
+                            ForEach(otherInstructions, id: \.id) { instruction in
+                                compactInstructionRow(instruction)
+                            }
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .accessibilityIdentifier("instruction_other_list")
                 }
-                .padding(.vertical, 6)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("instruction_row_\(instruction.id)")
+            .padding(.vertical, 16)
         }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func homeStyleInstructionCard(_ instruction: InstructionSummaryUiModel) -> some View {
+        Button {
+            onInstructionSelected(instruction.id)
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("あなたへの指示", systemImage: "checklist")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+
+                Text(instruction.preview)
+                    .font(.title3)
+                    .bold()
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("featured_instruction_card")
+    }
+
+    private func compactInstructionRow(_ instruction: InstructionSummaryUiModel) -> some View {
+        Button {
+            onInstructionSelected(instruction.id)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(instruction.title)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text(instruction.priorityLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+
+                HStack(spacing: 8) {
+                    Text(instruction.targetName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(instruction.statusLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if instruction.unreadCount > 0 {
+                        Text("未読 \(instruction.unreadCount)")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("instruction_row_\(instruction.id)")
     }
 }
 

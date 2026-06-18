@@ -22,7 +22,9 @@ final class SampleScenarioTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(tabBarButtons.count, 4)
 
         tabBarButtons.element(boundBy: 1).tap()
-        XCTAssertTrue(app.descendants(matching: .any)["instruction_row_instruction-gate-a"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["featured_instruction_card"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["instruction_row_instruction-patrol"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["instruction_other_list"].waitForExistence(timeout: 3))
 
         tabBarButtons.element(boundBy: 2).tap()
         XCTAssertTrue(app.descendants(matching: .any)["report_type_queue"].waitForExistence(timeout: 3))

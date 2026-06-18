@@ -76,6 +76,8 @@ data class InstructionDetailUiModel(
 
 data class InstructionsTabUiState(
     val instructions: List<InstructionSummaryUiModel> = emptyList(),
+    val featuredInstruction: InstructionSummaryUiModel? = null,
+    val otherInstructions: List<InstructionSummaryUiModel> = emptyList(),
     val selectedInstruction: InstructionDetailUiModel? = null,
     val isShowingThread: Boolean = false,
 )

@@ -75,12 +75,13 @@ class AppShellViewModel(
 
     fun onHomeInstructionSelected() {
         val selectedInstruction = currentState.instructionsTab.selectedInstruction
+            ?: instructionDetailFor(currentState.instructionsTab.featuredInstruction?.id)
             ?: instructionDetailFor(currentState.instructionsTab.instructions.firstOrNull()?.id)
             ?: return
         updateState {
             it.copy(
                 selectedTab = AppTab.INSTRUCTIONS,
-                instructionsTab = it.instructionsTab.copy(
+                instructionsTab = it.instructionsTab.withSelection(
                     selectedInstruction = selectedInstruction,
                     isShowingThread = false,
                 )
@@ -92,7 +93,7 @@ class AppShellViewModel(
         val detail = instructionDetailFor(instructionId) ?: return
         updateState {
             it.copy(
-                instructionsTab = it.instructionsTab.copy(
+                instructionsTab = it.instructionsTab.withSelection(
                     selectedInstruction = detail,
                     isShowingThread = false,
                 )
@@ -132,7 +133,7 @@ class AppShellViewModel(
     fun onInstructionDetailClosed() {
         updateState {
             it.copy(
-                instructionsTab = it.instructionsTab.copy(
+                instructionsTab = it.instructionsTab.withSelection(
                     selectedInstruction = null,
                     isShowingThread = false,
                 )
@@ -144,30 +145,37 @@ class AppShellViewModel(
         val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
         val statusLabel = status.toStatusLabel()
         updateState { state ->
+            val updatedSelectedInstruction = selectedInstruction.copy(
+                statusLabel = statusLabel,
+                participants = selectedInstruction.participants.map { participant ->
+                    if (participant.isCurrentStaff) {
+                        participant.copy(statusLabel = statusLabel)
+                    } else {
+                        participant
+                    }
+                }
+            )
+            val updatedInstructions = state.instructionsTab.instructions.map { summary ->
+                if (summary.id == selectedInstruction.id) {
+                    summary.copy(statusLabel = statusLabel)
+                } else {
+                    summary
+                }
+            }
             state.copy(
                 homeOverview = state.homeOverview.copy(
-                    currentInstruction = selectedInstruction.title,
+                    currentInstruction = selectedInstruction.toHomeInstructionText(),
                     currentInstructionId = selectedInstruction.id,
                 ),
-                instructionsTab = state.instructionsTab.copy(
-                    instructions = state.instructionsTab.instructions.map { summary ->
-                        if (summary.id == selectedInstruction.id) {
-                            summary.copy(statusLabel = statusLabel)
-                        } else {
-                            summary
-                        }
-                    },
-                    selectedInstruction = selectedInstruction.copy(
-                        statusLabel = statusLabel,
-                        participants = selectedInstruction.participants.map { participant ->
-                            if (participant.isCurrentStaff) {
-                                participant.copy(statusLabel = statusLabel)
-                            } else {
-                                participant
-                            }
-                        }
+                instructionsTab = state.instructionsTab
+                    .withInstructions(
+                        instructions = updatedInstructions,
+                        featuredInstructionId = state.homeOverview.currentInstructionId ?: selectedInstruction.id,
                     )
-                )
+                    .withSelection(
+                        selectedInstruction = updatedSelectedInstruction,
+                        isShowingThread = state.instructionsTab.isShowingThread,
+                    )
             )
         }
     }
@@ -453,6 +461,10 @@ class AppShellViewModel(
                 updateState {
                     it.copy(
                         homeOverview = projection.homeOverview,
+                        instructionsTab = it.instructionsTab.withInstructions(
+                            instructions = it.instructionsTab.instructions,
+                            featuredInstructionId = projection.homeOverview.currentInstructionId,
+                        ),
                         currentPlacementName = projection.currentPlacementName,
                         isLoading = false,
                         errorMessage = null,
@@ -544,20 +556,26 @@ class AppShellViewModel(
         fun initialState(
             currentStaff: CurrentStaffMember,
             availableStaff: List<CurrentStaffMember>,
-        ): AppShellUiState =
-            AppShellUiState(
+        ): AppShellUiState {
+            val instructionsTab = initialInstructionsState(currentStaff.toUiModel())
+            val featuredInstruction = instructionsTab.featuredInstruction
+            return AppShellUiState(
+                homeOverview = AppShellHomeOverview(
+                    currentInstruction = primaryInstructionDetail(currentStaff.toUiModel()).toHomeInstructionText(),
+                    currentInstructionId = featuredInstruction?.id,
+                ),
                 currentStaff = currentStaff.toUiModel(),
                 availableStaff = availableStaff.map { it.toUiModel() },
-                instructionsTab = initialInstructionsState(currentStaff.toUiModel()),
+                instructionsTab = instructionsTab,
                 reportsTab = initialReportsState(),
                 contactsTab = initialContactsState(),
                 isLoading = true,
             )
+        }
 
         fun initialInstructionsState(currentStaff: CurrentStaffUiModel): InstructionsTabUiState {
             val detail = primaryInstructionDetail(currentStaff)
-            return InstructionsTabUiState(
-                instructions = listOf(
+            val instructions = listOf(
                     InstructionSummaryUiModel(
                         id = detail.id,
                         title = detail.title,
@@ -575,8 +593,15 @@ class AppShellViewModel(
                         statusLabel = "未確認",
                         preview = "通路の滞留が増えた場合は本部へ即時報告してください。",
                     )
-                ),
-                selectedInstruction = detail,
+            )
+            return InstructionsTabUiState(
+                instructions = instructions,
+            ).withInstructions(
+                instructions = instructions,
+                featuredInstructionId = detail.id,
+            ).withSelection(
+                selectedInstruction = null,
+                isShowingThread = false,
             )
         }
 
@@ -703,6 +728,9 @@ class AppShellViewModel(
                 InstructionProgressStatus.COMPLETED -> "完了"
             }
 
+        fun InstructionDetailUiModel.toHomeInstructionText(): String =
+            if (body.isBlank()) title else "$title: $body"
+
         fun mergeContactSummary(
             current: List<ContactThreadSummaryUiModel>,
             threadId: String,
@@ -734,3 +762,24 @@ class AppShellViewModel(
             )
     }
 }
+
+private fun InstructionsTabUiState.withInstructions(
+    instructions: List<InstructionSummaryUiModel>,
+    featuredInstructionId: String?,
+): InstructionsTabUiState {
+    val featured = instructions.firstOrNull { it.id == featuredInstructionId } ?: instructions.firstOrNull()
+    val featuredId = featured?.id
+    return copy(
+        instructions = instructions,
+        featuredInstruction = featured,
+        otherInstructions = instructions.filterNot { it.id == featuredId },
+    )
+}
+
+private fun InstructionsTabUiState.withSelection(
+    selectedInstruction: InstructionDetailUiModel?,
+    isShowingThread: Boolean,
+): InstructionsTabUiState = copy(
+    selectedInstruction = selectedInstruction,
+    isShowingThread = isShowingThread,
+)

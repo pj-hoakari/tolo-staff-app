@@ -307,7 +307,11 @@ private fun InstructionsContent(
     onStatusUpdated: (InstructionProgressStatus) -> Unit,
 ) {
     when {
-        state.selectedInstruction == null -> InstructionList(state.instructions, onInstructionSelected)
+        state.selectedInstruction == null -> InstructionList(
+            featuredInstruction = state.featuredInstruction,
+            otherInstructions = state.otherInstructions,
+            onInstructionSelected = onInstructionSelected,
+        )
         state.isShowingThread -> InstructionThread(state.selectedInstruction, onThreadClosed)
         else -> InstructionDetail(state.selectedInstruction, onThreadOpened, onDetailClosed, onStatusUpdated)
     }
@@ -362,7 +366,8 @@ private fun ContactsContent(
 
 @Composable
 private fun InstructionList(
-    instructions: List<InstructionSummaryUiModel>,
+    featuredInstruction: InstructionSummaryUiModel?,
+    otherInstructions: List<InstructionSummaryUiModel>,
     onInstructionSelected: (String) -> Unit,
 ) {
     LazyColumn(
@@ -371,25 +376,49 @@ private fun InstructionList(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { ScreenHeader("指示", "現在受けている指示を確認します。") }
-        items(instructions, key = { it.id }) { instruction ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onInstructionSelected(instruction.id) }
-                    .semantics { contentDescription = "instruction_row_${instruction.id}" },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row {
-                        Text(instruction.title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        Text(instruction.priorityLabel, color = MaterialTheme.colorScheme.primary)
-                    }
-                    Text(instruction.targetName, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(instruction.preview, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(instruction.statusLabel)
-                        if (instruction.unreadCount > 0) {
-                            Text("未読 ${instruction.unreadCount}", color = MaterialTheme.colorScheme.error)
+        featuredInstruction?.let { instruction ->
+            item {
+                HomeOverviewCard(
+                    title = "あなたへの指示",
+                    primaryText = instruction.preview,
+                    secondaryText = null,
+                    identifier = "featured_instruction_card",
+                    onClick = { onInstructionSelected(instruction.id) },
+                )
+            }
+        }
+        if (otherInstructions.isNotEmpty()) {
+            item {
+                Text("その他の指示", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            items(otherInstructions, key = { it.id }) { instruction ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onInstructionSelected(instruction.id) }
+                        .semantics { contentDescription = "instruction_row_${instruction.id}" },
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row {
+                            Text(
+                                instruction.title,
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                instruction.priorityLabel,
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(instruction.targetName, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            Text(instruction.statusLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            if (instruction.unreadCount > 0) {
+                                Text("未読 ${instruction.unreadCount}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
@@ -870,9 +899,19 @@ private fun HomeOverviewCard(
     primaryText: String,
     secondaryText: String?,
     identifier: String,
+    onClick: (() -> Unit)? = null,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = identifier },
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { modifier ->
+                if (onClick != null) {
+                    modifier.clickable(onClick = onClick)
+                } else {
+                    modifier
+                }
+            }
+            .semantics { contentDescription = identifier },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {

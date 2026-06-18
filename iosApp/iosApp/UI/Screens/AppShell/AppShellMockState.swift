@@ -19,7 +19,7 @@ extension AppShellHomeOverview {
             eventTime: "受付開始 09:00 / 開場 10:00",
             placementName: "物販会場",
             placementDetail: "西ホール 入口ゲート A",
-            currentInstruction: "来場者導線を確保し、不明点はリーダーへ連絡してください。",
+            currentInstruction: "Aゲート前の列を右側へ誘導: 来場者導線を確保し、右側へ寄せてください。",
             mapState: mapState,
             currentInstructionId: "instruction-gate-a",
             unreadContactCount: 2,
@@ -31,6 +31,24 @@ extension AppShellHomeOverview {
 extension AppShellUiState {
     static func mock(selectedTab: AppTab = AppTab.home) -> AppShellUiState {
         let overview = AppShellHomeOverview.mock()
+        let featuredInstruction = InstructionSummaryUiModel(
+            id: "instruction-gate-a",
+            title: "Aゲート前の列を右側へ誘導",
+            targetName: "Aゲート担当",
+            priorityLabel: "高",
+            statusLabel: "対応中",
+            preview: "来場者導線を確保し、右側へ寄せてください。",
+            unreadCount: 1
+        )
+        let otherInstruction = InstructionSummaryUiModel(
+            id: "instruction-patrol",
+            title: "巡回スタッフは西ホール通路の滞留を確認",
+            targetName: "巡回担当",
+            priorityLabel: "通常",
+            statusLabel: "未確認",
+            preview: "通路の滞留が増えた場合は本部へ即時報告してください。",
+            unreadCount: 0
+        )
 
         return AppShellUiState(
             homeOverview: overview,
@@ -46,17 +64,9 @@ extension AppShellUiState {
             ],
             selectedTab: selectedTab,
             instructionsTab: InstructionsTabUiState(
-                instructions: [
-                    InstructionSummaryUiModel(
-                        id: "instruction-gate-a",
-                        title: "Aゲート前の列を右側へ誘導",
-                        targetName: "Aゲート担当",
-                        priorityLabel: "高",
-                        statusLabel: "対応中",
-                        preview: "来場者導線を確保し、右側へ寄せてください。",
-                        unreadCount: 1
-                    )
-                ],
+                instructions: [featuredInstruction, otherInstruction],
+                featuredInstruction: featuredInstruction,
+                otherInstructions: [otherInstruction],
                 selectedInstruction: nil,
                 isShowingThread: false
             ),

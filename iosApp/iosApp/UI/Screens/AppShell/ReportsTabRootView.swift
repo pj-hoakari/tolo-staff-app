@@ -24,8 +24,9 @@ struct ReportsTabRootView: View {
         NavigationStack(path: navigationPath) {
             reportTypeSelection
                 .navigationTitle("app_shell_reports_title")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
+                    ToolbarItem(id: "current-staff-header", placement: .topBarLeading) {
                         CurrentStaffHeaderIconView(currentStaff: currentStaff)
                     }
                 }
@@ -75,18 +76,18 @@ struct ReportsTabRootView: View {
 
     private var reportTypeSelection: some View {
         List(state.reportTypes, id: \.id) { type in
-            Button {
-                onTypeSelected(type.id)
-            } label: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(type.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(type.detailText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 6)
+                Button {
+                    onTypeSelected(type.id)
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(type.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        Text(type.detailText)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 6)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("report_type_\(type.id)")

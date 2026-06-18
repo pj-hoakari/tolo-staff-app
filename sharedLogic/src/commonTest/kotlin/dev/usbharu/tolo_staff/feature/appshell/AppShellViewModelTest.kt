@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppShellViewModelTest {
@@ -46,7 +45,10 @@ class AppShellViewModelTest {
         assertEquals("Tolo Staff Demo 2026", viewModel.uiState.value.homeOverview.eventName)
         assertEquals("North entrance", viewModel.uiState.value.homeOverview.placementDetail)
         assertEquals("Shift update: Move barricades", viewModel.uiState.value.homeOverview.currentInstruction)
-        assertNotNull(viewModel.uiState.value.instructionsTab.selectedInstruction)
+        assertEquals("instruction-gate-a", viewModel.uiState.value.homeOverview.currentInstructionId)
+        assertEquals(null, viewModel.uiState.value.instructionsTab.selectedInstruction)
+        assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
+        assertEquals(listOf("instruction-patrol"), viewModel.uiState.value.instructionsTab.otherInstructions.map { it.id })
         assertEquals(3, viewModel.uiState.value.reportsTab.reportTypes.size)
         assertEquals(3, viewModel.uiState.value.contactsTab.threads.size)
         assertEquals(AppTab.HOME, viewModel.uiState.value.selectedTab)
@@ -89,7 +91,34 @@ class AppShellViewModelTest {
 
         assertEquals(AppTab.INSTRUCTIONS, viewModel.uiState.value.selectedTab)
         assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.selectedInstruction?.id)
+        assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
         assertEquals(false, viewModel.uiState.value.instructionsTab.isShowingThread)
+        viewModel.clear()
+    }
+
+    @Test
+    fun `featured instruction falls back to first item when home overview id is missing`() = runTest {
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        currentInstruction = "No matching id",
+                        currentInstructionId = "missing-id",
+                    ),
+                    currentPlacementName = "未配属"
+                )
+            )
+        )
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
+        assertEquals(listOf("instruction-patrol"), viewModel.uiState.value.instructionsTab.otherInstructions.map { it.id })
+
         viewModel.clear()
     }
 
@@ -210,10 +239,9 @@ class AppShellViewModelTest {
         assertEquals(listOf("tanaka", "sato"), repository.observedStaffIds)
         assertEquals("佐藤", viewModel.uiState.value.currentStaff.displayName)
         assertEquals("Patrol", viewModel.uiState.value.currentPlacementName)
-        assertEquals(
-            "佐藤",
-            viewModel.uiState.value.instructionsTab.selectedInstruction?.participants?.first()?.staffName
-        )
+        assertEquals("Sato instruction", viewModel.uiState.value.homeOverview.currentInstruction)
+        assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
+        assertEquals(null, viewModel.uiState.value.instructionsTab.selectedInstruction)
 
         viewModel.clear()
     }

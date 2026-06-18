@@ -68,7 +68,8 @@ class OperationsOverviewRepositoryImpl(
                 placementName = placementName,
                 placementDetail = placementDetail,
                 currentInstruction = instructionText,
-                mapState = AppShellMapState()
+                mapState = AppShellMapState(),
+                currentInstructionId = activeInstruction?.instructionId,
             ),
             currentPlacementName = placementName
         )

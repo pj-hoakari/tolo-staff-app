@@ -101,8 +101,9 @@ struct AppShellContentView: View {
                         onOpenContacts: onOpenContactsFromHome
                     )
                     .navigationTitle("app_shell_home_title")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
+                        ToolbarItem(id: "current-staff-header", placement: .topBarLeading) {
                             CurrentStaffHeaderIconView(currentStaff: state.currentStaff)
                         }
                     }
@@ -174,7 +175,12 @@ struct CurrentStaffHeaderIconView: View {
     var body: some View {
         Image(systemName: "person.crop.circle")
             .font(.title3)
+            .frame(width: 28, height: 28)
             .foregroundStyle(Color.accentColor)
+            .contentTransition(.identity)
+            .transaction { transaction in
+                transaction.animation = nil
+            }
             .accessibilityIdentifier("current_mock_staff_\(currentStaff.staffId)")
             .accessibilityLabel("current_mock_staff_\(currentStaff.staffId)")
     }

@@ -54,6 +54,7 @@ class OperationsOverviewRepositoryTest {
         assertEquals("Gate A", projection.currentPlacementName)
         assertEquals("North entrance", projection.homeOverview.placementDetail)
         assertEquals("Shift update: Move barricades", projection.homeOverview.currentInstruction)
+        assertEquals("inst-1", projection.homeOverview.currentInstructionId)
     }
 }
 

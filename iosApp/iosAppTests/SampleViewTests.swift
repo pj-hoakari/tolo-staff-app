@@ -19,6 +19,8 @@ final class SampleViewTests: XCTestCase {
         let view = AppShellContentView(state: state)
 
         XCTAssertNotNil(view)
+        XCTAssertEqual(state.instructionsTab.featuredInstruction?.id, state.homeOverview.currentInstructionId)
+        XCTAssertEqual(state.instructionsTab.otherInstructions.count, 1)
     }
 
     func testReportsTabCanBeCreated() {
