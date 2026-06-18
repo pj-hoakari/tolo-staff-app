@@ -89,6 +89,54 @@ class CurrentStaffSessionTest {
         assertEquals("unknown", session.currentStaffSnapshot.staffId)
         assertEquals(emptyList(), session.availableStaff.value)
     }
+
+    @Test
+    fun `default staff converges to preferred id when it arrives after others`() = runTest {
+        val dataSource = SessionFakeOperationsStreamDataSource()
+        val session = MockCurrentStaffSession(
+            dataSource = dataSource,
+            coroutineContext = StandardTestDispatcher(testScheduler)
+        )
+        advanceUntilIdle()
+
+        dataSource.staffFlow.value = listOf(
+            OperationStaff(staffId = "suzuki", name = "Suzuki")
+        )
+        advanceUntilIdle()
+
+        dataSource.staffFlow.value = listOf(
+            OperationStaff(staffId = "suzuki", name = "Suzuki"),
+            OperationStaff(staffId = "tanaka", name = "Tanaka"),
+        )
+        advanceUntilIdle()
+
+        assertEquals("tanaka", session.currentStaffSnapshot.staffId)
+    }
+
+    @Test
+    fun `explicit selection is preserved when preferred id arrives later`() = runTest {
+        val dataSource = SessionFakeOperationsStreamDataSource()
+        val session = MockCurrentStaffSession(
+            dataSource = dataSource,
+            coroutineContext = StandardTestDispatcher(testScheduler)
+        )
+        advanceUntilIdle()
+
+        dataSource.staffFlow.value = listOf(
+            OperationStaff(staffId = "suzuki", name = "Suzuki")
+        )
+        advanceUntilIdle()
+
+        session.selectStaff("suzuki")
+
+        dataSource.staffFlow.value = listOf(
+            OperationStaff(staffId = "suzuki", name = "Suzuki"),
+            OperationStaff(staffId = "tanaka", name = "Tanaka"),
+        )
+        advanceUntilIdle()
+
+        assertEquals("suzuki", session.currentStaffSnapshot.staffId)
+    }
 }
 
 private class SessionFakeOperationsStreamDataSource : OperationsStreamDataSource {

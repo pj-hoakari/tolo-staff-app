@@ -102,11 +102,17 @@ class FirestoreOperationsStreamDataSource(
                     orderField = orderField,
                 ).snapshots.map { snapshot ->
                     snapshot.documents.mapNotNull { document ->
-                        runCatching { document.data(serializer) }.getOrNull()
+                        runCatching { document.data(serializer) }
+                            .onFailure { throwable ->
+                                logger.warn(throwable) {
+                                    "Failed to deserialize Firestore document: collection=$collectionName, documentId=${document.id}"
+                                }
+                            }
+                            .getOrNull()
                     }
                         .also {
                             logger.debug {
-                                "Observed Firestore collection: collectionName=$collectionName, documentCount=${it.size}"
+                                "Observed Firestore collection: collectionName=$collectionName, deserialized=${it.size}, total=${snapshot.documents.size}"
                             }
                         }
                 }

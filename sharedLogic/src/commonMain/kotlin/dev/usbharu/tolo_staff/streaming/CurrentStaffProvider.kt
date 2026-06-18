@@ -41,6 +41,7 @@ class MockCurrentStaffSession(
     private val _availableStaff = MutableStateFlow(initialStaff)
     private val _currentStaff = MutableStateFlow(defaultCurrentStaff(initialStaff))
     private val _isReady = MutableStateFlow(initialStaff.isNotEmpty() || dataSource == null)
+    private var explicitlySelected = false
 
     override val currentStaff: StateFlow<CurrentStaffMember> = _currentStaff.asStateFlow()
     override val availableStaff: StateFlow<List<CurrentStaffMember>> = _availableStaff.asStateFlow()
@@ -71,16 +72,24 @@ class MockCurrentStaffSession(
     override fun selectStaff(staffId: String) {
         val nextStaff = _availableStaff.value.firstOrNull { it.staffId == staffId } ?: return
         _currentStaff.value = nextStaff
+        explicitlySelected = true
         logger.info { "Selected current staff: staffId=$staffId, displayName=${nextStaff.displayName}" }
     }
 
     private fun updateAvailableStaff(streamedStaff: List<OperationStaff>) {
         val nextAvailable = streamedStaff.map { it.toCurrentStaffMember() }
         _availableStaff.value = nextAvailable
-        _currentStaff.value = nextAvailable.firstOrNull { it.staffId == _currentStaff.value.staffId }
-            ?: defaultCurrentStaff(nextAvailable)
+        val currentStaffId = _currentStaff.value.staffId
+        val currentStillAvailable = nextAvailable.firstOrNull { it.staffId == currentStaffId }
+        _currentStaff.value = when {
+            explicitlySelected && currentStillAvailable != null -> currentStillAvailable
+            nextAvailable.any { it.staffId == DEFAULT_STAFF_ID } ->
+                nextAvailable.first { it.staffId == DEFAULT_STAFF_ID }
+            currentStillAvailable != null -> currentStillAvailable
+            else -> defaultCurrentStaff(nextAvailable)
+        }
         logger.trace {
-            "Updated available staff: count=${nextAvailable.size}, currentStaffId=${_currentStaff.value.staffId}"
+            "Updated available staff: count=${nextAvailable.size}, currentStaffId=${_currentStaff.value.staffId}, explicitlySelected=$explicitlySelected"
         }
     }
 
