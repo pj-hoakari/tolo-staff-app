@@ -141,6 +141,18 @@ class AppShellViewModel(
         }
     }
 
+    fun onInstructionThreadClosed() {
+        val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
+        updateState {
+            it.copy(
+                instructionsTab = it.instructionsTab.withSelection(
+                    selectedInstruction = selectedInstruction,
+                    isShowingThread = false,
+                )
+            )
+        }
+    }
+
     fun onInstructionStatusUpdated(status: InstructionProgressStatus) {
         val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
         val statusLabel = status.toStatusLabel()
@@ -164,7 +176,13 @@ class AppShellViewModel(
             }
             state.copy(
                 homeOverview = state.homeOverview.copy(
-                    currentInstruction = selectedInstruction.toHomeInstructionText(),
+                    currentInstruction = updatedSelectedInstruction.toHomeInstructionText(),
+                    currentInstructionTitle = updatedSelectedInstruction.title,
+                    currentInstructionTargetName = updatedSelectedInstruction.target.displayName,
+                    currentInstructionPriorityLabel = updatedSelectedInstruction.priorityLabel,
+                    currentInstructionStatusLabel = updatedSelectedInstruction.statusLabel,
+                    currentInstructionLocationLabel = updatedSelectedInstruction.locationLabel,
+                    currentInstructionAttachmentSummary = updatedSelectedInstruction.attachmentSummary,
                     currentInstructionId = selectedInstruction.id,
                 ),
                 instructionsTab = state.instructionsTab
@@ -558,11 +576,18 @@ class AppShellViewModel(
             availableStaff: List<CurrentStaffMember>,
         ): AppShellUiState {
             val instructionsTab = initialInstructionsState(currentStaff.toUiModel())
-            val featuredInstruction = instructionsTab.featuredInstruction
+            val featuredInstruction = primaryInstructionDetail(currentStaff.toUiModel())
             return AppShellUiState(
                 homeOverview = AppShellHomeOverview(
-                    currentInstruction = primaryInstructionDetail(currentStaff.toUiModel()).toHomeInstructionText(),
-                    currentInstructionId = featuredInstruction?.id,
+                    currentInstruction = featuredInstruction.toHomeInstructionText(),
+                    currentInstructionTitle = featuredInstruction.title,
+                    currentInstructionTargetName = featuredInstruction.target.displayName,
+                    currentInstructionPriorityLabel = featuredInstruction.priorityLabel,
+                    currentInstructionStatusLabel = featuredInstruction.statusLabel,
+                    currentInstructionLocationLabel = featuredInstruction.locationLabel,
+                    currentInstructionAttachmentSummary = featuredInstruction.attachmentSummary,
+                    currentInstructionUnreadCount = 1,
+                    currentInstructionId = featuredInstruction.id,
                 ),
                 currentStaff = currentStaff.toUiModel(),
                 availableStaff = availableStaff.map { it.toUiModel() },
@@ -583,6 +608,8 @@ class AppShellViewModel(
                         priorityLabel = detail.priorityLabel,
                         statusLabel = detail.statusLabel,
                         preview = detail.body,
+                        locationLabel = detail.locationLabel,
+                        attachmentSummary = detail.attachmentSummary,
                         unreadCount = 1,
                     ),
                     InstructionSummaryUiModel(
@@ -592,6 +619,8 @@ class AppShellViewModel(
                         priorityLabel = "通常",
                         statusLabel = "未確認",
                         preview = "通路の滞留が増えた場合は本部へ即時報告してください。",
+                        locationLabel = "西ホール 中央通路",
+                        attachmentSummary = "位置情報あり",
                     )
             )
             return InstructionsTabUiState(

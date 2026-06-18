@@ -68,6 +68,10 @@ class OperationsOverviewRepositoryImpl(
                 placementName = placementName,
                 placementDetail = placementDetail,
                 currentInstruction = instructionText,
+                currentInstructionTitle = activeInstruction?.title,
+                currentInstructionTargetName = currentPoint?.name,
+                currentInstructionStatusLabel = activeInstruction?.status?.toStatusLabel(),
+                currentInstructionLocationLabel = currentPoint?.description,
                 mapState = AppShellMapState(),
                 currentInstructionId = activeInstruction?.instructionId,
             ),
@@ -81,6 +85,11 @@ class OperationsOverviewRepositoryImpl(
         }
         return "$title: $description"
     }
+
+    private fun OperationInstructionStatus.toStatusLabel(): String =
+        when (this) {
+            OperationInstructionStatus.ACTIVE -> "対応中"
+        }
 
     private val OperationAssignmentStatus.priority: Int
         get() = when (this) {

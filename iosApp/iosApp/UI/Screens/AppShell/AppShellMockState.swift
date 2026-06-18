@@ -20,6 +20,13 @@ extension AppShellHomeOverview {
             placementName: "物販会場",
             placementDetail: "西ホール 入口ゲート A",
             currentInstruction: "Aゲート前の列を右側へ誘導: 来場者導線を確保し、右側へ寄せてください。",
+            currentInstructionTitle: "Aゲート前の列を右側へ誘導",
+            currentInstructionTargetName: "Aゲート担当",
+            currentInstructionPriorityLabel: "高",
+            currentInstructionStatusLabel: "対応中",
+            currentInstructionLocationLabel: "西ホール 入口ゲート A",
+            currentInstructionAttachmentSummary: "添付画像 1件 / 位置情報あり",
+            currentInstructionUnreadCount: 1,
             mapState: mapState,
             currentInstructionId: "instruction-gate-a",
             unreadContactCount: 2,
@@ -38,6 +45,8 @@ extension AppShellUiState {
             priorityLabel: "高",
             statusLabel: "対応中",
             preview: "来場者導線を確保し、右側へ寄せてください。",
+            locationLabel: "西ホール 入口ゲート A",
+            attachmentSummary: "添付画像 1件 / 位置情報あり",
             unreadCount: 1
         )
         let otherInstruction = InstructionSummaryUiModel(
@@ -47,6 +56,8 @@ extension AppShellUiState {
             priorityLabel: "通常",
             statusLabel: "未確認",
             preview: "通路の滞留が増えた場合は本部へ即時報告してください。",
+            locationLabel: "西ホール 中央通路",
+            attachmentSummary: "位置情報あり",
             unreadCount: 0
         )
 

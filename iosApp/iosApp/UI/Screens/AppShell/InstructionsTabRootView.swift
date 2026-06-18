@@ -85,17 +85,32 @@ private struct InstructionListView: View {
         Button {
             onInstructionSelected(instruction.id)
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Label("あなたへの指示", systemImage: "checklist")
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
-                Text(instruction.preview)
+                Text(instruction.title)
                     .font(.title3)
                     .bold()
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(instruction.preview)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                InstructionMetaSummaryView(
+                    targetName: instruction.targetName,
+                    priorityLabel: instruction.priorityLabel,
+                    statusLabel: instruction.statusLabel,
+                    locationLabel: instruction.locationLabel,
+                    attachmentSummary: instruction.attachmentSummary,
+                    unreadCount: Int(instruction.unreadCount)
+                )
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -283,7 +283,11 @@ private fun HomeOverviewContent(
             HomePlacementMapOverviewCard(overview, "app_shell_home_placement_map_card")
         }
         item {
-            HomeOverviewCard("あなたへの指示", overview.currentInstruction, null, "app_shell_home_instruction_card")
+            HomeInstructionOverviewCard(
+                overview = overview,
+                identifier = "app_shell_home_instruction_card",
+                onClick = onOpenInstruction,
+            )
         }
         item {
             QuickActionsCard(
@@ -306,14 +310,15 @@ private fun InstructionsContent(
     onThreadClosed: () -> Unit,
     onStatusUpdated: (InstructionProgressStatus) -> Unit,
 ) {
+    val selectedInstruction = state.selectedInstruction
     when {
-        state.selectedInstruction == null -> InstructionList(
+        selectedInstruction == null -> InstructionList(
             featuredInstruction = state.featuredInstruction,
             otherInstructions = state.otherInstructions,
             onInstructionSelected = onInstructionSelected,
         )
-        state.isShowingThread -> InstructionThread(state.selectedInstruction, onThreadClosed)
-        else -> InstructionDetail(state.selectedInstruction, onThreadOpened, onDetailClosed, onStatusUpdated)
+        state.isShowingThread -> InstructionThread(selectedInstruction, onThreadClosed)
+        else -> InstructionDetail(selectedInstruction, onThreadOpened, onDetailClosed, onStatusUpdated)
     }
 }
 
@@ -357,8 +362,9 @@ private fun ContactsContent(
     onDraftChanged: (String) -> Unit,
     onSendClicked: () -> Unit,
 ) {
+    val selectedThread = state.selectedThread
     when {
-        state.selectedThread != null -> ContactThreadDetail(state.selectedThread, onBackToList, onDraftChanged, onSendClicked)
+        selectedThread != null -> ContactThreadDetail(selectedThread, onBackToList, onDraftChanged, onSendClicked)
         state.isChoosingTargetType -> ContactTargetSelection(state, onBackToList, onTargetTypeSelected, onTargetSelected)
         else -> ContactThreadList(state, onThreadSelected, onNewThreadStarted)
     }
@@ -378,10 +384,8 @@ private fun InstructionList(
         item { ScreenHeader("指示", "現在受けている指示を確認します。") }
         featuredInstruction?.let { instruction ->
             item {
-                HomeOverviewCard(
-                    title = "あなたへの指示",
-                    primaryText = instruction.preview,
-                    secondaryText = null,
+                FeaturedInstructionCard(
+                    instruction = instruction,
                     identifier = "featured_instruction_card",
                     onClick = { onInstructionSelected(instruction.id) },
                 )
@@ -919,6 +923,102 @@ private fun HomeOverviewCard(
             Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(primaryText, fontWeight = FontWeight.SemiBold)
             secondaryText?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+@Composable
+private fun HomeInstructionOverviewCard(
+    overview: AppShellHomeOverview,
+    identifier: String,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = identifier },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("あなたへの指示", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            overview.currentInstructionTitle?.let {
+                Text(it, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+            }
+            Text(overview.currentInstruction, color = MaterialTheme.colorScheme.onSurface)
+            InstructionMetaSummary(
+                targetName = overview.currentInstructionTargetName,
+                priorityLabel = overview.currentInstructionPriorityLabel,
+                statusLabel = overview.currentInstructionStatusLabel,
+                locationLabel = overview.currentInstructionLocationLabel,
+                attachmentSummary = overview.currentInstructionAttachmentSummary,
+                unreadCount = overview.currentInstructionUnreadCount,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeaturedInstructionCard(
+    instruction: InstructionSummaryUiModel,
+    identifier: String,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = identifier },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("あなたへの指示", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(instruction.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+            Text(instruction.preview, color = MaterialTheme.colorScheme.onSurface)
+            InstructionMetaSummary(
+                targetName = instruction.targetName,
+                priorityLabel = instruction.priorityLabel,
+                statusLabel = instruction.statusLabel,
+                locationLabel = instruction.locationLabel,
+                attachmentSummary = instruction.attachmentSummary,
+                unreadCount = instruction.unreadCount,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InstructionMetaSummary(
+    targetName: String?,
+    priorityLabel: String?,
+    statusLabel: String?,
+    locationLabel: String?,
+    attachmentSummary: String?,
+    unreadCount: Int,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val headline = listOfNotNull(
+            targetName?.takeIf { it.isNotBlank() }?.let { "対象: $it" },
+            priorityLabel?.takeIf { it.isNotBlank() }?.let { "優先度: $it" },
+            statusLabel?.takeIf { it.isNotBlank() }?.let { "状態: $it" },
+        )
+        if (headline.isNotEmpty()) {
+            Text(
+                headline.joinToString("  •  "),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        locationLabel?.takeIf { it.isNotBlank() }?.let {
+            Text("場所: $it", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        attachmentSummary?.takeIf { it.isNotBlank() }?.let {
+            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        if (unreadCount > 0) {
+            Text("未読メッセージ $unreadCount 件", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

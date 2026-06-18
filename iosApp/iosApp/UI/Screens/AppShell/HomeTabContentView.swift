@@ -31,11 +31,8 @@ struct HomeTabContentView: View {
                 HomePlacementMapCard(overview: overview)
                     .accessibilityIdentifier("app_shell_home_placement_map_card")
 
-                HomeTextCard(
-                    titleKey: "app_shell_home_instruction_card_title",
-                    systemImage: "checklist",
-                    primaryText: overview.currentInstruction,
-                    secondaryText: nil,
+                HomeInstructionCard(
+                    overview: overview,
                     action: onOpenInstruction
                 )
                 .accessibilityIdentifier("app_shell_home_instruction_card")
@@ -52,6 +49,46 @@ struct HomeTabContentView: View {
             .padding(.vertical, 12)
         }
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+private struct HomeInstructionCard: View {
+    let overview: AppShellHomeOverview
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("app_shell_home_instruction_card_title", systemImage: "checklist")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+
+                if let title = optionalText(overview.currentInstructionTitle) {
+                    Text(title)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+                }
+
+                Text(overview.currentInstruction)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+
+                InstructionMetaSummaryView(
+                    targetName: overview.currentInstructionTargetName,
+                    priorityLabel: overview.currentInstructionPriorityLabel,
+                    statusLabel: overview.currentInstructionStatusLabel,
+                    locationLabel: overview.currentInstructionLocationLabel,
+                    attachmentSummary: overview.currentInstructionAttachmentSummary,
+                    unreadCount: Int(overview.currentInstructionUnreadCount)
+                )
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -207,4 +244,51 @@ private struct HomePlacementMapCard: View {
         HomeTabContentView(overview: AppShellHomeOverview.mock())
             .navigationTitle("app_shell_home_title")
     }
+}
+
+struct InstructionMetaSummaryView: View {
+    let targetName: String?
+    let priorityLabel: String?
+    let statusLabel: String?
+    let locationLabel: String?
+    let attachmentSummary: String?
+    let unreadCount: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if !headlineItems.isEmpty {
+                Text(headlineItems.joined(separator: "  •  "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let location = optionalText(locationLabel) {
+                Text("場所: \(location)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let attachment = optionalText(attachmentSummary) {
+                Text(attachment)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if unreadCount > 0 {
+                Text("未読メッセージ \(unreadCount) 件")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var headlineItems: [String] {
+        [
+            optionalText(targetName).map { "対象: \($0)" },
+            optionalText(priorityLabel).map { "優先度: \($0)" },
+            optionalText(statusLabel).map { "状態: \($0)" }
+        ].compactMap { $0 }
+    }
+}
+
+private func optionalText(_ text: String?) -> String? {
+    guard let text, !text.isEmpty else { return nil }
+    return text
 }

@@ -58,6 +58,8 @@ data class InstructionSummaryUiModel(
     val priorityLabel: String,
     val statusLabel: String,
     val preview: String,
+    val locationLabel: String? = null,
+    val attachmentSummary: String? = null,
     val unreadCount: Int = 0,
 )
 
