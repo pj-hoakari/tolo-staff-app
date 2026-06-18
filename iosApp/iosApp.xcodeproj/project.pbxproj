@@ -53,8 +53,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B1C6CAFC783088F75F05211E /* Configuration */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = Configuration;
 			sourceTree = "<group>";
 		};
@@ -109,7 +107,6 @@
 			children = (
 				CB5D137909EDF0D079A67484 /* SampleViewTests.swift */,
 			);
-			name = iosAppTests;
 			path = iosAppTests;
 			sourceTree = "<group>";
 		};
@@ -148,7 +145,6 @@
 			children = (
 				51B008725EAF92AF2A9D7475 /* SampleScenarioTests.swift */,
 			);
-			name = iosAppUITests;
 			path = iosAppUITests;
 			sourceTree = "<group>";
 		};

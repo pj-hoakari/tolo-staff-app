@@ -51,6 +51,8 @@ firebase-android-common = { module = "com.google.firebase:firebase-common", vers
 firebase-android-firestore = { module = "com.google.firebase:firebase-firestore", version = "25.1.4" }
 grpc-netty = { module = "io.grpc:grpc-netty", version.ref = "grpc" }
 grpc-okhttp = { module = "io.grpc:grpc-okhttp", version.ref = "grpc" }
+firebase-android-bom = { module = "com.google.firebase:firebase-bom", version = "34.15.0" }
+grpc-protobuf-lite = { module = "io.grpc:grpc-protobuf-lite", version.ref = "grpc" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -221,13 +221,6 @@ private struct HomePlacementMapCard: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        HomeTabContentView(overview: AppShellHomeOverview.mock())
-            .navigationTitle("app_shell_home_title")
-    }
-}
-
 struct AppleInstructionHeroCard: View {
     let eyebrow: LocalizedStringKey
     let title: String?

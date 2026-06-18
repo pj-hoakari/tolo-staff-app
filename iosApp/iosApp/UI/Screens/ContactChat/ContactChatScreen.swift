@@ -233,9 +233,7 @@ struct ContactChatContentView: View {
 #Preview {
     ContactChatContentView(
         state: ContactChatUiState(
-            rooms: [
-                ChatRoom(id: "operations", title: "運営本部", lastMessage: "巡回前に配置表を確認してください。", unreadCount: 2)
-            ],
+            rooms: [],
             selectedRoomId: nil,
             selectedRoomTitle: nil,
             messages: [],

@@ -6,13 +6,19 @@ import dev.usbharu.tolo.communication.grpc.Message
 import dev.usbharu.tolo.communication.grpc.MessageRpc
 import dev.usbharu.tolo.communication.grpc.SimpleMessagePayload
 import dev.usbharu.tolo.communication.grpc.invoke
+import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
 import kotlin.random.Random
 
 class GrpcContactChatWriter(
     private val grpcClient: GrpcCommunicationClient,
 ) {
+    private val logger = AppLogger.withTag("GrpcContactChatWriter")
+
     suspend fun sendSimpleMessage(roomId: String, currentStaffId: String, text: String) {
+        logger.trace {
+            "sendSimpleMessage started: roomId=$roomId, currentStaffId=$currentStaffId, textLength=${text.length}"
+        }
         grpcClient.messageService.CreateMessage(
             CreateMessageRequest {
                 message = Message {
@@ -27,6 +33,7 @@ class GrpcContactChatWriter(
                 }
             }
         )
+        logger.trace { "sendSimpleMessage completed: roomId=$roomId, currentStaffId=$currentStaffId" }
     }
 
     private fun buildMessageId(currentStaffId: String): String =

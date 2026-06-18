@@ -248,10 +248,10 @@ private fun CurrentStaffHeaderIcon(
 ) {
     Icon(
         imageVector = Icons.Default.AccountCircle,
-        contentDescription = "current_mock_staff_${currentStaff.staffId}",
+        contentDescription = "current_staff_${currentStaff.staffId}",
         modifier = modifier
             .size(28.dp)
-            .semantics { contentDescription = "current_mock_staff_${currentStaff.staffId}" },
+            .semantics { contentDescription = "current_staff_${currentStaff.staffId}" },
         tint = MaterialTheme.colorScheme.primary
     )
 }

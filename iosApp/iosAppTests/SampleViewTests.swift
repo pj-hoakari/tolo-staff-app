@@ -6,7 +6,7 @@ import SharedLogic
 
 final class SampleViewTests: XCTestCase {
     func testAppShellContentViewCanBeCreated() {
-        let state = AppShellUiState.mock(selectedTab: AppTab.home)
+        let state = AppShellUiState(selectedTab: AppTab.home)
 
         let view = AppShellContentView(state: state)
 
@@ -14,17 +14,17 @@ final class SampleViewTests: XCTestCase {
     }
 
     func testInstructionsTabCanBeCreated() {
-        let state = AppShellUiState.mock(selectedTab: AppTab.instructions)
+        let state = AppShellUiState(selectedTab: AppTab.instructions)
 
         let view = AppShellContentView(state: state)
 
         XCTAssertNotNil(view)
-        XCTAssertEqual(state.instructionsTab.featuredInstruction?.id, state.homeOverview.currentInstructionId)
-        XCTAssertEqual(state.instructionsTab.otherInstructions.count, 1)
+        XCTAssertNil(state.instructionsTab.featuredInstruction)
+        XCTAssertEqual(state.instructionsTab.otherInstructions.count, 0)
     }
 
     func testReportsTabCanBeCreated() {
-        let state = AppShellUiState.mock(selectedTab: AppTab.reports)
+        let state = AppShellUiState(selectedTab: AppTab.reports)
 
         let view = AppShellContentView(state: state)
 
@@ -32,7 +32,7 @@ final class SampleViewTests: XCTestCase {
     }
 
     func testContactsTabCanBeCreated() {
-        let state = AppShellUiState.mock(selectedTab: AppTab.contacts)
+        let state = AppShellUiState(selectedTab: AppTab.contacts)
 
         let view = AppShellContentView(state: state)
 
@@ -40,7 +40,7 @@ final class SampleViewTests: XCTestCase {
     }
 
     func disabled_testAppShellContentSnapshotSmoke() {
-        let state = AppShellUiState.mock(selectedTab: AppTab.home)
+        let state = AppShellUiState(selectedTab: AppTab.home)
 
         assertSnapshot(
             of: AppShellContentView(state: state).frame(width: 390, height: 844),

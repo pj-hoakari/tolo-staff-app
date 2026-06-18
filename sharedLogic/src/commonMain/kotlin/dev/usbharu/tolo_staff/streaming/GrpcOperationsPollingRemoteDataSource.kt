@@ -19,41 +19,64 @@ import dev.usbharu.tolo.communication.grpc.Thread
 import dev.usbharu.tolo.communication.grpc.ThreadIdRequest
 import dev.usbharu.tolo.communication.grpc.ThreadRpc
 import dev.usbharu.tolo.communication.grpc.invoke
+import dev.usbharu.tolo_staff.logging.AppLogger
 
 class GrpcOperationsPollingRemoteDataSource(
     private val grpcClient: GrpcCommunicationClient,
 ) : OperationsPollingRemoteDataSource {
+    private val logger = AppLogger.withTag("GrpcOperationsPollingRemoteDataSource")
+
     override suspend fun listPoints(): List<OperationPoint> =
-        grpcClient.pointService.ListPoints(Empty {}).points.map { it.toOperationPoint() }
+        grpcClient.pointService.ListPoints(Empty {}).points
+            .map { it.toOperationPoint() }
+            .also { logger.debug { "Fetched points via gRPC: count=${it.size}" } }
 
     override suspend fun listStaff(): List<OperationStaff> =
-        grpcClient.staffService.ListStaff(Empty {}).staff.map { it.toOperationStaff() }
+        grpcClient.staffService.ListStaff(Empty {}).staff
+            .map { it.toOperationStaff() }
+            .also { logger.debug { "Fetched staff via gRPC: count=${it.size}" } }
 
     override suspend fun listAssignments(): List<OperationAssignment> =
-        grpcClient.assignmentService.ListAssignments(Empty {}).assignments.map { it.toOperationAssignment() }
+        grpcClient.assignmentService.ListAssignments(Empty {}).assignments
+            .map { it.toOperationAssignment() }
+            .also { logger.debug { "Fetched assignments via gRPC: count=${it.size}" } }
 
     override suspend fun listInstructions(): List<OperationInstruction> =
-        grpcClient.instructionService.ListInstructions(Empty {}).instructions.map { it.toOperationInstruction() }
+        grpcClient.instructionService.ListInstructions(Empty {}).instructions
+            .map { it.toOperationInstruction() }
+            .also { logger.debug { "Fetched instructions via gRPC: count=${it.size}" } }
 
     override suspend fun listRelevantInstructions(staffId: String): List<OperationInstruction> =
         grpcClient.instructionService.ListRelevantInstructions(
             StaffIdRequest {
                 this.staffId = staffId
             }
-        ).instructions.map { it.toOperationInstruction() }
+        ).instructions
+            .map { it.toOperationInstruction() }
+            .also {
+                logger.debug {
+                    "Fetched relevant instructions via gRPC: staffId=$staffId, count=${it.size}"
+                }
+            }
 
     override suspend fun listThreads(): List<OperationThread> =
-        grpcClient.threadService.ListThreads(Empty {}).threads.map { it.toOperationThread() }
+        grpcClient.threadService.ListThreads(Empty {}).threads
+            .map { it.toOperationThread() }
+            .also { logger.debug { "Fetched threads via gRPC: count=${it.size}" } }
 
     override suspend fun listMessages(): List<OperationMessage> =
-        grpcClient.messageService.ListMessages(Empty {}).messages.map { it.toOperationMessage() }
+        grpcClient.messageService.ListMessages(Empty {}).messages
+            .map { it.toOperationMessage() }
+            .also { logger.debug { "Fetched messages via gRPC: count=${it.size}" } }
 
     override suspend fun listThreadMessages(threadId: String): List<OperationMessage> =
         grpcClient.threadService.ListThreadMessages(
             ThreadIdRequest {
                 this.threadId = threadId
             }
-        ).messages.map { it.toOperationMessage() }
+        ).messages
+            .map { it.toOperationMessage() }
+            .also { logger.debug { "Fetched thread messages via gRPC: threadId=$threadId, count=${it.size}" } }
 }
 
 private fun Point.toOperationPoint(): OperationPoint = OperationPoint(

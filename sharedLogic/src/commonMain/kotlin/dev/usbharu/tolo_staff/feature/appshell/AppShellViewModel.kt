@@ -1,11 +1,27 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
+import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
+import dev.usbharu.tolo_staff.feature.contactchat.NoOpContactChatService
+import dev.usbharu.tolo_staff.feature.contactchat.deriveTitle
+import dev.usbharu.tolo_staff.feature.contactchat.toPreviewBody
+import dev.usbharu.tolo_staff.feature.contactchat.toUiMessage
+import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.CurrentStaffMember
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.NoOpOperationsStreamDataSource
+import dev.usbharu.tolo_staff.streaming.OperationAssignment
+import dev.usbharu.tolo_staff.streaming.OperationInstruction
+import dev.usbharu.tolo_staff.streaming.OperationInstructionStatus
+import dev.usbharu.tolo_staff.streaming.OperationMessage
+import dev.usbharu.tolo_staff.streaming.OperationPoint
+import dev.usbharu.tolo_staff.streaming.OperationStaff
+import dev.usbharu.tolo_staff.streaming.OperationThread
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepositoryImpl
+import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
+import dev.usbharu.tolo_staff.streaming.isUnknown
+import dev.usbharu.tolo_staff.streaming.sortedOperationMessages
 import dev.usbharu.tolo_staff.viewmodel.StateEffectViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,12 +29,15 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
 class AppShellViewModel(
     private val overviewRepository: OperationsOverviewRepository = OperationsOverviewRepositoryImpl(
         dataSource = NoOpOperationsStreamDataSource()
     ),
+    private val dataSource: OperationsStreamDataSource = NoOpOperationsStreamDataSource(),
+    private val contactChatService: ContactChatService = NoOpContactChatService(),
     private val currentStaffSession: CurrentStaffSession = MockCurrentStaffSession(),
     coroutineContext: CoroutineContext = Dispatchers.Default
 ) : StateEffectViewModel<AppShellUiState, Unit>(
@@ -28,37 +47,79 @@ class AppShellViewModel(
     ),
     coroutineContext = coroutineContext
 ) {
+    private val logger = AppLogger.withTag("AppShellViewModel")
+    private var isCurrentStaffReady: Boolean = currentStaffSession.isReady.value
     private var overviewJob: Job? = null
     private var staffSessionJob: Job? = null
-    private var nextContactMessageId = 1L
     private var observedStaffId: String? = null
+    private var instructionDetailsById: Map<String, InstructionDetailUiModel> = emptyMap()
+    private var contactDetailsById: Map<String, ContactThreadDetailUiModel> = emptyMap()
+    private var instructionThreadIdsByInstructionId: Map<String, String> = emptyMap()
 
     init {
         staffSessionJob = combine(
             currentStaffSession.currentStaff,
             currentStaffSession.availableStaff,
-        ) { currentStaff, availableStaff ->
-            currentStaff to availableStaff
+            currentStaffSession.isReady,
+        ) { currentStaff, availableStaff, isReady ->
+            Triple(currentStaff, availableStaff, isReady)
         }
-            .onEach { (currentStaff, availableStaff) ->
+            .onEach { (currentStaff, availableStaff, isReady) ->
+                logger.debug {
+                    "Current staff session updated: staffId=${currentStaff.staffId}, availableStaff=${availableStaff.size}, isReady=$isReady"
+                }
+                val readinessChanged = isCurrentStaffReady != isReady
+                isCurrentStaffReady = isReady
                 val didChange = observedStaffId != currentStaff.staffId
                 observedStaffId = currentStaff.staffId
 
                 updateState { state ->
-                    if (didChange) {
+                    if (!isReady) {
+                        state.copy(
+                            currentStaff = currentStaff.toUiModel(),
+                            availableStaff = availableStaff.map { it.toUiModel() },
+                            isLoading = true,
+                            errorMessage = null,
+                        )
+                    } else if (currentStaff.isUnknown()) {
                         initialState(
                             currentStaff = currentStaff,
                             availableStaff = availableStaff,
-                        ).copy(selectedTab = state.selectedTab)
+                        ).copy(
+                            selectedTab = state.selectedTab,
+                            isLoading = false,
+                            errorMessage = "スタッフ情報を取得できませんでした",
+                        )
+                    } else if (didChange || readinessChanged) {
+                        initialState(
+                            currentStaff = currentStaff,
+                            availableStaff = availableStaff,
+                        ).copy(
+                            selectedTab = state.selectedTab,
+                            isLoading = true,
+                            errorMessage = null,
+                        )
                     } else {
                         state.copy(
                             currentStaff = currentStaff.toUiModel(),
                             availableStaff = availableStaff.map { it.toUiModel() },
+                            errorMessage = null,
                         )
                     }
                 }
 
-                if (didChange) {
+                if (!isReady || currentStaff.isUnknown()) {
+                    logger.info {
+                        "Stopping overview observation: isReady=$isReady, staffId=${currentStaff.staffId}, isUnknown=${currentStaff.isUnknown()}"
+                    }
+                    overviewJob?.cancel()
+                    return@onEach
+                }
+
+                if (didChange || readinessChanged) {
+                    logger.info {
+                        "Refreshing overview observation: staffId=${currentStaff.staffId}, readinessChanged=$readinessChanged"
+                    }
                     observeOverview(currentStaff.staffId)
                 }
             }
@@ -66,31 +127,26 @@ class AppShellViewModel(
     }
 
     fun onCurrentStaffSelected(staffId: String) {
+        logger.info { "Current staff selected from UI: staffId=$staffId" }
         currentStaffSession.selectStaff(staffId)
     }
 
     fun onTabSelected(tab: AppTab) {
+        logger.debug { "Tab selected: tab=$tab" }
         updateState { it.copy(selectedTab = tab) }
     }
 
     fun onHomeInstructionSelected() {
-        val selectedInstruction = currentState.instructionsTab.selectedInstruction
-            ?: instructionDetailFor(currentState.instructionsTab.featuredInstruction?.id)
-            ?: instructionDetailFor(currentState.instructionsTab.instructions.firstOrNull()?.id)
+        val selectedInstructionId = currentState.instructionsTab.selectedInstruction?.id
+            ?: currentState.instructionsTab.featuredInstruction?.id
+            ?: currentState.instructionsTab.instructions.firstOrNull()?.id
             ?: return
-        updateState {
-            it.copy(
-                selectedTab = AppTab.INSTRUCTIONS,
-                instructionsTab = it.instructionsTab.withSelection(
-                    selectedInstruction = selectedInstruction,
-                    isShowingThread = false,
-                )
-            )
-        }
+        onInstructionSelected(selectedInstructionId)
+        updateState { it.copy(selectedTab = AppTab.INSTRUCTIONS) }
     }
 
     fun onInstructionSelected(instructionId: String) {
-        val detail = instructionDetailFor(instructionId) ?: return
+        val detail = instructionDetailsById[instructionId] ?: return
         updateState {
             it.copy(
                 instructionsTab = it.instructionsTab.withSelection(
@@ -102,29 +158,18 @@ class AppShellViewModel(
     }
 
     fun onInstructionThreadOpened() {
-        val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
-        val threadSummary = contactSummaryForInstruction(selectedInstruction)
-        val threadDetail = contactDetailFor(threadSummary)
+        val selectedInstructionId = currentState.instructionsTab.selectedInstruction?.id ?: return
+        val threadId = instructionThreadIdsByInstructionId[selectedInstructionId] ?: return
+        val detail = contactDetailsById[threadId] ?: return
         updateState { state ->
             state.copy(
                 selectedTab = AppTab.CONTACTS,
                 instructionsTab = state.instructionsTab.copy(isShowingThread = false),
-                homeOverview = state.homeOverview.copy(unreadContactCount = 0),
                 contactsTab = state.contactsTab.copy(
-                    selectedThread = threadDetail,
+                    selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
                     shouldReturnToInstructionOnBack = true,
-                    threads = mergeContactSummary(
-                        current = state.contactsTab.threads,
-                        threadId = threadSummary.id,
-                        title = threadSummary.title,
-                        target = threadSummary.target,
-                        preview = threadSummary.lastMessagePreview,
-                        isFormerAssignment = threadSummary.isFormerAssignment,
-                    ).map { summary ->
-                        if (summary.id == threadSummary.id) summary.copy(unreadCount = 0) else summary
-                    }
                 )
             )
         }
@@ -142,61 +187,14 @@ class AppShellViewModel(
     }
 
     fun onInstructionThreadClosed() {
-        val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
         updateState {
             it.copy(
-                instructionsTab = it.instructionsTab.withSelection(
-                    selectedInstruction = selectedInstruction,
-                    isShowingThread = false,
-                )
+                instructionsTab = it.instructionsTab.copy(isShowingThread = false)
             )
         }
     }
 
-    fun onInstructionStatusUpdated(status: InstructionProgressStatus) {
-        val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
-        val statusLabel = status.toStatusLabel()
-        updateState { state ->
-            val updatedSelectedInstruction = selectedInstruction.copy(
-                statusLabel = statusLabel,
-                participants = selectedInstruction.participants.map { participant ->
-                    if (participant.isCurrentStaff) {
-                        participant.copy(statusLabel = statusLabel)
-                    } else {
-                        participant
-                    }
-                }
-            )
-            val updatedInstructions = state.instructionsTab.instructions.map { summary ->
-                if (summary.id == selectedInstruction.id) {
-                    summary.copy(statusLabel = statusLabel)
-                } else {
-                    summary
-                }
-            }
-            state.copy(
-                homeOverview = state.homeOverview.copy(
-                    currentInstruction = updatedSelectedInstruction.toHomeInstructionText(),
-                    currentInstructionTitle = updatedSelectedInstruction.title,
-                    currentInstructionTargetName = updatedSelectedInstruction.target.displayName,
-                    currentInstructionPriorityLabel = updatedSelectedInstruction.priorityLabel,
-                    currentInstructionStatusLabel = updatedSelectedInstruction.statusLabel,
-                    currentInstructionLocationLabel = updatedSelectedInstruction.locationLabel,
-                    currentInstructionAttachmentSummary = updatedSelectedInstruction.attachmentSummary,
-                    currentInstructionId = selectedInstruction.id,
-                ),
-                instructionsTab = state.instructionsTab
-                    .withInstructions(
-                        instructions = updatedInstructions,
-                        featuredInstructionId = state.homeOverview.currentInstructionId ?: selectedInstruction.id,
-                    )
-                    .withSelection(
-                        selectedInstruction = updatedSelectedInstruction,
-                        isShowingThread = state.instructionsTab.isShowingThread,
-                    )
-            )
-        }
-    }
+    fun onInstructionStatusUpdated(status: InstructionProgressStatus) = Unit
 
     fun onReportTypeSelected(typeId: String) {
         val reportType = currentState.reportsTab.reportTypes.firstOrNull { it.id == typeId } ?: return
@@ -254,6 +252,9 @@ class AppShellViewModel(
     }
 
     fun onReportContinueToPlaceSelection() {
+        if (currentState.reportsTab.availablePlaces.isEmpty()) {
+            return
+        }
         updateState {
             it.copy(
                 reportsTab = it.reportsTab.copy(step = ReportFlowStep.PLACE_SELECTION)
@@ -275,45 +276,7 @@ class AppShellViewModel(
         }
     }
 
-    fun onReportSubmitted() {
-        val draft = currentState.reportsTab.draft
-        val selectedType = currentState.reportsTab.reportTypes.firstOrNull { it.id == draft.selectedTypeId }
-        val placeName = draft.selectedPlaceName ?: return
-        val currentStaff = currentState.currentStaff
-        updateState { state ->
-            state.copy(
-                homeOverview = state.homeOverview.copy(
-                    pendingReportLabel = "$placeName に関する${selectedType?.title ?: "報告"}を本部へ送信済み"
-                ),
-                reportsTab = state.reportsTab.copy(
-                    step = ReportFlowStep.THREAD,
-                    submittedThread = ReportThreadUiModel(
-                        id = "report-thread-$placeName",
-                        title = "${selectedType?.title ?: "報告"}スレッド",
-                        targetLabel = "宛先: 本部 / 対象場所: $placeName",
-                        lastSubmittedSummary = draft.comment.ifBlank { draft.templateText },
-                        messages = listOf(
-                            ThreadMessageUiModel(
-                                id = "report-1",
-                                senderName = currentStaff.displayName,
-                                senderRoleLabel = currentStaff.roleLabel ?: state.currentPlacementName,
-                                body = draft.comment.ifBlank { draft.templateText },
-                                timeLabel = "たった今",
-                                isCurrentUser = true,
-                            ),
-                            ThreadMessageUiModel(
-                                id = "report-2",
-                                senderName = "運営本部",
-                                senderRoleLabel = "HEADQUARTERS",
-                                body = "状況を確認しています。追加の情報が必要な場合はこのスレッドで連絡します。",
-                                timeLabel = "たった今",
-                            )
-                        )
-                    )
-                )
-            )
-        }
-    }
+    fun onReportSubmitted() = Unit
 
     fun onReportBack() {
         updateState { state ->
@@ -334,17 +297,14 @@ class AppShellViewModel(
     }
 
     fun onContactThreadSelected(threadId: String) {
-        val summary = currentState.contactsTab.threads.firstOrNull { it.id == threadId } ?: return
+        val detail = contactDetailsById[threadId] ?: return
         updateState {
             it.copy(
                 contactsTab = it.contactsTab.copy(
-                    selectedThread = contactDetailFor(summary),
+                    selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
                     shouldReturnToInstructionOnBack = false,
-                    threads = it.contactsTab.threads.map { thread ->
-                        if (thread.id == threadId) thread.copy(unreadCount = 0) else thread
-                    }
                 )
             )
         }
@@ -366,6 +326,9 @@ class AppShellViewModel(
     }
 
     fun onContactNewThreadStarted() {
+        if (currentState.contactsTab.availableTargets.isEmpty()) {
+            return
+        }
         updateState {
             it.copy(
                 contactsTab = it.contactsTab.copy(
@@ -386,38 +349,13 @@ class AppShellViewModel(
         }
     }
 
-    fun onContactTargetSelected(targetId: String) {
-        val contactsTab = currentState.contactsTab
-        val selectedTargetType = contactsTab.selectedTargetType ?: return
-        val target = contactsTab.availableTargets.firstOrNull {
-            it.id == targetId && it.type == selectedTargetType
-        } ?: return
-        updateState {
-            it.copy(
-                contactsTab = it.contactsTab.copy(
-                    isChoosingTargetType = false,
-                    shouldReturnToInstructionOnBack = false,
-                    selectedThread = ContactThreadDetailUiModel(
-                        id = "draft-${target.id}",
-                        title = target.displayName,
-                        target = target,
-                        messages = listOf(
-                            ThreadMessageUiModel(
-                                id = "system-${target.id}",
-                                senderName = "System",
-                                body = "${target.displayName} への新規連絡を開始しました。",
-                                timeLabel = "たった今",
-                                isSystemEvent = true,
-                            )
-                        )
-                    )
-                )
-            )
-        }
-    }
+    fun onContactTargetSelected(targetId: String) = Unit
 
     fun onContactDraftChanged(text: String) {
         val selectedThread = currentState.contactsTab.selectedThread ?: return
+        if (!selectedThread.canReply) {
+            return
+        }
         updateState {
             it.copy(
                 contactsTab = it.contactsTab.copy(
@@ -429,44 +367,54 @@ class AppShellViewModel(
 
     fun onContactSendClicked() {
         val selectedThread = currentState.contactsTab.selectedThread ?: return
-        val draftMessage = selectedThread.draftMessage.trim()
-        if (draftMessage.isEmpty()) {
+        if (!selectedThread.canReply) {
             return
         }
-        val currentStaff = currentState.currentStaff
-        val message = ThreadMessageUiModel(
-            id = "contact-local-${nextContactMessageId++}",
-            senderName = currentStaff.displayName,
-            senderRoleLabel = currentStaff.roleLabel ?: currentState.currentPlacementName,
-            body = draftMessage,
-            timeLabel = "たった今",
-            isCurrentUser = true,
-        )
+        val message = selectedThread.draftMessage.trim()
+        if (message.isEmpty()) {
+            return
+        }
+        val threadId = selectedThread.id
+        val currentStaffId = currentState.currentStaff.staffId
+
         updateState { state ->
-            val updatedDetail = selectedThread.copy(
-                draftMessage = "",
-                messages = selectedThread.messages + message,
-            )
             state.copy(
-                homeOverview = state.homeOverview.copy(
-                    unreadContactCount = 0
-                ),
                 contactsTab = state.contactsTab.copy(
-                    selectedThread = updatedDetail,
-                    threads = mergeContactSummary(
-                        state.contactsTab.threads,
-                        updatedDetail.id,
-                        updatedDetail.title,
-                        updatedDetail.target,
-                        draftMessage,
-                        updatedDetail.isFormerAssignment,
-                    )
-                )
+                    selectedThread = selectedThread.copy(draftMessage = "")
+                ),
+                errorMessage = null,
             )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                contactChatService.sendSimpleMessage(
+                    roomId = threadId,
+                    currentStaffId = currentStaffId,
+                    text = message,
+                )
+            }.onFailure { throwable ->
+                logger.warn(throwable) {
+                    "Failed to send contact message: threadId=$threadId, currentStaffId=$currentStaffId"
+                }
+                updateState { state ->
+                    val currentThread = state.contactsTab.selectedThread
+                    state.copy(
+                        contactsTab = state.contactsTab.copy(
+                            selectedThread = currentThread
+                                ?.takeIf { it.id == threadId }
+                                ?.copy(draftMessage = message)
+                                ?: currentThread
+                        ),
+                        errorMessage = throwable.message ?: "メッセージ送信に失敗しました",
+                    )
+                }
+            }
         }
     }
 
     override fun clear() {
+        logger.trace { "Clearing AppShellViewModel subscriptions" }
         overviewJob?.cancel()
         staffSessionJob?.cancel()
         super.clear()
@@ -474,22 +422,89 @@ class AppShellViewModel(
 
     private fun observeOverview(currentStaffId: String) {
         overviewJob?.cancel()
-        overviewJob = overviewRepository.observeOverview(currentStaffId)
-            .onEach { projection ->
-                updateState {
-                    it.copy(
-                        homeOverview = projection.homeOverview,
-                        instructionsTab = it.instructionsTab.withInstructions(
-                            instructions = it.instructionsTab.instructions,
-                            featuredInstructionId = projection.homeOverview.currentInstructionId,
+        dataSource.start()
+        logger.info { "observeOverview subscribed: currentStaffId=$currentStaffId" }
+        val combinedStream = combine(
+            overviewRepository.observeOverview(currentStaffId),
+            dataSource.observePoints(),
+            dataSource.observeStaff(),
+            dataSource.observeAssignments(),
+            dataSource.observeRelevantInstructions(currentStaffId),
+            dataSource.observeThreads(),
+            dataSource.observeMessages(),
+        ) { values ->
+            values
+        }
+        overviewJob = combinedStream
+            .onEach { values ->
+                val projection = values[0] as dev.usbharu.tolo_staff.streaming.AppShellOperationsProjection
+                val points = values[1] as List<OperationPoint>
+                val staff = values[2] as List<OperationStaff>
+                val assignments = values[3] as List<OperationAssignment>
+                val instructions = values[4] as List<OperationInstruction>
+                val threads = values[5] as List<OperationThread>
+                val messages = values[6] as List<OperationMessage>
+                logger.debug {
+                    "Received overview snapshot: currentStaffId=$currentStaffId, points=${points.size}, staff=${staff.size}, assignments=${assignments.size}, instructions=${instructions.size}, threads=${threads.size}, messages=${messages.size}"
+                }
+                val snapshot = buildSnapshot(
+                    currentStaffId = currentStaffId,
+                    currentStaff = currentState.currentStaff,
+                    projection = projection.homeOverview to projection.currentPlacementName,
+                    points = points,
+                    staff = staff,
+                    assignments = assignments,
+                    instructions = instructions,
+                    threads = threads,
+                    messages = messages,
+                )
+                instructionDetailsById = snapshot.instructionDetailsById
+                contactDetailsById = snapshot.contactDetailsById
+                instructionThreadIdsByInstructionId = snapshot.instructionThreadIdsByInstructionId
+
+                updateState { state ->
+                    val selectedInstruction = state.instructionsTab.selectedInstruction
+                        ?.id
+                        ?.let(snapshot.instructionDetailsById::get)
+                    val previousSelectedThread = state.contactsTab.selectedThread
+                    val selectedThread = previousSelectedThread
+                        ?.id
+                        ?.let(snapshot.contactDetailsById::get)
+                        ?.copy(draftMessage = previousSelectedThread.draftMessage)
+                    val selectedTargetType = state.contactsTab.selectedTargetType?.takeIf { type ->
+                        snapshot.contactsTab.availableTargets.any { it.type == type }
+                    }
+                    state.copy(
+                        homeOverview = snapshot.homeOverview,
+                        currentPlacementName = snapshot.currentPlacementName,
+                        instructionsTab = snapshot.instructionsTab.withSelection(
+                            selectedInstruction = selectedInstruction,
+                            isShowingThread = state.instructionsTab.isShowingThread && selectedInstruction != null,
                         ),
-                        currentPlacementName = projection.currentPlacementName,
+                        reportsTab = state.reportsTab.copy(
+                            availablePlaces = snapshot.reportPlaces,
+                            draft = state.reportsTab.draft.copy(
+                                selectedPlaceId = state.reportsTab.draft.selectedPlaceId?.takeIf { placeId ->
+                                    snapshot.reportPlaces.any { it.id == placeId }
+                                },
+                                selectedPlaceName = state.reportsTab.draft.selectedPlaceName?.takeIf { placeName ->
+                                    snapshot.reportPlaces.any { it.displayName == placeName }
+                                },
+                            )
+                        ),
+                        contactsTab = snapshot.contactsTab.copy(
+                            selectedThread = selectedThread,
+                            selectedTargetType = selectedTargetType,
+                            isChoosingTargetType = state.contactsTab.isChoosingTargetType && snapshot.contactsTab.availableTargets.isNotEmpty(),
+                            shouldReturnToInstructionOnBack = state.contactsTab.shouldReturnToInstructionOnBack && selectedThread != null,
+                        ),
                         isLoading = false,
                         errorMessage = null,
                     )
                 }
             }
             .catch { throwable ->
+                logger.warn(throwable) { "Failed to observe overview: currentStaffId=$currentStaffId" }
                 updateState {
                     it.copy(
                         isLoading = false,
@@ -500,73 +515,212 @@ class AppShellViewModel(
             .launchIn(viewModelScope)
     }
 
-    private fun instructionDetailFor(instructionId: String?): InstructionDetailUiModel? =
-        when (instructionId) {
-            "instruction-gate-a" -> primaryInstructionDetail(currentState.currentStaff)
-            "instruction-patrol" -> secondaryInstructionDetail()
-            else -> null
-        }
+    private fun buildSnapshot(
+        currentStaffId: String,
+        currentStaff: CurrentStaffUiModel,
+        projection: Pair<AppShellHomeOverview, String>,
+        points: List<OperationPoint>,
+        staff: List<OperationStaff>,
+        assignments: List<OperationAssignment>,
+        instructions: List<OperationInstruction>,
+        threads: List<OperationThread>,
+        messages: List<OperationMessage>,
+    ): AppShellSnapshot {
+        val instructionModels = buildInstructionModels(
+            currentStaffId = currentStaffId,
+            currentStaff = currentStaff,
+            points = points,
+            staff = staff,
+            assignments = assignments,
+            instructions = instructions,
+            threads = threads,
+            messages = messages,
+        )
+        val contactModels = buildContactModels(
+            currentStaffId = currentStaffId,
+            staff = staff,
+            assignments = assignments,
+            points = points,
+            threads = threads,
+            messages = messages,
+        )
+        val homeOverview = projection.first.copy(
+            currentInstructionUnreadCount = 0,
+            unreadContactCount = contactModels.contactsTab.threads.sumOf { it.unreadCount },
+        )
+        return AppShellSnapshot(
+            homeOverview = homeOverview,
+            currentPlacementName = projection.second,
+            instructionsTab = instructionModels.instructionsTab.withInstructions(
+                instructions = instructionModels.instructionsTab.instructions,
+                featuredInstructionId = homeOverview.currentInstructionId,
+            ),
+            contactsTab = contactModels.contactsTab,
+            reportPlaces = points.map { point ->
+                ContactTargetUiModel(
+                    id = point.pointId,
+                    type = ContactTargetType.PLACE,
+                    displayName = point.name,
+                    subtitle = point.description.ifBlank { null },
+                )
+            },
+            instructionDetailsById = instructionModels.detailsById,
+            contactDetailsById = contactModels.detailsById,
+            instructionThreadIdsByInstructionId = instructionModels.threadIdByInstructionId,
+        )
+    }
 
-    private fun contactDetailFor(summary: ContactThreadSummaryUiModel): ContactThreadDetailUiModel =
-        ContactThreadDetailUiModel(
-            id = summary.id,
-            title = summary.title,
-            target = summary.target,
-            isFormerAssignment = summary.isFormerAssignment,
-            canReply = true,
-            messages = when (summary.id) {
-                "contact-gate-a" -> listOf(
-                    ThreadMessageUiModel(
-                        id = "gate-a-1",
-                        senderName = "運営本部",
-                        senderRoleLabel = "HEADQUARTERS",
-                        body = "Aゲート前の導線を右側へ広げてください。",
-                        timeLabel = "10:15",
-                    ),
-                    ThreadMessageUiModel(
-                        id = "gate-a-2",
-                        senderName = currentState.currentStaff.displayName,
-                        senderRoleLabel = currentState.currentStaff.roleLabel ?: "Aゲート担当",
-                        body = "了解しました。カラーコーンを追加します。",
-                        timeLabel = "10:17",
-                        isCurrentUser = true,
-                    )
-                )
-                "contact-hq" -> listOf(
-                    ThreadMessageUiModel(
-                        id = "hq-1",
-                        senderName = "運営本部",
-                        senderRoleLabel = "HEADQUARTERS",
-                        body = "混雑報告があればこのスレッドへ送ってください。",
-                        timeLabel = "09:40",
-                    )
-                )
-                else -> listOf(
-                    ThreadMessageUiModel(
-                        id = "former-1",
-                        senderName = "山田",
-                        senderRoleLabel = "前Aゲート担当",
-                        body = "14:20時点では列が右側に伸びていました。",
-                        timeLabel = "14:21",
-                    )
+    private fun buildInstructionModels(
+        currentStaffId: String,
+        currentStaff: CurrentStaffUiModel,
+        points: List<OperationPoint>,
+        staff: List<OperationStaff>,
+        assignments: List<OperationAssignment>,
+        instructions: List<OperationInstruction>,
+        threads: List<OperationThread>,
+        messages: List<OperationMessage>,
+    ): BuiltInstructionModels {
+        val pointsById = points.associateBy { it.pointId }
+        val staffById = staff.associateBy { it.staffId }
+        val messagesByThreadId = messages.groupBy { it.threadId }
+        val threadIdByInstructionId = messages
+            .filter { it.instructionId != null }
+            .groupBy { it.instructionId.orEmpty() }
+            .mapValues { (_, instructionMessages) ->
+                instructionMessages
+                    .sortedOperationMessages()
+                    .lastOrNull()
+                    ?.threadId
+                    .orEmpty()
+            }
+            .filterValues { it.isNotBlank() }
+
+        val details = instructions
+            .sortedBy { it.instructionId }
+            .map { instruction ->
+                val target = instruction.toTarget(pointsById, staffById)
+                val instructionThreadId = threadIdByInstructionId[instruction.instructionId]
+                val threadMessages = instructionThreadId
+                    ?.let(messagesByThreadId::get)
+                    .orEmpty()
+                    .sortedOperationMessages()
+                    .map { message -> message.toThreadMessageUiModel(currentStaffId, staff) }
+                val participantStaffIds = buildSet {
+                    addAll(instruction.staffIds)
+                    assignments
+                        .filter { it.pointId in instruction.pointIds }
+                        .mapTo(this) { it.staffId }
+                }
+                val participants = participantStaffIds
+                    .sorted()
+                    .map { staffId ->
+                        val displayName = staffById[staffId]?.name ?: staffId
+                        InstructionParticipantStatusUiModel(
+                            staffName = displayName,
+                            statusLabel = instruction.status.toStatusLabel(),
+                            isCurrentStaff = staffId == currentStaff.staffId,
+                        )
+                    }
+                InstructionDetailUiModel(
+                    id = instruction.instructionId,
+                    title = instruction.title,
+                    body = instruction.description,
+                    target = target,
+                    priorityLabel = "",
+                    statusLabel = instruction.status.toStatusLabel(),
+                    locationLabel = instruction.pointIds
+                        .mapNotNull { pointId -> pointsById[pointId]?.description?.ifBlank { null } }
+                        .distinct()
+                        .joinToString(" / ")
+                        .ifBlank { null },
+                    attachmentSummary = null,
+                    participants = participants,
+                    thread = threadMessages,
                 )
             }
-        )
 
-    private fun contactSummaryForInstruction(
-        instruction: InstructionDetailUiModel
-    ): ContactThreadSummaryUiModel {
-        val existingThread = currentState.contactsTab.threads.firstOrNull { summary ->
-            summary.target.id == instruction.target.id
+        val detailsById = details.associateBy { it.id }
+        val summaries = details.map { detail ->
+            InstructionSummaryUiModel(
+                id = detail.id,
+                title = detail.title,
+                targetName = detail.target.displayName,
+                priorityLabel = detail.priorityLabel,
+                statusLabel = detail.statusLabel,
+                preview = detail.body.ifBlank { detail.title },
+                locationLabel = detail.locationLabel,
+                attachmentSummary = detail.attachmentSummary,
+                unreadCount = 0,
+            )
         }
-        if (existingThread != null) {
-            return existingThread
+        return BuiltInstructionModels(
+            instructionsTab = InstructionsTabUiState(
+                instructions = summaries,
+                featuredInstruction = null,
+                otherInstructions = emptyList(),
+                selectedInstruction = null,
+                isShowingThread = false,
+            ),
+            detailsById = detailsById,
+            threadIdByInstructionId = threadIdByInstructionId,
+        )
+    }
+
+    private fun buildContactModels(
+        currentStaffId: String,
+        staff: List<OperationStaff>,
+        assignments: List<OperationAssignment>,
+        points: List<OperationPoint>,
+        threads: List<OperationThread>,
+        messages: List<OperationMessage>,
+    ): BuiltContactModels {
+        val threadMessagesById = messages.groupBy { it.threadId }
+        val visibleThreads = threads
+            .filter { currentStaffId in it.members }
+            .sortedBy { it.threadId }
+
+        val details = visibleThreads.map { thread ->
+            val title = thread.deriveTitle(currentStaffId, staff)
+            val target = ContactTargetUiModel(
+                id = thread.threadId,
+                type = if (thread.members.count { it != currentStaffId } <= 1) ContactTargetType.USER else ContactTargetType.ROLE,
+                displayName = title,
+                subtitle = null,
+            )
+            ContactThreadDetailUiModel(
+                id = thread.threadId,
+                title = title,
+                target = target,
+                messages = threadMessagesById[thread.threadId]
+                    .orEmpty()
+                    .sortedOperationMessages()
+                    .map { message -> message.toThreadMessageUiModel(currentStaffId, staff) },
+                canReply = true,
+                isFormerAssignment = false,
+            )
         }
-        return ContactThreadSummaryUiModel(
-            id = "instruction-thread-${instruction.target.id}",
-            title = instruction.target.displayName,
-            target = instruction.target,
-            lastMessagePreview = instruction.body,
+        val detailsById = details.associateBy { it.id }
+        val summaries = details.map { detail ->
+            ContactThreadSummaryUiModel(
+                id = detail.id,
+                title = detail.title,
+                target = detail.target,
+                lastMessagePreview = detail.messages.lastOrNull()?.body.orEmpty(),
+                unreadCount = 0,
+                isFormerAssignment = false,
+            )
+        }
+        return BuiltContactModels(
+            contactsTab = ContactsTabUiState(
+                threads = summaries,
+                selectedThread = null,
+                availableTargets = emptyList(),
+                selectedTargetType = null,
+                isChoosingTargetType = false,
+                formerAssignments = emptyList(),
+                shouldReturnToInstructionOnBack = false,
+            ),
+            detailsById = detailsById,
         )
     }
 
@@ -574,214 +728,15 @@ class AppShellViewModel(
         fun initialState(
             currentStaff: CurrentStaffMember,
             availableStaff: List<CurrentStaffMember>,
-        ): AppShellUiState {
-            val instructionsTab = initialInstructionsState(currentStaff.toUiModel())
-            val featuredInstruction = primaryInstructionDetail(currentStaff.toUiModel())
-            return AppShellUiState(
-                homeOverview = AppShellHomeOverview(
-                    currentInstruction = featuredInstruction.toHomeInstructionText(),
-                    currentInstructionTitle = featuredInstruction.title,
-                    currentInstructionTargetName = featuredInstruction.target.displayName,
-                    currentInstructionPriorityLabel = featuredInstruction.priorityLabel,
-                    currentInstructionStatusLabel = featuredInstruction.statusLabel,
-                    currentInstructionLocationLabel = featuredInstruction.locationLabel,
-                    currentInstructionAttachmentSummary = featuredInstruction.attachmentSummary,
-                    currentInstructionUnreadCount = 1,
-                    currentInstructionId = featuredInstruction.id,
-                ),
+        ): AppShellUiState =
+            AppShellUiState(
                 currentStaff = currentStaff.toUiModel(),
                 availableStaff = availableStaff.map { it.toUiModel() },
-                instructionsTab = instructionsTab,
-                reportsTab = initialReportsState(),
-                contactsTab = initialContactsState(),
+                reportsTab = ReportsTabUiState(),
+                contactsTab = ContactsTabUiState(),
+                instructionsTab = InstructionsTabUiState(),
                 isLoading = true,
             )
-        }
-
-        fun initialInstructionsState(currentStaff: CurrentStaffUiModel): InstructionsTabUiState {
-            val detail = primaryInstructionDetail(currentStaff)
-            val instructions = listOf(
-                    InstructionSummaryUiModel(
-                        id = detail.id,
-                        title = detail.title,
-                        targetName = detail.target.displayName,
-                        priorityLabel = detail.priorityLabel,
-                        statusLabel = detail.statusLabel,
-                        preview = detail.body,
-                        locationLabel = detail.locationLabel,
-                        attachmentSummary = detail.attachmentSummary,
-                        unreadCount = 1,
-                    ),
-                    InstructionSummaryUiModel(
-                        id = "instruction-patrol",
-                        title = "巡回スタッフは西ホール通路の滞留を確認",
-                        targetName = "巡回担当",
-                        priorityLabel = "通常",
-                        statusLabel = "未確認",
-                        preview = "通路の滞留が増えた場合は本部へ即時報告してください。",
-                        locationLabel = "西ホール 中央通路",
-                        attachmentSummary = "位置情報あり",
-                    )
-            )
-            return InstructionsTabUiState(
-                instructions = instructions,
-            ).withInstructions(
-                instructions = instructions,
-                featuredInstructionId = detail.id,
-            ).withSelection(
-                selectedInstruction = null,
-                isShowingThread = false,
-            )
-        }
-
-        fun initialReportsState(): ReportsTabUiState =
-            ReportsTabUiState(
-                reportTypes = listOf(
-                    ReportTypeUiModel("queue", "混雑報告", "列の長さ、導線、増員要否を記録します。"),
-                    ReportTypeUiModel("incident", "トラブル報告", "転倒、迷子、クレームなどの状況を本部へ共有します。"),
-                    ReportTypeUiModel("inventory", "備品依頼", "カラーコーン、案内板、テープなどの補充を依頼します。"),
-                ),
-                availablePlaces = listOf(
-                    ContactTargetUiModel("place-gate-a", ContactTargetType.PLACE, "Aゲート"),
-                    ContactTargetUiModel("place-gate-b", ContactTargetType.PLACE, "Bゲート"),
-                    ContactTargetUiModel("place-tail", ContactTargetType.PLACE, "最後尾"),
-                )
-            )
-
-        fun initialContactsState(): ContactsTabUiState =
-            ContactsTabUiState(
-                threads = listOf(
-                    ContactThreadSummaryUiModel(
-                        id = "contact-gate-a",
-                        title = "Aゲート担当",
-                        target = ContactTargetUiModel("place-gate-a", ContactTargetType.PLACE, "Aゲート担当", "現担当 3名"),
-                        lastMessagePreview = "了解しました。カラーコーンを追加します。",
-                        unreadCount = 2,
-                    ),
-                    ContactThreadSummaryUiModel(
-                        id = "contact-hq",
-                        title = "運営本部",
-                        target = ContactTargetUiModel("headquarters", ContactTargetType.HEADQUARTERS, "運営本部", "報告・確認窓口"),
-                        lastMessagePreview = "混雑報告があればこのスレッドへ送ってください。",
-                    ),
-                    ContactThreadSummaryUiModel(
-                        id = "contact-former-a",
-                        title = "前Aゲート担当",
-                        target = ContactTargetUiModel("former-a", ContactTargetType.PLACE, "前Aゲート担当", "旧担当"),
-                        lastMessagePreview = "14:20時点では列が右側に伸びていました。",
-                        isFormerAssignment = true,
-                    )
-                ),
-                availableTargets = listOf(
-                    ContactTargetUiModel("place-gate-a", ContactTargetType.PLACE, "Aゲート担当", "現担当 3名"),
-                    ContactTargetUiModel("role-patrol", ContactTargetType.ROLE, "巡回担当", "会場内巡回"),
-                    ContactTargetUiModel("headquarters", ContactTargetType.HEADQUARTERS, "運営本部", "報告・確認窓口"),
-                    ContactTargetUiModel("user-sato", ContactTargetType.USER, "佐藤", "個人連絡"),
-                ),
-                formerAssignments = listOf(
-                    FormerAssignmentUiModel(
-                        id = "former-a",
-                        name = "前Aゲート担当",
-                        summary = "旧担当として閲覧・補足返信が可能です。",
-                    )
-                )
-            )
-
-        fun primaryInstructionDetail(currentStaff: CurrentStaffUiModel): InstructionDetailUiModel =
-            InstructionDetailUiModel(
-                id = "instruction-gate-a",
-                title = "Aゲート前の列を右側へ誘導",
-                body = "来場者導線を確保し、横断歩道側へ列がはみ出さないよう右側へ寄せてください。",
-                target = ContactTargetUiModel("place-gate-a", ContactTargetType.PLACE, "Aゲート担当", "現担当 3名"),
-                priorityLabel = "高",
-                statusLabel = "対応中",
-                locationLabel = "西ホール 入口ゲート A",
-                attachmentSummary = "添付画像 1件 / 位置情報あり",
-                participants = listOf(
-                    InstructionParticipantStatusUiModel(
-                        staffName = currentStaff.displayName,
-                        statusLabel = "対応中",
-                        isCurrentStaff = true,
-                    ),
-                    InstructionParticipantStatusUiModel("佐藤", "了解"),
-                    InstructionParticipantStatusUiModel("山田", "前担当", isFormerStaff = true),
-                ),
-                thread = listOf(
-                    ThreadMessageUiModel(
-                        id = "instruction-thread-1",
-                        senderName = "運営本部",
-                        senderRoleLabel = "HEADQUARTERS",
-                        body = "列が伸びてきたので、右側へ寄せながら最後尾を案内してください。",
-                        timeLabel = "10:12",
-                    ),
-                    ThreadMessageUiModel(
-                        id = "instruction-thread-2",
-                        senderName = currentStaff.displayName,
-                        senderRoleLabel = currentStaff.roleLabel ?: "Aゲート担当",
-                        body = "対応を開始しました。カラーコーン追加後に再度報告します。",
-                        timeLabel = "10:17",
-                        isCurrentUser = true,
-                    ),
-                    ThreadMessageUiModel(
-                        id = "instruction-thread-3",
-                        senderName = "山田",
-                        senderRoleLabel = "前Aゲート担当",
-                        body = "14:20時点では列が右側に伸びていました。",
-                        timeLabel = "10:18",
-                    )
-                )
-            )
-
-        fun secondaryInstructionDetail(): InstructionDetailUiModel =
-            InstructionDetailUiModel(
-                id = "instruction-patrol",
-                title = "巡回スタッフは西ホール通路の滞留を確認",
-                body = "通路の滞留が増えた場合は本部へ即時報告し、立ち止まり客へ移動を促してください。",
-                target = ContactTargetUiModel("role-patrol", ContactTargetType.ROLE, "巡回担当", "現担当 2名"),
-                priorityLabel = "通常",
-                statusLabel = "未確認",
-                locationLabel = "西ホール 中央通路",
-                attachmentSummary = "位置情報あり",
-                participants = listOf(
-                    InstructionParticipantStatusUiModel("高橋", "未確認"),
-                    InstructionParticipantStatusUiModel("伊藤", "未確認"),
-                ),
-                thread = emptyList()
-            )
-
-        fun InstructionProgressStatus.toStatusLabel(): String =
-            when (this) {
-                InstructionProgressStatus.UNCONFIRMED -> "未確認"
-                InstructionProgressStatus.ACKNOWLEDGED -> "了解"
-                InstructionProgressStatus.IN_PROGRESS -> "対応中"
-                InstructionProgressStatus.COMPLETED -> "完了"
-            }
-
-        fun InstructionDetailUiModel.toHomeInstructionText(): String =
-            if (body.isBlank()) title else "$title: $body"
-
-        fun mergeContactSummary(
-            current: List<ContactThreadSummaryUiModel>,
-            threadId: String,
-            title: String,
-            target: ContactTargetUiModel,
-            preview: String,
-            isFormerAssignment: Boolean,
-        ): List<ContactThreadSummaryUiModel> {
-            val updated = ContactThreadSummaryUiModel(
-                id = threadId,
-                title = title,
-                target = target,
-                lastMessagePreview = preview,
-                unreadCount = 0,
-                isFormerAssignment = isFormerAssignment,
-            )
-            return if (current.any { it.id == threadId }) {
-                current.map { if (it.id == threadId) updated else it }
-            } else {
-                listOf(updated) + current
-            }
-        }
 
         fun CurrentStaffMember.toUiModel(): CurrentStaffUiModel =
             CurrentStaffUiModel(
@@ -789,7 +744,76 @@ class AppShellViewModel(
                 displayName = displayName,
                 roleLabel = roleLabel,
             )
+
+        fun OperationInstructionStatus.toStatusLabel(): String =
+            when (this) {
+                OperationInstructionStatus.ACTIVE -> "対応中"
+            }
+
+        fun OperationInstruction.toTarget(
+            pointsById: Map<String, OperationPoint>,
+            staffById: Map<String, OperationStaff>,
+        ): ContactTargetUiModel {
+            val pointNames = pointIds.mapNotNull { pointId -> pointsById[pointId]?.name }.distinct()
+            if (pointNames.isNotEmpty()) {
+                return ContactTargetUiModel(
+                    id = pointIds.first(),
+                    type = ContactTargetType.PLACE,
+                    displayName = pointNames.joinToString(" / "),
+                    subtitle = pointIds
+                        .mapNotNull { pointId -> pointsById[pointId]?.description?.ifBlank { null } }
+                        .distinct()
+                        .joinToString(" / ")
+                        .ifBlank { null },
+                )
+            }
+
+            val staffNames = staffIds.map { staffId -> staffById[staffId]?.name ?: staffId }.distinct()
+            return ContactTargetUiModel(
+                id = staffIds.firstOrNull() ?: instructionId,
+                type = ContactTargetType.USER,
+                displayName = staffNames.joinToString(", ").ifBlank { title },
+                subtitle = null,
+            )
+        }
     }
+}
+
+private data class AppShellSnapshot(
+    val homeOverview: AppShellHomeOverview,
+    val currentPlacementName: String,
+    val instructionsTab: InstructionsTabUiState,
+    val contactsTab: ContactsTabUiState,
+    val reportPlaces: List<ContactTargetUiModel>,
+    val instructionDetailsById: Map<String, InstructionDetailUiModel>,
+    val contactDetailsById: Map<String, ContactThreadDetailUiModel>,
+    val instructionThreadIdsByInstructionId: Map<String, String>,
+)
+
+private data class BuiltInstructionModels(
+    val instructionsTab: InstructionsTabUiState,
+    val detailsById: Map<String, InstructionDetailUiModel>,
+    val threadIdByInstructionId: Map<String, String>,
+)
+
+private data class BuiltContactModels(
+    val contactsTab: ContactsTabUiState,
+    val detailsById: Map<String, ContactThreadDetailUiModel>,
+)
+
+private fun OperationMessage.toThreadMessageUiModel(
+    currentStaffId: String,
+    staff: List<OperationStaff>,
+): ThreadMessageUiModel {
+    val chatMessage = toUiMessage(currentStaffId, staff)
+    return ThreadMessageUiModel(
+        id = chatMessage.id,
+        senderName = chatMessage.senderName,
+        body = chatMessage.body,
+        timeLabel = chatMessage.timeLabel,
+        isCurrentUser = chatMessage.isFromCurrentUser,
+        isSystemEvent = chatMessage.isSystemEvent,
+    )
 }
 
 private fun InstructionsTabUiState.withInstructions(

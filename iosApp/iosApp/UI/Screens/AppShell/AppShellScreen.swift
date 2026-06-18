@@ -181,13 +181,7 @@ struct CurrentStaffHeaderIconView: View {
             .transaction { transaction in
                 transaction.animation = nil
             }
-            .accessibilityIdentifier("current_mock_staff_\(currentStaff.staffId)")
-            .accessibilityLabel("current_mock_staff_\(currentStaff.staffId)")
+            .accessibilityIdentifier("current_staff_\(currentStaff.staffId)")
+            .accessibilityLabel("current_staff_\(currentStaff.staffId)")
     }
-}
-
-#Preview {
-    AppShellContentView(
-        state: AppShellUiState.mock()
-    )
 }

@@ -4,6 +4,7 @@ import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.firestore.Direction
 import dev.gitlive.firebase.firestore.FirebaseFirestore
 import dev.gitlive.firebase.firestore.firestore
+import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ class FirestoreOperationsStreamDataSource(
         Firebase.firestore
     },
 ) : OperationsStreamDataSource {
+    private val logger = AppLogger.withTag("FirestoreOperationsStreamDataSource")
     private val started = MutableStateFlow(false)
     private var configuredFirestore: FirebaseFirestore? = null
 
@@ -61,20 +63,26 @@ class FirestoreOperationsStreamDataSource(
 
     override fun start() {
         if (!config.enabled || started.value) {
+            logger.debug {
+                "Firestore start skipped: enabled=${config.enabled}, alreadyStarted=${started.value}"
+            }
             return
         }
 
         val firestore = configuredFirestore ?: firestoreFactory().also { created ->
             created.useEmulator(config.host, config.port)
             configuredFirestore = created
+            logger.info { "Configured Firestore emulator: host=${config.host}, port=${config.port}" }
         }
 
         configuredFirestore = firestore
         started.value = true
+        logger.info { "Firestore operations stream started" }
     }
 
     override fun stop() {
         started.value = false
+        logger.info { "Firestore operations stream stopped" }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -96,6 +104,11 @@ class FirestoreOperationsStreamDataSource(
                     snapshot.documents.mapNotNull { document ->
                         runCatching { document.data(serializer) }.getOrNull()
                     }
+                        .also {
+                            logger.debug {
+                                "Observed Firestore collection: collectionName=$collectionName, documentCount=${it.size}"
+                            }
+                        }
                 }
             }
         }

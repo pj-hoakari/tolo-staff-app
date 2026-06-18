@@ -1,11 +1,14 @@
 package dev.usbharu.tolo_staff.feature.contactchat
 
+import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.CurrentStaffMember
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.isUnknown
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -19,19 +22,52 @@ class ContactChatViewModel(
     initialState = ContactChatUiState(isLoading = true),
     coroutineContext = coroutineContext
 ) {
+    private val logger = AppLogger.withTag("ContactChatViewModel")
     private var currentStaffJob: Job? = null
     private var roomsJob: Job? = null
     private var selectedRoomJob: Job? = null
     private var currentStaff: CurrentStaffMember = currentStaffSession.currentStaffSnapshot
+    private var isCurrentStaffReady: Boolean = currentStaffSession.isReady.value
     private var observedStaffId: String? = null
 
     init {
-        currentStaffJob = currentStaffSession.currentStaff
-            .onEach { nextStaff ->
+        currentStaffJob = combine(
+            currentStaffSession.currentStaff,
+            currentStaffSession.isReady,
+        ) { nextStaff, isReady ->
+            nextStaff to isReady
+        }
+            .onEach { (nextStaff, isReady) ->
+                logger.debug {
+                    "Current staff session updated: staffId=${nextStaff.staffId}, isReady=$isReady"
+                }
+                val readinessChanged = isCurrentStaffReady != isReady
+                isCurrentStaffReady = isReady
                 val didChange = observedStaffId != nextStaff.staffId
                 observedStaffId = nextStaff.staffId
                 currentStaff = nextStaff
-                if (didChange) {
+                if (!isReady) {
+                    updateState { ContactChatUiState(isLoading = true) }
+                    return@onEach
+                }
+
+                if (nextStaff.isUnknown()) {
+                    logger.warn { "Current staff is unknown; chat subscriptions will be cleared" }
+                    roomsJob?.cancel()
+                    selectedRoomJob?.cancel()
+                    updateState {
+                        ContactChatUiState(
+                            isLoading = false,
+                            errorMessage = "スタッフ情報を取得できませんでした",
+                        )
+                    }
+                    return@onEach
+                }
+
+                if (didChange || readinessChanged) {
+                    logger.info {
+                        "Refreshing chat rooms for current staff: staffId=${nextStaff.staffId}, readinessChanged=$readinessChanged"
+                    }
                     updateState {
                         ContactChatUiState(isLoading = true)
                     }
@@ -43,6 +79,7 @@ class ContactChatViewModel(
 
     fun onRoomSelected(roomId: String) {
         val room = currentState.rooms.firstOrNull { it.id == roomId } ?: return
+        logger.info { "Room selected: roomId=$roomId, title=${room.title}" }
         updateState {
             it.copy(
                 selectedRoomId = room.id,
@@ -56,6 +93,7 @@ class ContactChatViewModel(
     }
 
     fun onBackToRooms() {
+        logger.info { "Returning from message detail to room list" }
         updateState {
             it.copy(
                 selectedRoomId = null,
@@ -79,6 +117,7 @@ class ContactChatViewModel(
         if (text.isEmpty() || currentState.isSending) {
             return
         }
+        logger.info { "Sending chat draft: roomId=$roomId, staffId=${currentStaff.staffId}, textLength=${text.length}" }
 
         val optimisticMessage = ChatMessage(
             id = "local-${nextLocalMessageId++}",
@@ -104,8 +143,12 @@ class ContactChatViewModel(
         viewModelScope.launch {
             runCatching {
                 service.sendSimpleMessage(roomId, currentStaff.staffId, text)
+                logger.info { "Chat draft sent successfully: roomId=$roomId, staffId=${currentStaff.staffId}" }
                 updateState { it.copy(isSending = false, errorMessage = null) }
             }.onFailure { throwable ->
+                logger.warn(throwable) {
+                    "Failed to send chat draft: roomId=$roomId, staffId=${currentStaff.staffId}"
+                }
                 updateState { state ->
                     state.copy(
                         isSending = false,
@@ -120,8 +163,10 @@ class ContactChatViewModel(
     private fun observeRooms() {
         roomsJob?.cancel()
         selectedRoomJob?.cancel()
+        logger.info { "observeRooms subscribed: staffId=${currentStaff.staffId}" }
         roomsJob = service.observeRooms(currentStaff.staffId)
             .onEach { rooms ->
+                logger.debug { "Received room snapshot: staffId=${currentStaff.staffId}, roomCount=${rooms.size}" }
                 val selectedRoomId = currentState.selectedRoomId?.takeIf { roomId ->
                     rooms.any { it.id == roomId }
                 }
@@ -144,6 +189,7 @@ class ContactChatViewModel(
                 }
             }
             .catch { throwable ->
+                logger.warn(throwable) { "Failed to observe chat rooms: staffId=${currentStaff.staffId}" }
                 updateState {
                     it.copy(
                         isLoading = false,
@@ -157,8 +203,10 @@ class ContactChatViewModel(
 
     private fun observeSelectedRoom(roomId: String) {
         selectedRoomJob?.cancel()
+        logger.info { "observeSelectedRoom subscribed: roomId=$roomId, staffId=${currentStaff.staffId}" }
         selectedRoomJob = service.observeMessages(roomId, currentStaff.staffId)
             .onEach { messages ->
+                logger.debug { "Received message snapshot: roomId=$roomId, count=${messages.size}" }
                 updateState {
                     it.copy(
                         isLoading = false,
@@ -170,6 +218,7 @@ class ContactChatViewModel(
                 }
             }
             .catch { throwable ->
+                logger.warn(throwable) { "Failed to observe messages: roomId=$roomId, staffId=${currentStaff.staffId}" }
                 updateState {
                     it.copy(
                         isLoading = false,
@@ -183,6 +232,7 @@ class ContactChatViewModel(
     }
 
     override fun clear() {
+        logger.trace { "Clearing ContactChatViewModel subscriptions" }
         currentStaffJob?.cancel()
         roomsJob?.cancel()
         selectedRoomJob?.cancel()

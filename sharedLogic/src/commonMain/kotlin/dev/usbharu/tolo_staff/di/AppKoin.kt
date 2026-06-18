@@ -4,6 +4,7 @@ import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatViewModel
 import dev.usbharu.tolo_staff.feature.sample.SampleViewModel
+import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
@@ -17,6 +18,8 @@ val coreModule = module {
     factory {
         AppShellViewModel(
             overviewRepository = get(),
+            dataSource = get(),
+            contactChatService = get(),
             currentStaffSession = get(),
         )
     }
@@ -25,16 +28,20 @@ val coreModule = module {
 }
 
 object KoinInitializer {
+    private val logger = AppLogger.withTag("KoinInitializer")
     private var started = false
 
     fun start() {
         if (started) {
+            logger.debug { "start skipped because Koin is already initialized" }
             return
         }
 
+        logger.info { "Starting Koin modules for shared logic" }
         startKoin {
             modules(coreModule, platformModule())
         }
         started = true
+        logger.info { "Koin started successfully" }
     }
 }

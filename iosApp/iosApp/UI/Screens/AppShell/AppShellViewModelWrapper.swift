@@ -9,7 +9,10 @@ final class AppShellViewModelWrapper: ObservableObject {
 
     init(viewModel: AppShellViewModel = KoinHelper().getAppShellViewModel()) {
         self.viewModel = viewModel
-        self.state = viewModel.uiState.value ?? AppShellUiState.mock()
+        guard let initialState = viewModel.uiState.value else {
+            fatalError("AppShellViewModel.uiState.value was unexpectedly nil")
+        }
+        self.state = initialState
 
         self.stateJob = viewModel.observeUiState { [weak self] state in
             guard let state else { return }

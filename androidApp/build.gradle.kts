@@ -24,6 +24,7 @@ dependencies {
     implementation(libs.compose.uiToolingPreview)
     implementation(compose.materialIconsExtended)
     debugImplementation(libs.compose.uiTooling)
+    implementation(libs.grpc.protobuf.lite)
 }
 
 android {
@@ -50,5 +51,23 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+configurations.configureEach {
+    if (
+        name == "debugRuntimeClasspath" ||
+        name == "releaseRuntimeClasspath" ||
+        name == "debugCompileClasspath" ||
+        name == "releaseCompileClasspath"
+    ) {
+        exclude(
+            group = "com.google.api.grpc",
+            module = "proto-google-common-protos"
+        )
+        exclude(
+            group = "com.google.protobuf",
+            module = "protobuf-java"
+        )
     }
 }

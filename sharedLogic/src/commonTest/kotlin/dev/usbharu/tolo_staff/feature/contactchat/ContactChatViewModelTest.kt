@@ -1,8 +1,8 @@
 package dev.usbharu.tolo_staff.feature.contactchat
 
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.CurrentStaffMember
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
-import dev.usbharu.tolo_staff.streaming.defaultMockStaffMembers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -220,9 +220,33 @@ class ContactChatViewModelTest {
         viewModel.clear()
     }
 
+    @Test
+    fun `unknown current staff does not observe rooms`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val service = FakeContactChatService(
+            rooms = listOf(ChatRoom(id = "thread-1", title = "sato"))
+        )
+        val viewModel = ContactChatViewModel(
+            service = service,
+            currentStaffSession = MockCurrentStaffSession(coroutineContext = dispatcher),
+            coroutineContext = dispatcher,
+        )
+
+        advanceUntilIdle()
+
+        assertTrue(service.observedRoomStaffIds.isEmpty())
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals("スタッフ情報を取得できませんでした", viewModel.uiState.value.errorMessage)
+
+        viewModel.clear()
+    }
+
     private fun createSession(dispatcher: CoroutineContext): CurrentStaffSession =
         MockCurrentStaffSession(
-            initialStaff = defaultMockStaffMembers(),
+            initialStaff = listOf(
+                CurrentStaffMember("tanaka", "田中", "Aゲート担当"),
+                CurrentStaffMember("sato", "佐藤", "巡回担当"),
+            ),
             coroutineContext = dispatcher
         )
 }

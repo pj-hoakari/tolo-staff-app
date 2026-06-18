@@ -96,7 +96,7 @@ data class ReportDraftUiModel(
     val comment: String = "",
     val selectedPlaceId: String? = null,
     val selectedPlaceName: String? = null,
-    val urgencyLabel: String = "通常",
+    val urgencyLabel: String = "",
     val includesImage: Boolean = false,
     val includesLocation: Boolean = false,
 )

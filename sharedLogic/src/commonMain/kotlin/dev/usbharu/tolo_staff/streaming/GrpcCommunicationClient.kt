@@ -7,6 +7,7 @@ import dev.usbharu.tolo.communication.grpc.PointRpc
 import dev.usbharu.tolo.communication.grpc.ReportRpc
 import dev.usbharu.tolo.communication.grpc.StaffRpc
 import dev.usbharu.tolo.communication.grpc.ThreadRpc
+import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.rpc.grpc.client.GrpcClient
 import kotlinx.rpc.withService
 
@@ -14,8 +15,13 @@ class GrpcCommunicationClient(
     host: String,
     port: Int,
 ) {
+    private val logger = AppLogger.withTag("GrpcCommunicationClient")
     private val client = GrpcClient(host, port) {
         credentials = plaintext()
+    }
+
+    init {
+        logger.info { "Configured gRPC client: host=$host, port=$port" }
     }
 
     val pointService: PointRpc by lazy { client.withService<PointRpc>() }

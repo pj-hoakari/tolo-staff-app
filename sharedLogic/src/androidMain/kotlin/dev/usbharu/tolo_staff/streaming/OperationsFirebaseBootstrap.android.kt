@@ -3,6 +3,7 @@ package dev.usbharu.tolo_staff.streaming
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.apps
+import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.initialize
 
 actual class OperationsFirebaseBootstrap {
@@ -20,5 +21,6 @@ actual class OperationsFirebaseBootstrap {
                 gcmSenderId = "1234567890",
             )
         )
+        Firebase.firestore.useEmulator("10.0.2.2", 8081)
     }
 }

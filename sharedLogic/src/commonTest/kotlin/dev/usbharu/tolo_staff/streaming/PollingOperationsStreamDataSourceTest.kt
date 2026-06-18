@@ -30,7 +30,7 @@ class PollingOperationsStreamDataSourceTest {
     }
 
     @Test
-    fun `staff polling flow is shared across subscribers`() = runTest {
+    fun `staff polling flow performs an independent fetch per subscriber`() = runTest {
         val remote = CountingOperationsPollingRemoteDataSource(
             staff = listOf(
                 OperationStaff(
@@ -58,7 +58,7 @@ class PollingOperationsStreamDataSourceTest {
         first.join()
         second.join()
 
-        assertEquals(1, remote.staffRequests)
+        assertEquals(2, remote.staffRequests)
     }
 }
 

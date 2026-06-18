@@ -2,6 +2,7 @@ package dev.usbharu.tolo_staff.streaming
 
 import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
 import dev.usbharu.tolo_staff.feature.appshell.AppShellMapState
+import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -17,13 +18,19 @@ interface OperationsOverviewRepository {
 class OperationsOverviewRepositoryImpl(
     private val dataSource: OperationsStreamDataSource,
 ) : OperationsOverviewRepository {
+    private val logger = AppLogger.withTag("OperationsOverviewRepository")
+
     override fun observeOverview(currentStaffId: String): Flow<AppShellOperationsProjection> {
+        logger.info { "observeOverview started: currentStaffId=$currentStaffId" }
         dataSource.start()
         return combine(
             dataSource.observePoints(),
             dataSource.observeAssignments(),
             dataSource.observeRelevantInstructions(currentStaffId),
         ) { points, assignments, instructions ->
+            logger.debug {
+                "Building overview projection: currentStaffId=$currentStaffId, points=${points.size}, assignments=${assignments.size}, instructions=${instructions.size}"
+            }
             buildProjection(
                 currentStaffId = currentStaffId,
                 points = points,
@@ -56,15 +63,12 @@ class OperationsOverviewRepositoryImpl(
                     .thenBy { it.instructionId }
             )
 
-        val placementName = currentPoint?.name ?: "未配属"
-        val placementDetail = currentPoint?.description ?: "現在の配置情報はまだ共有されていません。"
-        val instructionText = activeInstruction?.toDisplayText()
-            ?: "現在有効な指示はありません。"
+        val placementName = currentPoint?.name.orEmpty()
+        val placementDetail = currentPoint?.description.orEmpty()
+        val instructionText = activeInstruction?.toDisplayText().orEmpty()
 
         return AppShellOperationsProjection(
             homeOverview = AppShellHomeOverview(
-                eventName = "Tolo Staff Demo 2026",
-                eventTime = "Firestore Streaming Demo",
                 placementName = placementName,
                 placementDetail = placementDetail,
                 currentInstruction = instructionText,

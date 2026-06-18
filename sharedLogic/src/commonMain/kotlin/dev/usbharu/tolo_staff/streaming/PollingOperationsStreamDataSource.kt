@@ -1,11 +1,13 @@
 package dev.usbharu.tolo_staff.streaming
 
+import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.coroutines.flow.Flow
 
 class PollingOperationsStreamDataSource(
     private val remoteDataSource: OperationsPollingRemoteDataSource,
     private val config: OperationsPollingConfig = defaultOperationsPollingConfig(),
 ) : OperationsStreamDataSource {
+    private val logger = AppLogger.withTag("PollingOperationsStreamDataSource")
     private val pollingFactory = SharedPollingFlowFactory(config.intervalMillis)
     private val pointsFlow by lazy { pollingFactory.create { remoteDataSource.listPoints() } }
     private val staffFlow by lazy { pollingFactory.create { remoteDataSource.listStaff() } }
@@ -29,6 +31,7 @@ class PollingOperationsStreamDataSource(
 
     override fun observeRelevantInstructions(currentStaffId: String): Flow<List<OperationInstruction>> =
         relevantInstructionsFlows.getOrPut(currentStaffId) {
+            logger.info { "Creating relevant instructions flow: currentStaffId=$currentStaffId" }
             pollingFactory.create { remoteDataSource.listRelevantInstructions(currentStaffId) }
         }
 
@@ -36,9 +39,13 @@ class PollingOperationsStreamDataSource(
 
     override fun observeMessages(): Flow<List<OperationMessage>> = messagesFlow
 
-    override fun start() = Unit
+    override fun start() {
+        logger.info { "Polling operations stream started: intervalMillis=${config.intervalMillis}" }
+    }
 
-    override fun stop() = Unit
+    override fun stop() {
+        logger.info { "Polling operations stream stopped" }
+    }
 }
 
 fun List<OperationMessage>.sortedOperationMessages(): List<OperationMessage> =

@@ -1,46 +1,33 @@
 package dev.usbharu.tolo_staff.streaming
 
-import kotlinx.coroutines.CoroutineScope
+import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
 
 internal class SharedPollingFlowFactory(
     private val intervalMillis: Long,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val logger = AppLogger.withTag("SharedPollingFlowFactory")
 
     fun <T> create(fetch: suspend () -> List<T>): Flow<List<T>> = flow {
-        var latestValue: List<T>? = null
         while (currentCoroutineContext().isActive) {
-            val nextValue = try {
+            val result = try {
                 withContext(Dispatchers.Default) { fetch() }
-            } catch (_: Throwable) {
-                latestValue
+            } catch (throwable: Throwable) {
+                logger.warn(throwable) { "Polling fetch failed; terminating current flow" }
+                throw throwable
             }
-            if (nextValue != null) {
-                latestValue = nextValue
-                emit(nextValue)
-            }
+            emit(result)
             delay(intervalMillis)
         }
     }
         .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
-        .shareIn(
-            scope = scope,
-            started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(
-                stopTimeoutMillis = intervalMillis,
-            ),
-            replay = 1,
-        )
 }
