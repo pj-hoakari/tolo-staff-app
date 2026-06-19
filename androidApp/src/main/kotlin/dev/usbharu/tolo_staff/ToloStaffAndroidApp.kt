@@ -26,6 +26,7 @@ fun ToloStaffAndroidApp(
         onInstructionThreadOpened = viewModel::onInstructionThreadOpened,
         onInstructionDetailClosed = viewModel::onInstructionDetailClosed,
         onReportTypeSelected = viewModel::onReportTypeSelected,
+        onReportSelected = viewModel::onReportSelected,
         onReportCommentChanged = viewModel::onReportCommentChanged,
         onReportUrgencySelected = viewModel::onReportUrgencySelected,
         onReportImageToggleChanged = viewModel::onReportImageToggleChanged,

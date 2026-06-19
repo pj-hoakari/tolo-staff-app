@@ -46,6 +46,7 @@ fun ToloStaffAndroidContent(
     onInstructionDetailClosed: () -> Unit = {},
     onInstructionStatusUpdated: (InstructionProgressStatus) -> Unit = {},
     onReportTypeSelected: (String) -> Unit = {},
+    onReportSelected: (String) -> Unit = {},
     onReportCommentChanged: (String) -> Unit = {},
     onReportUrgencySelected: (String) -> Unit = {},
     onReportImageToggleChanged: (Boolean) -> Unit = {},
@@ -108,9 +109,6 @@ fun ToloStaffAndroidContent(
                         onReportBack()
                     }
                     lastRoute == AppShellRoutes.REPORTS_PLACE && currentRoute == AppShellRoutes.REPORTS_DRAFT -> {
-                        onReportBack()
-                    }
-                    lastRoute == AppShellRoutes.REPORTS_THREAD && currentRoute == AppShellRoutes.REPORTS_PLACE -> {
                         onReportBack()
                     }
                     lastRoute == AppShellRoutes.CONTACTS_DETAIL && currentRoute == AppShellRoutes.CONTACTS_LIST -> {
@@ -219,8 +217,9 @@ fun ToloStaffAndroidContent(
                     }
                     composable(AppShellRoutes.REPORTS_TYPE) {
                         ReportTypeSelectionScreen(
-                            reportTypes = state.reportsTab.reportTypes,
+                            state = state.reportsTab,
                             onTypeSelected = onReportTypeSelected,
+                            onReportSelected = onReportSelected,
                         )
                     }
                     composable(AppShellRoutes.REPORTS_DRAFT) {
@@ -239,9 +238,6 @@ fun ToloStaffAndroidContent(
                             onPlaceSelected = onReportPlaceSelected,
                             onSubmitted = onReportSubmitted,
                         )
-                    }
-                    composable(AppShellRoutes.REPORTS_THREAD) {
-                        ReportThreadScreen(state = state.reportsTab)
                     }
                     composable(AppShellRoutes.CONTACTS_LIST) {
                         ContactThreadListScreen(
@@ -288,7 +284,6 @@ private fun appBarTitle(
         AppShellRoutes.REPORTS_TYPE -> "報告"
         AppShellRoutes.REPORTS_DRAFT -> reportTitleForStep(state.reportsTab.step)
         AppShellRoutes.REPORTS_PLACE -> "対象場所"
-        AppShellRoutes.REPORTS_THREAD -> "報告スレッド"
         AppShellRoutes.CONTACTS_LIST -> "連絡"
         AppShellRoutes.CONTACTS_TARGET -> "宛先を選択"
         AppShellRoutes.CONTACTS_DETAIL -> state.contactsTab.selectedThread?.title ?: "連絡"

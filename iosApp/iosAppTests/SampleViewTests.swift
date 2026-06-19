@@ -182,7 +182,9 @@ final class SampleViewTests: XCTestCase {
                     includesLocation: false
                 ),
                 step: .typeSelection,
-                submittedThread: nil
+                relatedReports: [],
+                isLoadingReports: false,
+                reportsErrorMessage: nil
             ),
             contactsTab: ContactsTabUiState(
                 threads: [],
@@ -191,7 +193,7 @@ final class SampleViewTests: XCTestCase {
                 selectedTargetType: nil,
                 isChoosingTargetType: false,
                 formerAssignments: [],
-                shouldReturnToInstructionOnBack: false
+                selectedThreadBackDestination: .none
             ),
             isLoading: false,
             errorMessage: nil

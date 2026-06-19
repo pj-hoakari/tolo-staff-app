@@ -1,5 +1,7 @@
 package dev.usbharu.tolo_staff.di
 
+import dev.usbharu.tolo_staff.feature.appshell.NoOpReportRepository
+import dev.usbharu.tolo_staff.feature.appshell.ReportRepository
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.NoOpContactChatService
 import dev.usbharu.tolo_staff.streaming.NoOpOperationsStreamDataSource
@@ -13,4 +15,5 @@ actual fun platformModule(): Module = module {
     single { defaultOperationsReadMode() }
     single<OperationsStreamDataSource> { NoOpOperationsStreamDataSource() }
     single<ContactChatService> { NoOpContactChatService() }
+    single<ReportRepository> { NoOpReportRepository() }
 }

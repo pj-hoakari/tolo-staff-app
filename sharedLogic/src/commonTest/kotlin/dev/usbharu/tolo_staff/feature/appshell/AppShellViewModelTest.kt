@@ -171,7 +171,7 @@ class AppShellViewModelTest {
     }
 
     @Test
-    fun `report flow progresses to submitted thread`() = runTest {
+    fun `report flow opens submitted thread in contacts and adds it to thread list`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val dataSource = FakeOperationsStreamDataSource(
             points = listOf(
@@ -188,6 +188,7 @@ class AppShellViewModelTest {
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
             dataSource = dataSource,
+            reportRepository = FakeReportRepository(),
             currentStaffSession = createSession(dispatcher),
             coroutineContext = dispatcher
         )
@@ -199,13 +200,108 @@ class AppShellViewModelTest {
         viewModel.onReportPlaceSelected("gate-a")
         viewModel.onReportSubmitted()
 
-        assertEquals(ReportFlowStep.THREAD, viewModel.uiState.value.reportsTab.step)
-        assertEquals("Gate A", viewModel.uiState.value.reportsTab.draft.selectedPlaceName)
-        assertEquals("導線報告 / Gate A", viewModel.uiState.value.reportsTab.submittedThread?.title)
+        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
+        assertEquals(ReportFlowStep.TYPE_SELECTION, viewModel.uiState.value.reportsTab.step)
+        assertEquals(null, viewModel.uiState.value.reportsTab.draft.selectedPlaceName)
+        assertEquals("導線報告 / Gate A", viewModel.uiState.value.contactsTab.selectedThread?.title)
         assertEquals(
             "導線報告: 最後尾が歩道へ伸びています [高]",
-            viewModel.uiState.value.reportsTab.submittedThread?.lastSubmittedSummary
+            viewModel.uiState.value.contactsTab.selectedThread?.messages?.lastOrNull()?.body
         )
+        assertEquals("report-queue-gate-a", viewModel.uiState.value.reportsTab.relatedReports.first().reportId)
+        assertEquals(
+            ContactThreadBackDestination.REPORTS,
+            viewModel.uiState.value.contactsTab.selectedThreadBackDestination
+        )
+        assertTrue(viewModel.uiState.value.contactsTab.threads.any { it.id == "report-queue-gate-a" })
+        viewModel.clear()
+    }
+
+    @Test
+    fun `related reports load and can open thread in contacts`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            staff = listOf(
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "tanaka",
+                    staffId = "tanaka",
+                    name = "田中",
+                    roles = listOf("Aゲート担当"),
+                )
+            ),
+            threads = listOf(
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "report-thread-1",
+                    threadId = "report-thread-1",
+                    members = listOf("tanaka", "hq"),
+                    displayTitle = "本部 / 南口",
+                )
+            ),
+            messages = listOf(
+                OperationMessage(
+                    updatedAt = "2026-06-19T09:00:00Z",
+                    reason = "test",
+                    entityId = "report-message-1",
+                    messageId = "report-message-1",
+                    threadId = "report-thread-1",
+                    staffId = "tanaka",
+                    messageType = OperationMessageType.REPORT,
+                    reportId = "report-1",
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            reportRepository = FakeReportRepository(
+                reports = listOf(
+                    RelevantReport(
+                        reportId = "report-1",
+                        threadId = "report-thread-1",
+                        authorStaffId = "tanaka",
+                        title = "導線報告",
+                        summary = "南口の入場列は安定しています",
+                        priorityLabel = "通常",
+                        createdAtLabel = "2026-06-19T09:00:00Z",
+                    )
+                )
+            ),
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        assertEquals(1, viewModel.uiState.value.reportsTab.relatedReports.size)
+
+        viewModel.onReportSelected("report-1")
+
+        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
+        assertEquals("本部 / 南口", viewModel.uiState.value.contactsTab.selectedThread?.title)
+        assertEquals(
+            ContactThreadBackDestination.REPORTS,
+            viewModel.uiState.value.contactsTab.selectedThreadBackDestination
+        )
+        viewModel.onContactBackToList()
+        assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
+        assertEquals(null, viewModel.uiState.value.contactsTab.selectedThread)
+        viewModel.clear()
+    }
+
+    @Test
+    fun `related report loading failure updates error state`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            reportRepository = FakeReportRepository(errorMessage = "load failed"),
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        assertEquals("load failed", viewModel.uiState.value.reportsTab.reportsErrorMessage)
+        assertFalse(viewModel.uiState.value.reportsTab.isLoadingReports)
         viewModel.clear()
     }
 
@@ -723,6 +819,16 @@ private class FakeContactChatService : ContactChatService {
 
     override suspend fun sendSimpleMessage(roomId: String, currentStaffId: String, text: String) {
         sentMessages += Triple(roomId, currentStaffId, text)
+    }
+}
+
+private class FakeReportRepository(
+    private val reports: List<RelevantReport> = emptyList(),
+    private val errorMessage: String? = null,
+) : ReportRepository {
+    override suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport> {
+        errorMessage?.let { error(it) }
+        return reports
     }
 }
 

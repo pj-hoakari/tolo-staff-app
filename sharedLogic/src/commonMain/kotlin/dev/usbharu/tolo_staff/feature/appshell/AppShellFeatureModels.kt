@@ -17,8 +17,7 @@ enum class InstructionProgressStatus {
 enum class ReportFlowStep {
     TYPE_SELECTION,
     DRAFT_INPUT,
-    PLACE_SELECTION,
-    THREAD
+    PLACE_SELECTION
 }
 
 data class ContactTargetUiModel(
@@ -101,12 +100,17 @@ data class ReportDraftUiModel(
     val includesLocation: Boolean = false,
 )
 
-data class ReportThreadUiModel(
-    val id: String,
+data class RelatedReportUiModel(
+    val reportId: String,
+    val threadId: String,
     val title: String,
+    val summary: String,
+    val priorityLabel: String,
+    val authorStaffId: String,
+    val authorName: String,
     val targetLabel: String,
-    val messages: List<ThreadMessageUiModel> = emptyList(),
-    val lastSubmittedSummary: String = "",
+    val timeLabel: String? = null,
+    val isAuthoredByCurrentStaff: Boolean = false,
 )
 
 data class ReportsTabUiState(
@@ -114,7 +118,9 @@ data class ReportsTabUiState(
     val availablePlaces: List<ContactTargetUiModel> = emptyList(),
     val draft: ReportDraftUiModel = ReportDraftUiModel(),
     val step: ReportFlowStep = ReportFlowStep.TYPE_SELECTION,
-    val submittedThread: ReportThreadUiModel? = null,
+    val relatedReports: List<RelatedReportUiModel> = emptyList(),
+    val isLoadingReports: Boolean = false,
+    val reportsErrorMessage: String? = null,
 )
 
 data class ContactThreadSummaryUiModel(
@@ -143,6 +149,12 @@ data class FormerAssignmentUiModel(
     val canReply: Boolean = true,
 )
 
+enum class ContactThreadBackDestination {
+    NONE,
+    INSTRUCTIONS,
+    REPORTS,
+}
+
 data class ContactsTabUiState(
     val threads: List<ContactThreadSummaryUiModel> = emptyList(),
     val selectedThread: ContactThreadDetailUiModel? = null,
@@ -150,5 +162,5 @@ data class ContactsTabUiState(
     val selectedTargetType: ContactTargetType? = null,
     val isChoosingTargetType: Boolean = false,
     val formerAssignments: List<FormerAssignmentUiModel> = emptyList(),
-    val shouldReturnToInstructionOnBack: Boolean = false,
+    val selectedThreadBackDestination: ContactThreadBackDestination = ContactThreadBackDestination.NONE,
 )

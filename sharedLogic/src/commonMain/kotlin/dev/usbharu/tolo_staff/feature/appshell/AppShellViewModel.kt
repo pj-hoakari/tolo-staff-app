@@ -41,6 +41,7 @@ class AppShellViewModel(
     private val dataSource: OperationsStreamDataSource = NoOpOperationsStreamDataSource(),
     private val contactChatService: ContactChatService = NoOpContactChatService(),
     private val currentStaffSession: CurrentStaffSession = MockCurrentStaffSession(),
+    private val reportRepository: ReportRepository = NoOpReportRepository(),
     coroutineContext: CoroutineContext = Dispatchers.Default
 ) : StateEffectViewModel<AppShellUiState, Unit>(
     initialState = initialState(
@@ -53,10 +54,13 @@ class AppShellViewModel(
     private var isCurrentStaffReady: Boolean = currentStaffSession.isReady.value
     private var overviewJob: Job? = null
     private var staffSessionJob: Job? = null
+    private var reportLoadJob: Job? = null
     private var observedStaffId: String? = null
     private var instructionDetailsById: Map<String, InstructionDetailUiModel> = emptyMap()
     private var contactDetailsById: Map<String, ContactThreadDetailUiModel> = emptyMap()
     private var instructionThreadIdsByInstructionId: Map<String, String> = emptyMap()
+    private var localCreatedReports: List<RelatedReportUiModel> = emptyList()
+    private var localCreatedContactThreads: Map<String, ContactThreadDetailUiModel> = emptyMap()
 
     init {
         staffSessionJob = combine(
@@ -115,14 +119,18 @@ class AppShellViewModel(
                         "Stopping overview observation: isReady=$isReady, staffId=${currentStaff.staffId}, isUnknown=${currentStaff.isUnknown()}"
                     }
                     overviewJob?.cancel()
+                    reportLoadJob?.cancel()
                     return@onEach
                 }
 
                 if (didChange || readinessChanged) {
+                    localCreatedReports = emptyList()
+                    localCreatedContactThreads = emptyMap()
                     logger.info {
                         "Refreshing overview observation: staffId=${currentStaff.staffId}, readinessChanged=$readinessChanged"
                     }
                     observeOverview(currentStaff.staffId)
+                    loadRelatedReports(currentStaff.staffId)
                 }
             }
             .launchIn(viewModelScope)
@@ -171,7 +179,7 @@ class AppShellViewModel(
                     selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    shouldReturnToInstructionOnBack = true,
+                    selectedThreadBackDestination = ContactThreadBackDestination.INSTRUCTIONS,
                 )
             )
         }
@@ -333,26 +341,57 @@ class AppShellViewModel(
         }
         val threadId = "report-${selectedType.id}-${selectedPlace.id}"
         val currentStaff = currentState.currentStaff
+        val submittedThread = ContactThreadDetailUiModel(
+            id = threadId,
+            title = "${selectedType.title} / ${selectedPlace.displayName}",
+            target = ContactTargetUiModel(
+                id = selectedPlace.id,
+                type = ContactTargetType.PLACE,
+                displayName = selectedPlace.displayName,
+                subtitle = "本部"
+            ),
+            messages = listOf(
+                ThreadMessageUiModel(
+                    id = "$threadId-message",
+                    senderName = currentStaff.displayName,
+                    senderRoleLabel = currentStaff.roleLabel,
+                    body = submittedSummary,
+                    isCurrentUser = true,
+                )
+            ),
+            canReply = true,
+        )
+        val submittedReport = RelatedReportUiModel(
+            reportId = threadId,
+            threadId = threadId,
+            title = selectedType.title,
+            summary = submittedSummary,
+            priorityLabel = reportsTab.draft.urgencyLabel,
+            authorStaffId = currentStaff.staffId,
+            authorName = currentStaff.displayName,
+            targetLabel = selectedPlace.displayName,
+            isAuthoredByCurrentStaff = true,
+        )
+        localCreatedReports = mergeRelatedReports(localCreatedReports, listOf(submittedReport))
+        localCreatedContactThreads = localCreatedContactThreads + (threadId to submittedThread)
 
         updateState { state ->
             state.copy(
                 reportsTab = state.reportsTab.copy(
-                    step = ReportFlowStep.THREAD,
-                    submittedThread = ReportThreadUiModel(
-                        id = threadId,
-                        title = "${selectedType.title} / ${selectedPlace.displayName}",
-                        targetLabel = "本部 -> ${selectedPlace.displayName}",
-                        lastSubmittedSummary = submittedSummary,
-                        messages = listOf(
-                            ThreadMessageUiModel(
-                                id = "$threadId-message",
-                                senderName = currentStaff.displayName,
-                                senderRoleLabel = currentStaff.roleLabel,
-                                body = submittedSummary,
-                                isCurrentUser = true,
-                            )
-                        )
-                    )
+                    relatedReports = mergeRelatedReports(state.reportsTab.relatedReports, localCreatedReports),
+                    step = ReportFlowStep.TYPE_SELECTION,
+                    draft = ReportDraftUiModel(),
+                ),
+                selectedTab = AppTab.CONTACTS,
+                contactsTab = state.contactsTab.copy(
+                    threads = mergeLocalContactThreads(
+                        baseThreads = state.contactsTab.threads,
+                        localThreads = localCreatedContactThreads,
+                    ),
+                    selectedThread = submittedThread,
+                    isChoosingTargetType = false,
+                    selectedTargetType = null,
+                    selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
                 ),
                 homeOverview = state.homeOverview.copy(
                     pendingReportLabel = "最新報告: ${selectedType.title}"
@@ -361,11 +400,32 @@ class AppShellViewModel(
         }
     }
 
+    fun onReportSelected(reportId: String) {
+        val report = currentState.reportsTab.relatedReports.firstOrNull { it.reportId == reportId } ?: return
+        val detail = contactDetailsById[report.threadId]
+            ?: localCreatedContactThreads[report.threadId]
+            ?: buildRelatedReportContactThread(report)
+        updateState { state ->
+            state.copy(
+                selectedTab = AppTab.CONTACTS,
+                contactsTab = state.contactsTab.copy(
+                    threads = mergeLocalContactThreads(
+                        baseThreads = state.contactsTab.threads,
+                        localThreads = localCreatedContactThreads,
+                    ),
+                    selectedThread = detail,
+                    isChoosingTargetType = false,
+                    selectedTargetType = null,
+                    selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
+                )
+            )
+        }
+    }
+
     fun onReportBack() {
         updateState { state ->
             val reportsTab = state.reportsTab
             val nextStep = when (reportsTab.step) {
-                ReportFlowStep.THREAD -> ReportFlowStep.PLACE_SELECTION
                 ReportFlowStep.PLACE_SELECTION -> ReportFlowStep.DRAFT_INPUT
                 ReportFlowStep.DRAFT_INPUT -> ReportFlowStep.TYPE_SELECTION
                 ReportFlowStep.TYPE_SELECTION -> ReportFlowStep.TYPE_SELECTION
@@ -373,21 +433,20 @@ class AppShellViewModel(
             state.copy(
                 reportsTab = reportsTab.copy(
                     step = nextStep,
-                    submittedThread = if (nextStep == ReportFlowStep.THREAD) reportsTab.submittedThread else null
                 )
             )
         }
     }
 
     fun onContactThreadSelected(threadId: String) {
-        val detail = contactDetailsById[threadId] ?: return
+        val detail = contactDetailsById[threadId] ?: localCreatedContactThreads[threadId] ?: return
         updateState {
             it.copy(
                 contactsTab = it.contactsTab.copy(
                     selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    shouldReturnToInstructionOnBack = false,
+                    selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                 )
             )
         }
@@ -395,14 +454,17 @@ class AppShellViewModel(
 
     fun onContactBackToList() {
         updateState { state ->
-            val shouldReturnToInstruction = state.contactsTab.shouldReturnToInstructionOnBack
             state.copy(
-                selectedTab = if (shouldReturnToInstruction) AppTab.INSTRUCTIONS else state.selectedTab,
+                selectedTab = when (state.contactsTab.selectedThreadBackDestination) {
+                    ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
+                    ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
+                    ContactThreadBackDestination.NONE -> state.selectedTab
+                },
                 contactsTab = state.contactsTab.copy(
                     selectedThread = null,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    shouldReturnToInstructionOnBack = false,
+                    selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                 )
             )
         }
@@ -418,7 +480,7 @@ class AppShellViewModel(
                     selectedThread = null,
                     isChoosingTargetType = true,
                     selectedTargetType = null,
-                    shouldReturnToInstructionOnBack = false,
+                    selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                 )
             )
         }
@@ -500,7 +562,58 @@ class AppShellViewModel(
         logger.trace { "Clearing AppShellViewModel subscriptions" }
         overviewJob?.cancel()
         staffSessionJob?.cancel()
+        reportLoadJob?.cancel()
         super.clear()
+    }
+
+    private fun loadRelatedReports(currentStaffId: String) {
+        reportLoadJob?.cancel()
+        reportLoadJob = viewModelScope.launch {
+            updateState { state ->
+                state.copy(
+                    reportsTab = state.reportsTab.copy(
+                        isLoadingReports = true,
+                        reportsErrorMessage = null,
+                    )
+                )
+            }
+
+            runCatching { reportRepository.listRelevantReports(currentStaffId) }
+                .onSuccess { reports ->
+                    updateState { state ->
+                        val remoteReports = reports
+                            .sortedByDescending { it.createdAtLabel.orEmpty() }
+                            .map { report ->
+                                report.toUiModel(
+                                    currentStaffId = currentStaffId,
+                                    currentThreadTitle = contactDetailsById[report.threadId]?.title,
+                                    availableStaff = state.availableStaff,
+                                )
+                            }
+                        val mergedReports = mergeRelatedReports(remoteReports, localCreatedReports)
+                        state.copy(
+                            reportsTab = state.reportsTab.copy(
+                                relatedReports = mergedReports,
+                                isLoadingReports = false,
+                                reportsErrorMessage = null,
+                            )
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    logger.warn(throwable) {
+                        "Failed to load related reports: currentStaffId=$currentStaffId"
+                    }
+                    updateState { state ->
+                        state.copy(
+                            reportsTab = state.reportsTab.copy(
+                                isLoadingReports = false,
+                                reportsErrorMessage = throwable.message ?: "関連報告の取得に失敗しました",
+                            )
+                        )
+                    }
+                }
+        }
     }
 
     private fun observeOverview(currentStaffId: String) {
@@ -542,7 +655,7 @@ class AppShellViewModel(
                     messages = messages,
                 )
                 instructionDetailsById = snapshot.instructionDetailsById
-                contactDetailsById = snapshot.contactDetailsById
+                contactDetailsById = snapshot.contactDetailsById + localCreatedContactThreads
                 instructionThreadIdsByInstructionId = snapshot.instructionThreadIdsByInstructionId
 
                 updateState { state ->
@@ -552,10 +665,17 @@ class AppShellViewModel(
                     val previousSelectedThread = state.contactsTab.selectedThread
                     val selectedThread = previousSelectedThread
                         ?.id
-                        ?.let(snapshot.contactDetailsById::get)
+                        ?.let { threadId -> (snapshot.contactDetailsById + localCreatedContactThreads)[threadId] }
                         ?.copy(draftMessage = previousSelectedThread.draftMessage)
                     val selectedTargetType = state.contactsTab.selectedTargetType?.takeIf { type ->
                         snapshot.contactsTab.availableTargets.any { it.type == type }
+                    }
+                    val resolvedReports = state.reportsTab.relatedReports.map { report ->
+                        report.withResolvedMetadata(
+                            currentStaffId = currentStaffId,
+                            currentThreadTitle = snapshot.contactDetailsById[report.threadId]?.title,
+                            availableStaff = staff,
+                        )
                     }
                     state.copy(
                         homeOverview = snapshot.homeOverview,
@@ -567,6 +687,7 @@ class AppShellViewModel(
                         reportsTab = state.reportsTab.copy(
                             reportTypes = snapshot.reportTypes,
                             availablePlaces = snapshot.reportPlaces,
+                            relatedReports = resolvedReports,
                             draft = state.reportsTab.draft.copy(
                                 selectedPlaceId = state.reportsTab.draft.selectedPlaceId?.takeIf { placeId ->
                                     snapshot.reportPlaces.any { it.id == placeId }
@@ -574,13 +695,21 @@ class AppShellViewModel(
                                 selectedPlaceName = state.reportsTab.draft.selectedPlaceName?.takeIf { placeName ->
                                     snapshot.reportPlaces.any { it.displayName == placeName }
                                 },
-                            )
+                            ),
                         ),
                         contactsTab = snapshot.contactsTab.copy(
+                            threads = mergeLocalContactThreads(
+                                baseThreads = snapshot.contactsTab.threads,
+                                localThreads = localCreatedContactThreads,
+                            ),
                             selectedThread = selectedThread,
                             selectedTargetType = selectedTargetType,
                             isChoosingTargetType = state.contactsTab.isChoosingTargetType && snapshot.contactsTab.availableTargets.isNotEmpty(),
-                            shouldReturnToInstructionOnBack = state.contactsTab.shouldReturnToInstructionOnBack && selectedThread != null,
+                            selectedThreadBackDestination = if (selectedThread != null) {
+                                state.contactsTab.selectedThreadBackDestination
+                            } else {
+                                ContactThreadBackDestination.NONE
+                            },
                         ),
                         isLoading = false,
                         errorMessage = null,
@@ -810,7 +939,7 @@ class AppShellViewModel(
                 selectedTargetType = null,
                 isChoosingTargetType = false,
                 formerAssignments = emptyList(),
-                shouldReturnToInstructionOnBack = false,
+                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
             ),
             detailsById = detailsById,
         )
@@ -897,6 +1026,51 @@ class AppShellViewModel(
     }
 }
 
+private fun mergeLocalContactThreads(
+    baseThreads: List<ContactThreadSummaryUiModel>,
+    localThreads: Map<String, ContactThreadDetailUiModel>,
+): List<ContactThreadSummaryUiModel> {
+    val baseOrder = baseThreads.mapIndexed { index, summary -> summary.id to index }.toMap()
+    val merged = baseThreads.associateBy { it.id }.toMutableMap()
+    localThreads.values.forEach { detail ->
+        merged[detail.id] = ContactThreadSummaryUiModel(
+            id = detail.id,
+            title = detail.title,
+            target = detail.target,
+            lastMessagePreview = detail.messages.lastOrNull()?.body.orEmpty(),
+            unreadCount = 0,
+            isFormerAssignment = detail.isFormerAssignment,
+        )
+    }
+    return merged.values.sortedWith(
+        compareBy<ContactThreadSummaryUiModel> { summary ->
+            baseOrder[summary.id] ?: Int.MAX_VALUE
+        }.thenBy { it.id }
+    )
+}
+
+private fun buildRelatedReportContactThread(report: RelatedReportUiModel): ContactThreadDetailUiModel {
+    val target = ContactTargetUiModel(
+        id = report.threadId,
+        type = ContactTargetType.HEADQUARTERS,
+        displayName = report.targetLabel,
+    )
+    return ContactThreadDetailUiModel(
+        id = report.threadId,
+        title = report.title,
+        target = target,
+        messages = listOf(
+            ThreadMessageUiModel(
+                id = "${report.reportId}-summary",
+                senderName = report.authorName,
+                body = report.summary,
+                timeLabel = report.timeLabel,
+                isCurrentUser = report.isAuthoredByCurrentStaff,
+            )
+        ),
+    )
+}
+
 private fun AppShellHomeOverview.toFallbackInstructionSummary(): InstructionSummaryUiModel? {
     if (currentInstruction.isBlank()) {
         return null
@@ -936,6 +1110,38 @@ private data class BuiltContactModels(
     val contactsTab: ContactsTabUiState,
     val detailsById: Map<String, ContactThreadDetailUiModel>,
 )
+
+private fun RelevantReport.toUiModel(
+    currentStaffId: String,
+    currentThreadTitle: String?,
+    availableStaff: List<CurrentStaffUiModel>,
+): RelatedReportUiModel = RelatedReportUiModel(
+    reportId = reportId,
+    threadId = threadId,
+    title = title,
+    summary = summary,
+    priorityLabel = priorityLabel,
+    authorStaffId = authorStaffId,
+    authorName = availableStaff.firstOrNull { it.staffId == authorStaffId }?.displayName ?: authorStaffId,
+    targetLabel = currentThreadTitle ?: title,
+    timeLabel = createdAtLabel,
+    isAuthoredByCurrentStaff = authorStaffId == currentStaffId,
+)
+
+private fun RelatedReportUiModel.withResolvedMetadata(
+    currentStaffId: String,
+    currentThreadTitle: String?,
+    availableStaff: List<OperationStaff>,
+): RelatedReportUiModel = copy(
+    authorName = availableStaff.firstOrNull { it.staffId == authorStaffId }?.name ?: authorName,
+    targetLabel = currentThreadTitle ?: targetLabel,
+    isAuthoredByCurrentStaff = authorStaffId == currentStaffId,
+)
+
+private fun mergeRelatedReports(
+    remote: List<RelatedReportUiModel>,
+    local: List<RelatedReportUiModel>,
+): List<RelatedReportUiModel> = (local + remote).distinctBy { it.reportId }
 
 private fun OperationMessage.toThreadMessageUiModel(
     currentStaffId: String,

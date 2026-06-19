@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 class FirestoreOperationsStreamDataSource(
     private val config: OperationsStreamingConfig = defaultOperationsStreamingConfig(),
@@ -58,6 +60,7 @@ class FirestoreOperationsStreamDataSource(
 
     override fun observeMessages(): Flow<List<OperationMessage>> = flowOf(emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeMessages(currentStaffId: String): Flow<List<OperationMessage>> = started
         .flatMapLatest { isStarted ->
             if (!config.enabled || !isStarted || currentStaffId.isBlank() || currentStaffId == UNKNOWN_STAFF_ID) {
@@ -187,11 +190,28 @@ class FirestoreOperationsStreamDataSource(
     private fun decodeMessageDocument(document: DocumentSnapshot): OperationMessage? =
         runCatching { document.data(OperationMessage.serializer()) }
             .recoverCatching { decodeMessageDocumentFallback(document) }
+            .mapCatching { message -> message.withResolvedSender(decodeSenderEnvelope(document)) }
+            .onSuccess { message ->
+                val senderEnvelope = decodeSenderEnvelope(document)
+                val decodedSenderStaffId = message.normalizedSenderStaffId()
+                    ?: senderEnvelope?.resolvedStaffId()
+                val decodedSenderName = message.normalizedSenderName()
+                    ?: senderEnvelope?.resolvedName()
+                logger.trace {
+                    "Decoded Firestore message: documentId=${document.id}, messageId=${message.messageId}, threadId=${message.threadId}, senderStaffId=$decodedSenderStaffId, decodedSenderName=$decodedSenderName, messageType=${message.messageType}"
+                }
+                if (decodedSenderStaffId == null && decodedSenderName == null) {
+                    val senderFieldPresence = senderDiagnosticFieldPresence(document, senderEnvelope)
+                    logger.warn {
+                        "Firestore message is missing sender identity fields: documentId=${document.id}, messageId=${message.messageId}, threadId=${message.threadId}$senderFieldPresence"
+                    }
+                }
+            }
             .onFailure { throwable ->
                 val diagnosticFields = listOf(
                     "updatedAt", "updated_at", "reason", "entityId", "entity_id", "messageId", "message_id",
                     "recipientStaffId", "recipient_staff_id", "threadId", "thread_id", "staffId", "staff_id",
-                    "senderStaffId", "sender_staff_id", "messageType", "message_type",
+                    "senderStaffId", "sender_staff_id", "senderName", "sender_name", "messageType", "message_type",
                     "instructionId", "instruction_id", "reportId", "report_id", "text", "replyTo", "reply_to",
                     "simple", "payload",
                 )
@@ -206,69 +226,36 @@ class FirestoreOperationsStreamDataSource(
             .getOrNull()
 
     private fun decodeMessageDocumentFallback(document: DocumentSnapshot): OperationMessage {
-        val fields = OperationMessageDecodedFields(
-            updatedAt = document.optionalString("updatedAt", "updated_at").orEmpty(),
-            reason = document.optionalString("reason").orEmpty(),
-            entityId = document.optionalString("entityId", "entity_id") ?: document.id,
-            messageId = document.optionalString("messageId", "message_id") ?: document.id,
-            threadId = document.requiredString("threadId", "thread_id"),
-            staffId = document.requiredString("senderStaffId", "sender_staff_id", "staffId", "staff_id"),
-            messageType = parseMessageType(document),
-            instructionId = document.optionalString(
-                "instructionId",
-                "instruction_id",
-                "instruction.instructionId",
-                "instruction.instruction_id",
-                "payload.instruction.instructionId",
-                "payload.instruction.instruction_id",
-            ),
-            reportId = document.optionalString(
-                "reportId",
-                "report_id",
-                "report.reportId",
-                "report.report_id",
-                "payload.report.reportId",
-                "payload.report.report_id",
-            ),
-            text = document.optionalString(
-                "text",
-                "simple.text",
-                "payload.simple.text",
-            ),
-            replyTo = document.optionalString(
-                "replyTo",
-                "reply_to",
-                "simple.replyTo",
-                "simple.reply_to",
-                "payload.simple.replyTo",
-                "payload.simple.reply_to",
-            ),
+        val senderEnvelope = decodeSenderEnvelope(document)
+        val fields = decodeMessageDocumentFields(
+            documentId = document.id,
+            optionalString = { fields -> document.optionalString(*fields) },
+            contains = document::contains,
+            senderStaffIdFallback = senderEnvelope?.resolvedStaffId(),
+            senderNameFallback = senderEnvelope?.resolvedName(),
         )
+        logger.debug {
+            "Decoded Firestore message via fallback: documentId=${document.id}, messageId=${fields.messageId}, threadId=${fields.threadId}, senderStaffId=${fields.staffId}, senderName=${fields.senderName}, messageType=${fields.messageType}"
+        }
         return fields.toOperationMessage()
     }
 
     private fun parseMessageType(document: DocumentSnapshot): OperationMessageType {
-        val rawType = document.optionalString("messageType", "message_type")
+        val rawType = document.optionalString(*MESSAGE_TYPE_FIELDS)
         return OperationMessageType.parse(rawType)
             ?: when {
-                document.contains("simple") || document.contains("payload.simple") -> OperationMessageType.SIMPLE
-                document.contains("assign") || document.contains("payload.assign") -> OperationMessageType.ASSIGN
-                document.contains("unassign") || document.contains("payload.unassign") -> OperationMessageType.UNASSIGN
-                document.contains("instruction") || document.contains("payload.instruction") -> OperationMessageType.INSTRUCTION
-                document.contains("report") || document.contains("payload.report") -> OperationMessageType.REPORT
+                MESSAGE_SIMPLE_TYPE_FIELDS.any(document::contains) -> OperationMessageType.SIMPLE
+                MESSAGE_ASSIGN_TYPE_FIELDS.any(document::contains) -> OperationMessageType.ASSIGN
+                MESSAGE_UNASSIGN_TYPE_FIELDS.any(document::contains) -> OperationMessageType.UNASSIGN
+                MESSAGE_INSTRUCTION_TYPE_FIELDS.any(document::contains) -> OperationMessageType.INSTRUCTION
+                MESSAGE_REPORT_TYPE_FIELDS.any(document::contains) -> OperationMessageType.REPORT
                 else -> error("Unsupported message document shape")
             }
     }
 
     private fun DocumentSnapshot.optionalString(vararg fields: String): String? =
         fields.firstNotNullOfOrNull { field ->
-            runCatching {
-                if (!contains(field)) {
-                    null
-                } else {
-                    get<String?>(field)
-                }
-            }.getOrNull()
+            runCatching { get<String?>(field) }.getOrNull()
         }?.takeIf { it.isNotBlank() }
 
     private fun DocumentSnapshot.requiredString(vararg fields: String): String =
@@ -277,7 +264,42 @@ class FirestoreOperationsStreamDataSource(
     private fun messageCollectionPath(currentStaffId: String): String =
         "$USER_MESSAGES_COLLECTION/$currentStaffId/$MESSAGES_SUBCOLLECTION"
 
-    private companion object {
+    private fun senderDiagnosticFieldPresence(
+        document: DocumentSnapshot,
+        senderEnvelope: FirestoreSenderEnvelope?,
+    ): String = (
+        MESSAGE_SENDER_STAFF_ID_FIELDS.asList() + MESSAGE_SENDER_NAME_FIELDS.asList() + MESSAGE_SENDER_NESTED_NAME_FIELDS.asList()
+        ).distinct()
+        .joinToString(
+            prefix = ", senderFieldPresence={",
+            postfix = "}",
+        ) { field -> "$field=${document.contains(field)}" } +
+        ", senderEnvelopePresent=${senderEnvelope != null}, senderEnvelopeStaffId=${senderEnvelope?.resolvedStaffId()}, senderEnvelopeName=${senderEnvelope?.resolvedName()}"
+
+    private fun decodeSenderEnvelope(document: DocumentSnapshot): FirestoreSenderEnvelope? =
+        runCatching { document.get<FirestoreSenderEnvelope?>("sender") }
+            .getOrNull()
+
+    private fun OperationMessage.normalizedSenderStaffId(): String? =
+        staffId.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+
+    private fun OperationMessage.normalizedSenderName(): String? =
+        senderName?.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+
+    private fun OperationMessage.withResolvedSender(senderEnvelope: FirestoreSenderEnvelope?): OperationMessage {
+        val resolvedStaffId = normalizedSenderStaffId() ?: senderEnvelope?.resolvedStaffId()
+        val resolvedSenderName = normalizedSenderName() ?: senderEnvelope?.resolvedName()
+        return if (resolvedStaffId == staffId && resolvedSenderName == senderName) {
+            this
+        } else {
+            copy(
+                staffId = resolvedStaffId ?: staffId,
+                senderName = resolvedSenderName ?: senderName,
+            )
+        }
+    }
+
+    companion object {
         const val UNKNOWN_STAFF_ID = "unknown"
         const val POINTS_COLLECTION = "operations_points"
         const val STAFF_COLLECTION = "operations_staff"
@@ -286,7 +308,102 @@ class FirestoreOperationsStreamDataSource(
         const val THREADS_COLLECTION = "operations_threads"
         const val USER_MESSAGES_COLLECTION = "operations_user_messages"
         const val MESSAGES_SUBCOLLECTION = "messages"
+
+        val MESSAGE_UPDATED_AT_FIELDS = arrayOf(
+            "updatedAt",
+            "updated_at",
+            "createdAt",
+            "created_at",
+            "message.updatedAt",
+            "message.updated_at",
+            "message.createdAt",
+            "message.created_at",
+        )
+        val MESSAGE_ENTITY_ID_FIELDS = arrayOf(
+            "entityId",
+            "entity_id",
+            "message.entityId",
+            "message.entity_id",
+        )
+        val MESSAGE_ID_FIELDS = arrayOf(
+            "messageId",
+            "message_id",
+            "message.messageId",
+            "message.message_id",
+        )
+        val MESSAGE_THREAD_ID_FIELDS = arrayOf(
+            "threadId",
+            "thread_id",
+            "message.threadId",
+            "message.thread_id",
+        )
+        val MESSAGE_SENDER_STAFF_ID_FIELDS = arrayOf(
+            "senderStaffId",
+            "sender_staff_id",
+            "staffId",
+            "staff_id",
+            "senderId",
+            "sender_id",
+            "message.senderStaffId",
+            "message.sender_staff_id",
+            "message.staffId",
+            "message.staff_id",
+            "payload.senderStaffId",
+            "payload.sender_staff_id",
+            "payload.staffId",
+            "payload.staff_id",
+            "sender.staffId",
+            "sender.staff_id",
+            "sender.id",
+        )
+        val MESSAGE_TYPE_FIELDS = arrayOf(
+            "messageType",
+            "message_type",
+            "message.messageType",
+            "message.message_type",
+            "payload.messageType",
+            "payload.message_type",
+        )
+        val MESSAGE_SENDER_NAME_FIELDS = arrayOf(
+            "senderName",
+            "sender_name",
+            "message.senderName",
+            "message.sender_name",
+            "payload.senderName",
+            "payload.sender_name",
+        )
+        val MESSAGE_SENDER_NESTED_NAME_FIELDS = arrayOf("sender.name")
+        val MESSAGE_SIMPLE_TYPE_FIELDS = arrayOf("simple", "payload.simple", "message.simple", "message.payload.simple")
+        val MESSAGE_ASSIGN_TYPE_FIELDS = arrayOf("assign", "payload.assign", "message.assign", "message.payload.assign")
+        val MESSAGE_UNASSIGN_TYPE_FIELDS = arrayOf(
+            "unassign",
+            "payload.unassign",
+            "message.unassign",
+            "message.payload.unassign",
+        )
+        val MESSAGE_INSTRUCTION_TYPE_FIELDS = arrayOf(
+            "instruction",
+            "payload.instruction",
+            "message.instruction",
+            "message.payload.instruction",
+        )
+        val MESSAGE_REPORT_TYPE_FIELDS = arrayOf("report", "payload.report", "message.report", "message.payload.report")
     }
+}
+
+@Serializable
+private data class FirestoreSenderEnvelope(
+    val staffId: String? = null,
+    @SerialName("staff_id")
+    val staffIdSnakeCase: String? = null,
+    val id: String? = null,
+    val name: String? = null,
+) {
+    fun resolvedStaffId(): String? = listOf(staffId, staffIdSnakeCase, id)
+        .firstOrNull { !it.isNullOrBlank() && !it.equals("null", ignoreCase = true) }
+
+    fun resolvedName(): String? = name
+        ?.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
 }
 
 internal data class OperationMessageDecodedFields(
@@ -301,6 +418,7 @@ internal data class OperationMessageDecodedFields(
     val reportId: String? = null,
     val text: String? = null,
     val replyTo: String? = null,
+    val senderName: String? = null,
 ) {
     fun toOperationMessage(): OperationMessage = OperationMessage(
         updatedAt = updatedAt,
@@ -314,8 +432,71 @@ internal data class OperationMessageDecodedFields(
         reportId = reportId,
         text = text,
         replyTo = replyTo,
+        senderName = senderName,
     )
 }
+
+internal fun decodeMessageDocumentFields(
+    documentId: String,
+    optionalString: (Array<out String>) -> String?,
+    contains: (String) -> Boolean,
+    senderStaffIdFallback: String? = null,
+    senderNameFallback: String? = null,
+): OperationMessageDecodedFields = OperationMessageDecodedFields(
+    updatedAt = optionalString(FirestoreOperationsStreamDataSource.MESSAGE_UPDATED_AT_FIELDS).orEmpty(),
+    reason = optionalString(arrayOf("reason")).orEmpty(),
+    entityId = optionalString(FirestoreOperationsStreamDataSource.MESSAGE_ENTITY_ID_FIELDS) ?: documentId,
+    messageId = optionalString(FirestoreOperationsStreamDataSource.MESSAGE_ID_FIELDS) ?: documentId,
+    threadId = requiredString(optionalString, *FirestoreOperationsStreamDataSource.MESSAGE_THREAD_ID_FIELDS),
+    staffId = optionalString(FirestoreOperationsStreamDataSource.MESSAGE_SENDER_STAFF_ID_FIELDS)
+        ?: senderStaffIdFallback
+        ?: error(
+            "Missing required field from Firestore document: ${
+                FirestoreOperationsStreamDataSource.MESSAGE_SENDER_STAFF_ID_FIELDS.joinToString()
+            }"
+        ),
+    messageType = parseMessageType(optionalString, contains),
+    instructionId = optionalString(
+        arrayOf(
+            "instructionId",
+            "instruction_id",
+            "instruction.instructionId",
+            "instruction.instruction_id",
+            "payload.instruction.instructionId",
+            "payload.instruction.instruction_id",
+        )
+    ),
+    reportId = optionalString(
+        arrayOf(
+            "reportId",
+            "report_id",
+            "report.reportId",
+            "report.report_id",
+            "payload.report.reportId",
+            "payload.report.report_id",
+        )
+    ),
+    text = optionalString(
+        arrayOf(
+            "text",
+            "simple.text",
+            "payload.simple.text",
+        )
+    ),
+    replyTo = optionalString(
+        arrayOf(
+            "replyTo",
+            "reply_to",
+            "simple.replyTo",
+            "simple.reply_to",
+            "payload.simple.replyTo",
+            "payload.simple.reply_to",
+        )
+    ),
+    senderName = optionalString(FirestoreOperationsStreamDataSource.MESSAGE_SENDER_NAME_FIELDS)
+        ?: optionalString(FirestoreOperationsStreamDataSource.MESSAGE_SENDER_NESTED_NAME_FIELDS)
+        ?: senderNameFallback,
+)
 
 internal fun OperationMessageType.Companion.parse(raw: String?): OperationMessageType? = when (raw?.uppercase()) {
     "ASSIGN" -> OperationMessageType.ASSIGN
@@ -325,3 +506,24 @@ internal fun OperationMessageType.Companion.parse(raw: String?): OperationMessag
     "SIMPLE" -> OperationMessageType.SIMPLE
     else -> null
 }
+
+private fun parseMessageType(
+    optionalString: (Array<out String>) -> String?,
+    contains: (String) -> Boolean,
+): OperationMessageType {
+    val rawType = optionalString(FirestoreOperationsStreamDataSource.MESSAGE_TYPE_FIELDS)
+    return OperationMessageType.parse(rawType)
+        ?: when {
+            FirestoreOperationsStreamDataSource.MESSAGE_SIMPLE_TYPE_FIELDS.any(contains) -> OperationMessageType.SIMPLE
+            FirestoreOperationsStreamDataSource.MESSAGE_ASSIGN_TYPE_FIELDS.any(contains) -> OperationMessageType.ASSIGN
+            FirestoreOperationsStreamDataSource.MESSAGE_UNASSIGN_TYPE_FIELDS.any(contains) -> OperationMessageType.UNASSIGN
+            FirestoreOperationsStreamDataSource.MESSAGE_INSTRUCTION_TYPE_FIELDS.any(contains) -> OperationMessageType.INSTRUCTION
+            FirestoreOperationsStreamDataSource.MESSAGE_REPORT_TYPE_FIELDS.any(contains) -> OperationMessageType.REPORT
+            else -> error("Unsupported message document shape")
+        }
+}
+
+private fun requiredString(
+    optionalString: (Array<out String>) -> String?,
+    vararg fields: String,
+): String = optionalString(fields) ?: error("Missing required field from Firestore document: ${fields.joinToString()}")

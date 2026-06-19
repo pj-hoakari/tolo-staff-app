@@ -5,12 +5,12 @@ struct ReportsTabRootView: View {
     private enum ReportRoute: Hashable {
         case draft
         case placeSelection
-        case thread
     }
 
     let state: ReportsTabUiState
     let currentStaff: CurrentStaffUiModel
     var onTypeSelected: (String) -> Void = { _ in }
+    var onReportSelected: (String) -> Void = { _ in }
     var onCommentChanged: (String) -> Void = { _ in }
     var onUrgencySelected: (String) -> Void = { _ in }
     var onImageToggleChanged: (Bool) -> Void = { _ in }
@@ -40,10 +40,6 @@ struct ReportsTabRootView: View {
                         reportPlaceSelection
                             .navigationTitle("対象場所")
                             .navigationBarTitleDisplayMode(.inline)
-                    case .thread:
-                        reportThread
-                            .navigationTitle("報告スレッド")
-                            .navigationBarTitleDisplayMode(.inline)
                     }
                 }
         }
@@ -69,13 +65,13 @@ struct ReportsTabRootView: View {
             [.draft]
         case .placeSelection:
             [.draft, .placeSelection]
-        case .thread:
-            [.draft, .placeSelection, .thread]
         }
     }
 
     private var reportTypeSelection: some View {
-        List(state.reportTypes, id: \.id) { type in
+        List {
+            Section("報告種別") {
+                ForEach(state.reportTypes, id: \.id) { type in
                 Button {
                     onTypeSelected(type.id)
                 } label: {
@@ -88,9 +84,62 @@ struct ReportsTabRootView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("report_type_\(type.id)")
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("report_type_\(type.id)")
+
+            Section("関連報告一覧") {
+                if state.isLoadingReports {
+                    ProgressView("関連報告を読み込んでいます")
+                } else if let reportsErrorMessage = state.reportsErrorMessage {
+                    Text(reportsErrorMessage)
+                        .foregroundStyle(.red)
+                } else if state.relatedReports.isEmpty {
+                    Text("関連する報告はまだありません")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(state.relatedReports, id: \.reportId) { report in
+                        Button {
+                            onReportSelected(report.reportId)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(alignment: .top) {
+                                    Text(report.title)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    if report.isAuthoredByCurrentStaff {
+                                        Text("自分の報告")
+                                            .font(.caption)
+                                            .foregroundStyle(.tint)
+                                    }
+                                }
+                                if !report.priorityLabel.isEmpty {
+                                    Text(report.priorityLabel)
+                                        .font(.caption)
+                                        .foregroundStyle(.tint)
+                                }
+                                Text(report.summary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text("\(report.targetLabel) / \(report.authorName)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                if let timeLabel = report.timeLabel {
+                                    Text(timeLabel)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("related_report_\(report.reportId)")
+                    }
+                }
+            }
         }
     }
 
@@ -174,26 +223,5 @@ struct ReportsTabRootView: View {
             .background(.thinMaterial)
         }
         .accessibilityIdentifier("report_place_selection")
-    }
-
-    private var reportThread: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(state.submittedThread?.title ?? "報告スレッド")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                Text(state.submittedThread?.targetLabel ?? "")
-                    .foregroundStyle(.secondary)
-                Text(state.submittedThread?.lastSubmittedSummary ?? "")
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                ForEach(state.submittedThread?.messages ?? [], id: \.id) { message in
-                    ThreadMessageBubble(message: message)
-                }
-            }
-            .padding(16)
-        }
-        .accessibilityIdentifier("report_thread")
     }
 }

@@ -50,6 +50,10 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onReportTypeSelected(typeId: typeId)
     }
 
+    func onReportSelected(_ reportId: String) {
+        viewModel.onReportSelected(reportId: reportId)
+    }
+
     func onReportCommentChanged(_ comment: String) {
         viewModel.onReportCommentChanged(comment: comment)
     }

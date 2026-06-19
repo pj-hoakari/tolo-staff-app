@@ -5,16 +5,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.usbharu.tolo_staff.feature.appshell.ReportFlowStep
@@ -23,8 +24,9 @@ import dev.usbharu.tolo_staff.feature.appshell.ReportsTabUiState
 
 @Composable
 internal fun ReportTypeSelectionScreen(
-    reportTypes: List<ReportTypeUiModel>,
+    state: ReportsTabUiState,
     onTypeSelected: (String) -> Unit,
+    onReportSelected: (String) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -34,13 +36,66 @@ internal fun ReportTypeSelectionScreen(
         item {
             ScreenHeader("報告", "本部へ送る報告種別を選択します。")
         }
-        items(reportTypes, key = { it.id }) { reportType ->
+        items(state.reportTypes, key = { it.id }) { reportType ->
             SectionCard(
                 onClick = { onTypeSelected(reportType.id) },
                 contentDescription = "report_type_${reportType.id}",
             ) {
                 Text(reportType.title, fontWeight = FontWeight.SemiBold)
                 Text(reportType.detailText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        item {
+            ScreenHeader("関連報告一覧", "自分が作成した報告と担当に関連する報告を表示します。")
+        }
+        when {
+            state.isLoadingReports -> item {
+                SectionCard {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CircularProgressIndicator()
+                        Text("関連報告を読み込んでいます")
+                    }
+                }
+            }
+
+            state.reportsErrorMessage != null -> item {
+                SectionCard {
+                    val errorMessage = state.reportsErrorMessage.orEmpty()
+                    Text(errorMessage, color = MaterialTheme.colorScheme.error)
+                }
+            }
+
+            state.relatedReports.isEmpty() -> item {
+                SectionCard {
+                    Text("関連する報告はまだありません")
+                }
+            }
+
+            else -> items(state.relatedReports, key = { it.reportId }) { report ->
+                SectionCard(
+                    onClick = { onReportSelected(report.reportId) },
+                    contentDescription = "related_report_${report.reportId}",
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(report.title, fontWeight = FontWeight.SemiBold)
+                            if (report.isAuthoredByCurrentStaff) {
+                                Text("自分の報告", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        if (report.priorityLabel.isNotBlank()) {
+                            Text(report.priorityLabel, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Text(report.summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${report.targetLabel} / ${report.authorName}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        report.timeLabel?.let { timeLabel ->
+                            Text(timeLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
     }
@@ -137,38 +192,9 @@ internal fun ReportPlaceSelectionScreen(
     }
 }
 
-@Composable
-internal fun ReportThreadScreen(
-    state: ReportsTabUiState,
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .semantics { contentDescription = AppShellRoutes.REPORTS_THREAD },
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
-            ScreenHeader(
-                title = state.submittedThread?.title ?: "報告スレッド",
-                description = state.submittedThread?.targetLabel ?: "送信済みの報告内容"
-            )
-        }
-        item {
-            SectionCard {
-                Text(state.submittedThread?.lastSubmittedSummary ?: "")
-            }
-        }
-        items(state.submittedThread?.messages.orEmpty(), key = { it.id }) { message ->
-            ThreadMessageBubble(message)
-        }
-    }
-}
-
 internal fun reportTitleForStep(step: ReportFlowStep): String =
     when (step) {
         ReportFlowStep.TYPE_SELECTION -> "報告"
         ReportFlowStep.DRAFT_INPUT -> "報告内容入力"
         ReportFlowStep.PLACE_SELECTION -> "対象場所"
-        ReportFlowStep.THREAD -> "報告スレッド"
     }

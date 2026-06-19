@@ -61,6 +61,8 @@ message Report {
   string title = 3;
   string description = 4;
   ReportPriority priority = 5;
+  string thread_id = 6;
+  google.protobuf.Timestamp created_at = 7;
 }
 
 enum ReportPriority {

@@ -68,6 +68,55 @@ class ContactChatMappingsTest {
         assertEquals(listOf("thread-new", "thread-old", "thread-none"), sorted.map { it.threadId })
         assertEquals(mapOf("thread-old" to "old", "thread-new" to "new"), messages.toRoomPreviewByThread())
     }
+
+    @Test
+    fun `ui message falls back to sender name when sender id is unavailable`() {
+        val message = OperationMessage(
+            updatedAt = "2026-06-19T09:00:00Z",
+            reason = "test",
+            entityId = "message-1",
+            messageId = "message-1",
+            threadId = "thread-1",
+            staffId = "null",
+            messageType = OperationMessageType.SIMPLE,
+            text = "了解です",
+            senderName = "佐藤",
+        ).toUiMessage(
+            currentStaffId = "tanaka",
+            staff = listOf(
+                OperationStaff(updatedAt = "", reason = "test", entityId = "tanaka", staffId = "tanaka", name = "田中"),
+                OperationStaff(updatedAt = "", reason = "test", entityId = "sato", staffId = "sato", name = "佐藤"),
+            ),
+        )
+
+        assertEquals("佐藤", message.senderName)
+        assertEquals(false, message.isFromCurrentUser)
+    }
+
+    @Test
+    fun `ui message identifies current user from sender name when sender id is unavailable`() {
+        val message = OperationMessage(
+            updatedAt = "2026-06-19T09:00:00Z",
+            reason = "test",
+            entityId = "message-1",
+            messageId = "message-1",
+            threadId = "thread-1",
+            staffId = "null",
+            messageType = OperationMessageType.SIMPLE,
+            text = "こちら配置済みです",
+            senderName = "田中",
+        ).toUiMessage(
+            currentStaffId = "tanaka",
+            staff = listOf(
+                OperationStaff(updatedAt = "", reason = "test", entityId = "tanaka", staffId = "tanaka", name = "田中"),
+                OperationStaff(updatedAt = "", reason = "test", entityId = "sato", staffId = "sato", name = "佐藤"),
+            ),
+        )
+
+        assertEquals("田中", message.senderName)
+        assertEquals(true, message.isFromCurrentUser)
+    }
+
 }
 
 private fun operationMessage(

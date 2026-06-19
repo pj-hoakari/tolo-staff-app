@@ -4,8 +4,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -13,6 +14,7 @@ import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
 import dev.usbharu.tolo_staff.feature.appshell.AppShellMapState
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
+import dev.usbharu.tolo_staff.feature.appshell.ContactThreadBackDestination
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetType
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ContactThreadDetailUiModel
@@ -24,6 +26,7 @@ import dev.usbharu.tolo_staff.feature.appshell.InstructionSummaryUiModel
 import dev.usbharu.tolo_staff.feature.appshell.InstructionsTabUiState
 import dev.usbharu.tolo_staff.feature.appshell.ReportDraftUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ReportFlowStep
+import dev.usbharu.tolo_staff.feature.appshell.RelatedReportUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ReportTypeUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ReportsTabUiState
 import dev.usbharu.tolo_staff.feature.appshell.ThreadMessageUiModel
@@ -62,7 +65,7 @@ class ToloStaffAndroidContentTest {
     }
 
     @Test
-    fun reportsFlowNavigatesForwardAndBack() {
+    fun reportsSubmissionOpensContactThreadAndBackReturnsToReports() {
         setTestContent()
 
         composeRule.onNodeWithText("報告").performClick()
@@ -70,9 +73,22 @@ class ToloStaffAndroidContentTest {
         composeRule.onNodeWithText("対象場所を選ぶ").assertExists()
         composeRule.onNodeWithText("対象場所を選ぶ").performClick()
         composeRule.onNodeWithText("対象場所").assertExists()
+        composeRule.onNodeWithText("南口").performClick()
+        composeRule.onNodeWithText("本部へ送信").performClick()
+
+        composeRule.onNodeWithContentDescription("contact_thread_detail").assertExists()
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        composeRule.onNodeWithText("報告内容入力").assertExists()
+        composeRule.onNodeWithText("本部へ送る報告種別を選択します。").assertExists()
+    }
+
+    @Test
+    fun relatedReportOpensContactThreadAndBackReturnsToReports() {
+        setTestContent()
+
+        composeRule.onNodeWithText("報告").performClick()
+        composeRule.onNodeWithContentDescription("related_report_report-1").performClick()
+        composeRule.onNodeWithContentDescription("contact_thread_detail").assertExists()
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.onNodeWithText("本部へ送る報告種別を選択します。").assertExists()
@@ -102,11 +118,11 @@ class ToloStaffAndroidContentTest {
 
         composeRule.onNodeWithText("連絡").performClick()
         composeRule.onNodeWithContentDescription("contact_new_thread_button").performClick()
-        composeRule.onNodeWithContentDescription("contact_new_thread_button").assertDoesNotExist()
+        composeRule.onAllNodesWithContentDescription("contact_new_thread_button").assertCountEquals(0)
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.onNodeWithContentDescription("contact_thread_thread-1").performClick()
-        composeRule.onNodeWithContentDescription("contact_new_thread_button").assertDoesNotExist()
+        composeRule.onAllNodesWithContentDescription("contact_new_thread_button").assertCountEquals(0)
     }
 
     private fun setTestContent() {
@@ -143,6 +159,18 @@ class ToloStaffAndroidContentTest {
         )
         val reportPlaces = listOf(
             ContactTargetUiModel("place-1", ContactTargetType.PLACE, "南口", "入場導線")
+        )
+        val relatedReport = RelatedReportUiModel(
+            reportId = "report-1",
+            threadId = "report-thread-1",
+            title = "巡回報告",
+            summary = "南口の入場列は安定しています",
+            priorityLabel = "通常",
+            authorStaffId = "tanaka",
+            authorName = "田中",
+            targetLabel = "南口",
+            timeLabel = "2026-06-19T09:00:00Z",
+            isAuthoredByCurrentStaff = true,
         )
         val contactThread = ContactThreadDetailUiModel(
             id = "thread-1",
@@ -203,6 +231,7 @@ class ToloStaffAndroidContentTest {
                         availablePlaces = reportPlaces,
                         draft = ReportDraftUiModel(urgencyLabel = "通常"),
                         step = ReportFlowStep.TYPE_SELECTION,
+                        relatedReports = listOf(relatedReport),
                     ),
                     contactsTab = ContactsTabUiState(
                         threads = listOf(summaryThread),
@@ -232,7 +261,10 @@ class ToloStaffAndroidContentTest {
                 onInstructionThreadOpened = {
                     state = state.copy(
                         selectedTab = AppTab.CONTACTS,
-                        contactsTab = state.contactsTab.copy(selectedThread = contactThread),
+                        contactsTab = state.contactsTab.copy(
+                            selectedThread = contactThread,
+                            selectedThreadBackDestination = ContactThreadBackDestination.INSTRUCTIONS,
+                        ),
                     )
                 },
                 onInstructionDetailClosed = {
@@ -252,6 +284,32 @@ class ToloStaffAndroidContentTest {
                 },
                 onReportCommentChanged = {
                     state = state.copy(reportsTab = state.reportsTab.copy(draft = state.reportsTab.draft.copy(comment = it)))
+                },
+                onReportSelected = {
+                    state = state.copy(
+                        selectedTab = AppTab.CONTACTS,
+                        contactsTab = state.contactsTab.copy(
+                            selectedThread = contactThread.copy(
+                                id = relatedReport.threadId,
+                                title = relatedReport.title,
+                                target = ContactTargetUiModel(
+                                    relatedReport.threadId,
+                                    ContactTargetType.HEADQUARTERS,
+                                    relatedReport.targetLabel,
+                                ),
+                                messages = listOf(
+                                    ThreadMessageUiModel(
+                                        id = "report-message-1",
+                                        senderName = relatedReport.authorName,
+                                        body = relatedReport.summary,
+                                        timeLabel = relatedReport.timeLabel,
+                                        isCurrentUser = true,
+                                    )
+                                ),
+                            ),
+                            selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
+                        )
+                    )
                 },
                 onReportUrgencySelected = {
                     state = state.copy(reportsTab = state.reportsTab.copy(draft = state.reportsTab.draft.copy(urgencyLabel = it)))
@@ -277,8 +335,32 @@ class ToloStaffAndroidContentTest {
                 },
                 onReportSubmitted = {
                     state = state.copy(
+                        selectedTab = AppTab.CONTACTS,
                         reportsTab = state.reportsTab.copy(
-                            step = ReportFlowStep.THREAD,
+                            draft = ReportDraftUiModel(urgencyLabel = "通常"),
+                            step = ReportFlowStep.TYPE_SELECTION,
+                        ),
+                        contactsTab = state.contactsTab.copy(
+                            threads = state.contactsTab.threads + ContactThreadSummaryUiModel(
+                                id = "report-report-1-place-1",
+                                title = "巡回報告 / 南口",
+                                target = ContactTargetUiModel("place-1", ContactTargetType.PLACE, "南口", "本部"),
+                                lastMessagePreview = "巡回報告 [通常]",
+                            ),
+                            selectedThread = ContactThreadDetailUiModel(
+                                id = "report-report-1-place-1",
+                                title = "巡回報告 / 南口",
+                                target = ContactTargetUiModel("place-1", ContactTargetType.PLACE, "南口", "本部"),
+                                messages = listOf(
+                                    ThreadMessageUiModel(
+                                        id = "report-message-submitted",
+                                        senderName = "田中",
+                                        body = "巡回報告 [通常]",
+                                        isCurrentUser = true,
+                                    )
+                                ),
+                            ),
+                            selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
                         )
                     )
                 },
@@ -289,7 +371,6 @@ class ToloStaffAndroidContentTest {
                                 ReportFlowStep.TYPE_SELECTION -> ReportFlowStep.TYPE_SELECTION
                                 ReportFlowStep.DRAFT_INPUT -> ReportFlowStep.TYPE_SELECTION
                                 ReportFlowStep.PLACE_SELECTION -> ReportFlowStep.DRAFT_INPUT
-                                ReportFlowStep.THREAD -> ReportFlowStep.PLACE_SELECTION
                             }
                         )
                     )
@@ -297,22 +378,34 @@ class ToloStaffAndroidContentTest {
                 onContactThreadSelected = {
                     state = state.copy(
                         selectedTab = AppTab.CONTACTS,
-                        contactsTab = state.contactsTab.copy(selectedThread = contactThread),
+                        contactsTab = state.contactsTab.copy(
+                            selectedThread = contactThread,
+                            selectedThreadBackDestination = ContactThreadBackDestination.NONE,
+                        ),
                     )
                 },
                 onContactBackToList = {
                     state = state.copy(
+                        selectedTab = when (state.contactsTab.selectedThreadBackDestination) {
+                            ContactThreadBackDestination.NONE -> state.selectedTab
+                            ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
+                            ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
+                        },
                         contactsTab = state.contactsTab.copy(
                             selectedThread = null,
                             isChoosingTargetType = false,
                             selectedTargetType = null,
+                            selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                         )
                     )
                 },
                 onContactNewThreadStarted = {
                     state = state.copy(
                         selectedTab = AppTab.CONTACTS,
-                        contactsTab = state.contactsTab.copy(isChoosingTargetType = true),
+                        contactsTab = state.contactsTab.copy(
+                            isChoosingTargetType = true,
+                            selectedThreadBackDestination = ContactThreadBackDestination.NONE,
+                        ),
                     )
                 },
                 onContactTargetTypeSelected = {

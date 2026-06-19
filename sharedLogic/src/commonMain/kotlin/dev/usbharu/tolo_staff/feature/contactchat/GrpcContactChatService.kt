@@ -48,9 +48,7 @@ class GrpcContactChatService(
             messages
                 .filter { it.threadId == roomId }
                 .sortedOperationMessages()
-                .map { message ->
-                    message.toUiMessage(currentStaffId, staff)
-                }
+                .map { message -> message.toUiMessage(currentStaffId, staff) }
                 .also { logger.debug { "Built chat messages from stream: roomId=$roomId, count=${it.size}" } }
         }
     }

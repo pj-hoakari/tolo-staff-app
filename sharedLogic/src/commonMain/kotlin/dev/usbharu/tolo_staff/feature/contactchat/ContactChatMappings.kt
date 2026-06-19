@@ -46,20 +46,39 @@ internal fun OperationMessage.toUiMessage(
     currentStaffId: String,
     staff: List<OperationStaff>,
 ): ChatMessage {
+    logger.trace {
+        "toUiMessage started: messageId=$messageId, threadId=$threadId, currentStaffId=$currentStaffId, rawSenderStaffId=$staffId, rawSenderName=$senderName"
+    }
     val effectiveSenderStaffId = normalizedSenderStaffId()
-    val senderName = staff.firstOrNull { it.staffId == effectiveSenderStaffId }?.name
+    val effectiveSenderName = senderName
         ?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
+    val resolvedSenderName = staff.firstOrNull { it.staffId == effectiveSenderStaffId }?.name
+        ?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
+        ?: effectiveSenderName
         ?: effectiveSenderStaffId
         ?: "不明"
-    val isFromCurrentUser = effectiveSenderStaffId == currentStaffId
+    val currentStaffName = staff.firstOrNull { it.staffId == currentStaffId }?.name
+        ?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
+    val isFromCurrentUser = effectiveSenderStaffId == currentStaffId ||
+        (
+            effectiveSenderStaffId == null &&
+                effectiveSenderName != null &&
+                currentStaffName != null &&
+                effectiveSenderName == currentStaffName
+            )
+    if (resolvedSenderName == "不明") {
+        logger.warn {
+            "Unable to resolve sender for chat message: messageId=$messageId, threadId=$threadId, currentStaffId=$currentStaffId, rawSenderStaffId=$staffId, normalizedSenderStaffId=$effectiveSenderStaffId, rawSenderName=$senderName, currentStaffName=$currentStaffName, messageType=$messageType"
+        }
+    }
     logger.debug {
-        "Mapped chat message: messageId=$messageId, threadId=$threadId, senderStaffId=$staffId, effectiveSenderStaffId=$effectiveSenderStaffId, currentStaffId=$currentStaffId, senderName=$senderName, isFromCurrentUser=$isFromCurrentUser"
+        "Mapped chat message: messageId=$messageId, threadId=$threadId, senderStaffId=$staffId, effectiveSenderStaffId=$effectiveSenderStaffId, currentStaffId=$currentStaffId, senderName=$resolvedSenderName, isFromCurrentUser=$isFromCurrentUser"
     }
 
     return ChatMessage(
         id = messageId,
         roomId = threadId,
-        senderName = senderName,
+        senderName = resolvedSenderName,
         body = toPreviewBody(),
         timeLabel = updatedAt.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() },
         isFromCurrentUser = isFromCurrentUser,

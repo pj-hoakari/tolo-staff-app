@@ -17,7 +17,6 @@ internal object AppShellRoutes {
     const val REPORTS_TYPE = "reports/type"
     const val REPORTS_DRAFT = "reports/draft"
     const val REPORTS_PLACE = "reports/place"
-    const val REPORTS_THREAD = "reports/thread"
     const val CONTACTS_LIST = "contacts/list"
     const val CONTACTS_TARGET = "contacts/target"
     const val CONTACTS_DETAIL = "contacts/detail"
@@ -49,7 +48,6 @@ internal fun AppShellUiState.navigationRoute(): String =
             ReportFlowStep.TYPE_SELECTION -> AppShellRoutes.REPORTS_TYPE
             ReportFlowStep.DRAFT_INPUT -> AppShellRoutes.REPORTS_DRAFT
             ReportFlowStep.PLACE_SELECTION -> AppShellRoutes.REPORTS_PLACE
-            ReportFlowStep.THREAD -> AppShellRoutes.REPORTS_THREAD
         }
         AppTab.CONTACTS -> when {
             contactsTab.selectedThread != null -> AppShellRoutes.CONTACTS_DETAIL

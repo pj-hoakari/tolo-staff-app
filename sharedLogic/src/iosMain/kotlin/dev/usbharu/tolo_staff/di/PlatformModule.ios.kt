@@ -1,5 +1,7 @@
 package dev.usbharu.tolo_staff.di
 
+import dev.usbharu.tolo_staff.feature.appshell.GrpcReportRepository
+import dev.usbharu.tolo_staff.feature.appshell.ReportRepository
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.PollingContactChatService
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
@@ -20,6 +22,7 @@ actual fun platformModule(): Module = module {
         val config = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>()
         GrpcCommunicationClient(host = config.host, port = config.port)
     }
+    single<ReportRepository> { GrpcReportRepository(grpcClient = get()) }
     single<OperationsPollingRemoteDataSource> { GrpcOperationsPollingRemoteDataSource(grpcClient = get()) }
     single<OperationsStreamDataSource> {
         check(get<OperationsReadMode>() == OperationsReadMode.POLLING)

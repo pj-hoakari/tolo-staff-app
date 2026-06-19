@@ -99,4 +99,5 @@ data class OperationMessage(
     val reportId: String? = null,
     val text: String? = null,
     val replyTo: String? = null,
+    val senderName: String? = null,
 ) : OperationsStreamEntity
