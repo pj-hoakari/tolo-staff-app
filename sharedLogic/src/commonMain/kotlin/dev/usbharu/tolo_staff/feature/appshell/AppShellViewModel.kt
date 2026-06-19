@@ -3,6 +3,7 @@ package dev.usbharu.tolo_staff.feature.appshell
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.NoOpContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.deriveTitle
+import dev.usbharu.tolo_staff.feature.contactchat.sortedByLatestMessage
 import dev.usbharu.tolo_staff.feature.contactchat.toPreviewBody
 import dev.usbharu.tolo_staff.feature.contactchat.toUiMessage
 import dev.usbharu.tolo_staff.logging.AppLogger
@@ -677,7 +678,7 @@ class AppShellViewModel(
         val threadMessagesById = messages.groupBy { it.threadId }
         val visibleThreads = threads
             .filter { currentStaffId in it.members }
-            .sortedBy { it.threadId }
+            .sortedByLatestMessage(messages)
 
         val details = visibleThreads.map { thread ->
             val title = thread.deriveTitle(currentStaffId, staff)

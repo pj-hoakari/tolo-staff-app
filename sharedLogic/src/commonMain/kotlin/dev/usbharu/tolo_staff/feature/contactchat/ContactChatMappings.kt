@@ -13,6 +13,10 @@ internal fun OperationThread.deriveTitle(
     currentStaffId: String,
     staff: List<OperationStaff>,
 ): String {
+    displayTitle
+        .takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
+        ?.let { return it }
+
     val namesById = staff.associate { it.staffId to it.name }
     val otherMembers = members
         .filterNot { it == currentStaffId }
@@ -21,8 +25,22 @@ internal fun OperationThread.deriveTitle(
     return otherMembers.joinToString(", ").ifBlank { threadId }
 }
 
-internal fun List<OperationMessage>.toRoomPreviewByThread(): Map<String, String> = groupBy { it.threadId }
-    .mapValues { (_, messages) -> messages.sortedOperationMessages().lastOrNull()?.toPreviewBody().orEmpty() }
+internal fun List<OperationMessage>.latestMessageByThread(): Map<String, OperationMessage?> = groupBy { it.threadId }
+    .mapValues { (_, messages) -> messages.sortedOperationMessages().lastOrNull() }
+
+internal fun List<OperationMessage>.toRoomPreviewByThread(): Map<String, String> = latestMessageByThread()
+    .mapValues { (_, message) -> message?.toPreviewBody().orEmpty() }
+
+internal fun List<OperationThread>.sortedByLatestMessage(messages: List<OperationMessage>): List<OperationThread> {
+    val latestMessagesByThread = messages.latestMessageByThread()
+    return sortedWith(
+        compareByDescending<OperationThread> { thread ->
+            latestMessagesByThread[thread.threadId]?.updatedAt?.takeUnless {
+                it.equals("null", ignoreCase = true) || it.isBlank()
+            }
+        }.thenBy { it.threadId }
+    )
+}
 
 internal fun OperationMessage.toUiMessage(
     currentStaffId: String,

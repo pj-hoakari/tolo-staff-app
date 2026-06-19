@@ -541,6 +541,78 @@ class AppShellViewModelTest {
         viewModel.clear()
     }
 
+    @Test
+    fun `contacts tab sorts threads by latest message and uses display title`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            staff = listOf(
+                OperationStaff(updatedAt = "", reason = "test", entityId = "tanaka", staffId = "tanaka", name = "田中"),
+                OperationStaff(updatedAt = "", reason = "test", entityId = "sato", staffId = "sato", name = "佐藤"),
+            ),
+            threads = listOf(
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "thread-old",
+                    threadId = "thread-old",
+                    members = listOf("tanaka", "sato"),
+                ),
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "thread-none",
+                    threadId = "thread-none",
+                    members = listOf("tanaka", "sato"),
+                ),
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "thread-new",
+                    threadId = "thread-new",
+                    members = listOf("tanaka", "sato"),
+                    displayTitle = "Aゲート連絡",
+                ),
+            ),
+            messages = listOf(
+                OperationMessage(
+                    updatedAt = "2026-06-19T09:00:00Z",
+                    reason = "test",
+                    entityId = "message-1",
+                    messageId = "message-1",
+                    threadId = "thread-old",
+                    staffId = "sato",
+                    messageType = OperationMessageType.SIMPLE,
+                    text = "old",
+                ),
+                OperationMessage(
+                    updatedAt = "2026-06-19T10:00:00Z",
+                    reason = "test",
+                    entityId = "message-2",
+                    messageId = "message-2",
+                    threadId = "thread-new",
+                    staffId = "sato",
+                    messageType = OperationMessageType.SIMPLE,
+                    text = "new",
+                ),
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        val threads = viewModel.uiState.value.contactsTab.threads
+        assertEquals(listOf("thread-new", "thread-old", "thread-none"), threads.map { it.id })
+        assertEquals(listOf("Aゲート連絡", "佐藤", "佐藤"), threads.map { it.title })
+
+        viewModel.onContactThreadSelected("thread-new")
+        assertEquals("Aゲート連絡", viewModel.uiState.value.contactsTab.selectedThread?.title)
+
+        viewModel.clear()
+    }
+
     private fun createSession(dispatcher: CoroutineContext): CurrentStaffSession = MockCurrentStaffSession(
         initialStaff = listOf(
             CurrentStaffMember("tanaka", "田中", "Aゲート担当"),

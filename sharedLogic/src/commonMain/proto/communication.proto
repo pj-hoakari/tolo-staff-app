@@ -7,10 +7,12 @@ option java_outer_classname = "CommunicationProto";
 package communication;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 message Thread {
   string thread_id = 1;
   repeated string member_staff_ids = 2;
+  string display_title = 3;
 }
 
 message Point {
@@ -80,6 +82,7 @@ message Message {
     ReportMessagePayload report = 7;
     SimpleMessagePayload simple = 8;
   }
+  google.protobuf.Timestamp created_at = 9;
 }
 
 message AssignMessagePayload {}

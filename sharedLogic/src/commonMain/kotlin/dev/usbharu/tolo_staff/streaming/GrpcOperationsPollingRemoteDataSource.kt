@@ -1,6 +1,7 @@
 package dev.usbharu.tolo_staff.streaming
 
 import com.google.protobuf.kotlin.Empty
+import com.google.protobuf.kotlin.Timestamp
 import com.google.protobuf.kotlin.invoke
 import dev.usbharu.tolo.communication.grpc.Assignment
 import dev.usbharu.tolo.communication.grpc.AssignmentRpc
@@ -20,6 +21,7 @@ import dev.usbharu.tolo.communication.grpc.ThreadIdRequest
 import dev.usbharu.tolo.communication.grpc.ThreadRpc
 import dev.usbharu.tolo.communication.grpc.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
+import kotlin.time.Instant
 
 class GrpcOperationsPollingRemoteDataSource(
     private val grpcClient: GrpcCommunicationClient,
@@ -79,7 +81,7 @@ class GrpcOperationsPollingRemoteDataSource(
             .also { logger.debug { "Fetched thread messages via gRPC: threadId=$threadId, count=${it.size}" } }
 }
 
-private fun Point.toOperationPoint(): OperationPoint = OperationPoint(
+internal fun Point.toOperationPoint(): OperationPoint = OperationPoint(
     updatedAt = "",
     reason = "grpc.list",
     entityId = pointId,
@@ -88,7 +90,7 @@ private fun Point.toOperationPoint(): OperationPoint = OperationPoint(
     description = description,
 )
 
-private fun Staff.toOperationStaff(): OperationStaff = OperationStaff(
+internal fun Staff.toOperationStaff(): OperationStaff = OperationStaff(
     updatedAt = "",
     reason = "grpc.list",
     entityId = staffId,
@@ -97,7 +99,7 @@ private fun Staff.toOperationStaff(): OperationStaff = OperationStaff(
     roles = roles,
 )
 
-private fun Assignment.toOperationAssignment(): OperationAssignment = OperationAssignment(
+internal fun Assignment.toOperationAssignment(): OperationAssignment = OperationAssignment(
     updatedAt = "",
     reason = "grpc.list",
     entityId = assignId,
@@ -113,7 +115,7 @@ private fun Assignment.toOperationAssignment(): OperationAssignment = OperationA
     },
 )
 
-private fun Instruction.toOperationInstruction(): OperationInstruction = OperationInstruction(
+internal fun Instruction.toOperationInstruction(): OperationInstruction = OperationInstruction(
     updatedAt = "",
     reason = "grpc.list",
     entityId = instructionId,
@@ -129,19 +131,20 @@ private fun Instruction.toOperationInstruction(): OperationInstruction = Operati
     },
 )
 
-private fun Thread.toOperationThread(): OperationThread = OperationThread(
+internal fun Thread.toOperationThread(): OperationThread = OperationThread(
     updatedAt = "",
     reason = "grpc.list",
     entityId = threadId,
     threadId = threadId,
     members = memberStaffIds,
+    displayTitle = displayTitle,
 )
 
-private fun Message.toOperationMessage(): OperationMessage {
+internal fun Message.toOperationMessage(): OperationMessage {
     val payload = payload
     return when (payload) {
         is Message.Payload.Assign -> OperationMessage(
-            updatedAt = "",
+            updatedAt = createdAt.toIsoString(),
             reason = "grpc.list",
             entityId = messageId,
             messageId = messageId,
@@ -151,7 +154,7 @@ private fun Message.toOperationMessage(): OperationMessage {
         )
 
         is Message.Payload.Unassign -> OperationMessage(
-            updatedAt = "",
+            updatedAt = createdAt.toIsoString(),
             reason = "grpc.list",
             entityId = messageId,
             messageId = messageId,
@@ -161,7 +164,7 @@ private fun Message.toOperationMessage(): OperationMessage {
         )
 
         is Message.Payload.Instruction -> OperationMessage(
-            updatedAt = "",
+            updatedAt = createdAt.toIsoString(),
             reason = "grpc.list",
             entityId = messageId,
             messageId = messageId,
@@ -172,7 +175,7 @@ private fun Message.toOperationMessage(): OperationMessage {
         )
 
         is Message.Payload.Report -> OperationMessage(
-            updatedAt = "",
+            updatedAt = createdAt.toIsoString(),
             reason = "grpc.list",
             entityId = messageId,
             messageId = messageId,
@@ -183,7 +186,7 @@ private fun Message.toOperationMessage(): OperationMessage {
         )
 
         is Message.Payload.Simple -> OperationMessage(
-            updatedAt = "",
+            updatedAt = createdAt.toIsoString(),
             reason = "grpc.list",
             entityId = messageId,
             messageId = messageId,
@@ -195,7 +198,7 @@ private fun Message.toOperationMessage(): OperationMessage {
         )
 
         else -> OperationMessage(
-            updatedAt = "",
+            updatedAt = createdAt.toIsoString(),
             reason = "grpc.list",
             entityId = messageId,
             messageId = messageId,
@@ -205,3 +208,7 @@ private fun Message.toOperationMessage(): OperationMessage {
         )
     }
 }
+
+internal fun Timestamp?.toIsoString(): String = this
+    ?.let { Instant.fromEpochSeconds(it.seconds, it.nanos).toString() }
+    .orEmpty()

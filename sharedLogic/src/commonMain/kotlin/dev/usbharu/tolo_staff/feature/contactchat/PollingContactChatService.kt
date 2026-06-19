@@ -39,7 +39,7 @@ class PollingContactChatService(
             val previewByThread = messages.toRoomPreviewByThread()
             threads
                 .filter { currentStaffId in it.members }
-                .sortedBy { it.threadId }
+                .sortedByLatestMessage(messages)
                 .map { thread ->
                     ChatRoom(
                         id = thread.threadId,

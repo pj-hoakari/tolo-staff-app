@@ -71,6 +71,7 @@ data class OperationThread(
     override val entityId: String = "",
     val threadId: String,
     val members: List<String> = emptyList(),
+    val displayTitle: String = "",
 ) : OperationsStreamEntity
 
 @Serializable
