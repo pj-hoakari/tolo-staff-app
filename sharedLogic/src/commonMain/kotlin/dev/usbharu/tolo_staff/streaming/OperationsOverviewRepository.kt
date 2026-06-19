@@ -67,6 +67,22 @@ class OperationsOverviewRepositoryImpl(
         val placementName = currentPoint?.name.orEmpty()
         val placementDetail = currentPoint?.description.orEmpty()
         val instructionText = activeInstruction?.toDisplayText().orEmpty()
+        val instructionTargetName = activeInstruction
+            ?.pointIds
+            ?.mapNotNull { pointId -> points.firstOrNull { it.pointId == pointId }?.name }
+            ?.distinct()
+            ?.joinToString(" / ")
+            ?.ifBlank { null }
+        val instructionLocationLabel = activeInstruction
+            ?.pointIds
+            ?.mapNotNull { pointId ->
+                points.firstOrNull { it.pointId == pointId }
+                    ?.description
+                    ?.ifBlank { null }
+            }
+            ?.distinct()
+            ?.joinToString(" / ")
+            ?.ifBlank { null }
 
         return AppShellOperationsProjection(
             homeOverview = AppShellHomeOverview(
@@ -74,9 +90,9 @@ class OperationsOverviewRepositoryImpl(
                 placementDetail = placementDetail,
                 currentInstruction = instructionText,
                 currentInstructionTitle = activeInstruction?.title,
-                currentInstructionTargetName = currentPoint?.name,
+                currentInstructionTargetName = instructionTargetName,
                 currentInstructionStatusLabel = activeInstruction?.status?.toStatusLabel(),
-                currentInstructionLocationLabel = currentPoint?.description,
+                currentInstructionLocationLabel = instructionLocationLabel,
                 mapState = AppShellMapState(),
                 currentInstructionId = activeInstruction?.instructionId,
             ),

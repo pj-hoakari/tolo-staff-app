@@ -41,7 +41,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		6F84EE1693838BD4C083A656 /* Exceptions for "iosApp" folder in "iosApp" target */ = {
+		6F84EE1693838BD4C083A656 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -59,7 +59,7 @@
 		F8BC5D5686B70F07BAD9123F /* iosApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				6F84EE1693838BD4C083A656 /* Exceptions for "iosApp" folder in "iosApp" target */,
+				6F84EE1693838BD4C083A656 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -369,7 +369,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;

@@ -57,20 +57,27 @@ private struct HomeInstructionCard: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            AppleInstructionHeroCard(
-                eyebrow: "app_shell_home_instruction_card_title",
-                title: overview.currentInstructionTitle,
-                bodyText: overview.currentInstruction,
-                targetName: overview.currentInstructionTargetName,
-                priorityLabel: overview.currentInstructionPriorityLabel,
-                statusLabel: overview.currentInstructionStatusLabel,
-                locationLabel: overview.currentInstructionLocationLabel,
-                attachmentSummary: overview.currentInstructionAttachmentSummary,
-                unreadCount: Int(overview.currentInstructionUnreadCount)
-            )
-        }
-        .buttonStyle(.plain)
+        AppShellInstructionCard(
+            instruction: overview.currentInstruction.isEmpty ? nil : overview.asInstructionCardModel(),
+            identifier: "app_shell_home_instruction_card",
+            action: action
+        )
+    }
+}
+
+private extension AppShellHomeOverview {
+    func asInstructionCardModel() -> InstructionCardModel {
+        InstructionCardModel(
+            id: currentInstructionId ?? "home-current-instruction",
+            title: currentInstructionTitle,
+            bodyText: currentInstruction,
+            targetName: currentInstructionTargetName,
+            priorityLabel: currentInstructionPriorityLabel,
+            statusLabel: currentInstructionStatusLabel,
+            locationLabel: currentInstructionLocationLabel,
+            attachmentSummary: currentInstructionAttachmentSummary,
+            unreadCount: Int(currentInstructionUnreadCount)
+        )
     }
 }
 
@@ -221,8 +228,8 @@ private struct HomePlacementMapCard: View {
     }
 }
 
-struct AppleInstructionHeroCard: View {
-    let eyebrow: LocalizedStringKey
+struct InstructionCardModel {
+    let id: String
     let title: String?
     let bodyText: String
     let targetName: String?
@@ -231,22 +238,70 @@ struct AppleInstructionHeroCard: View {
     let locationLabel: String?
     let attachmentSummary: String?
     let unreadCount: Int
+}
+
+struct AppShellInstructionCard: View {
+    let instruction: InstructionCardModel?
+    let identifier: String
+    let action: (() -> Void)?
+
+    var body: some View {
+        Group {
+            if let instruction {
+                Group {
+                    if let action {
+                        Button(action: action) {
+                            AppleInstructionHeroCard(instruction: instruction)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        AppleInstructionHeroCard(instruction: instruction)
+                    }
+                }
+            } else {
+                AppShellEmptyInstructionCard()
+            }
+        }
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+struct AppShellEmptyInstructionCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("あなたへの指示")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text("表示できるような内容はありません")
+                .font(.title3)
+                .fontWeight(.semibold)
+            Text("担当エリア向け、またはあなた宛ての指示が届くとここに表示されます。")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
+    }
+}
+
+struct AppleInstructionHeroCard: View {
+    let instruction: InstructionCardModel
 
     var bodyView: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                Label(eyebrow, systemImage: "checklist")
+                Label("あなたへの指示", systemImage: "checklist")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 HStack(spacing: 8) {
-                    if let priorityLabel = optionalText(priorityLabel) {
+                    if let priorityLabel = optionalText(instruction.priorityLabel) {
                         InstructionStatusPill(
                             text: priorityLabel,
                             tint: priorityLabel == "高" ? .orange : .secondary
                         )
                     }
-                    if let statusLabel = optionalText(statusLabel) {
+                    if let statusLabel = optionalText(instruction.statusLabel) {
                         InstructionStatusPill(
                             text: statusLabel,
                             tint: statusLabel == "対応中" ? .blue : statusLabel == "完了" ? .green : .secondary
@@ -255,7 +310,7 @@ struct AppleInstructionHeroCard: View {
                 }
             }
 
-            if let title = optionalText(title) {
+            if let title = optionalText(instruction.title) {
                 Text(title)
                     .font(.title3)
                     .bold()
@@ -264,17 +319,17 @@ struct AppleInstructionHeroCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Text(bodyText)
+            Text(instruction.bodyText)
                 .font(.body)
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             InstructionMetaSummaryView(
-                targetName: targetName,
-                locationLabel: locationLabel,
-                attachmentSummary: attachmentSummary,
-                unreadCount: unreadCount
+                targetName: instruction.targetName,
+                locationLabel: instruction.locationLabel,
+                attachmentSummary: instruction.attachmentSummary,
+                unreadCount: instruction.unreadCount
             )
         }
     }

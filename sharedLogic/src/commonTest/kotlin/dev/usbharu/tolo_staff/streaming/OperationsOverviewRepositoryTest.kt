@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OperationsOverviewRepositoryTest {
@@ -111,6 +112,44 @@ class OperationsOverviewRepositoryTest {
             .map { it.instructionId }
 
         assertEquals(listOf("inst-area", "inst-direct"), relevantIds)
+    }
+
+    @Test
+    fun `overview does not expose instruction metadata when there is no relevant instruction`() = runTest {
+        val dataSource = FakeOperationsStreamDataSource(
+            points = listOf(
+                OperationPoint(
+                    updatedAt = "",
+                    reason = "point.updated",
+                    entityId = "gate-a",
+                    pointId = "gate-a",
+                    name = "Gate A",
+                    description = "North entrance"
+                )
+            ),
+            assignments = listOf(
+                OperationAssignment(
+                    updatedAt = "",
+                    reason = "assignment.updated",
+                    entityId = "assign-1",
+                    assignId = "assign-1",
+                    pointId = "gate-a",
+                    staffId = "tanaka",
+                    status = OperationAssignmentStatus.ACTIVE
+                )
+            ),
+            instructions = emptyList()
+        )
+        val repository = OperationsOverviewRepositoryImpl(dataSource)
+
+        val projection = repository.observeOverview("tanaka").first()
+
+        assertEquals("", projection.homeOverview.currentInstruction)
+        assertNull(projection.homeOverview.currentInstructionId)
+        assertNull(projection.homeOverview.currentInstructionTitle)
+        assertNull(projection.homeOverview.currentInstructionTargetName)
+        assertNull(projection.homeOverview.currentInstructionStatusLabel)
+        assertNull(projection.homeOverview.currentInstructionLocationLabel)
     }
 }
 

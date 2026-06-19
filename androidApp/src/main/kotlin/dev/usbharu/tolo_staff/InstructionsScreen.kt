@@ -62,7 +62,7 @@ internal fun InstructionsListScreen(
         }
         if (state.featuredInstruction == null && state.otherInstructions.isEmpty()) {
             item {
-                EmptyInstructionCard()
+                EmptyInstructionCard(identifier = "instruction_empty_state")
             }
         }
         if (state.otherInstructions.isNotEmpty()) {
@@ -73,28 +73,6 @@ internal fun InstructionsListScreen(
                 InstructionListRow(instruction = instruction, onInstructionSelected = onInstructionSelected)
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyInstructionCard() {
-    SectionCard(
-        contentDescription = "instruction_empty_state",
-    ) {
-        Text(
-            "あなたへの指示",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
-        )
-        Text(
-            "表示できる指示はまだありません",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            "担当エリア向け、またはあなた宛ての指示が届くとここに表示されます。",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

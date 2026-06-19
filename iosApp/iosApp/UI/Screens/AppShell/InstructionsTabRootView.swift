@@ -56,10 +56,18 @@ private struct InstructionListView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if let featuredInstruction {
-                    homeStyleInstructionCard(featuredInstruction)
+                    AppShellInstructionCard(
+                        instruction: featuredInstruction.asInstructionCardModel(),
+                        identifier: "featured_instruction_card",
+                        action: { onInstructionSelected(featuredInstruction.id) }
+                    )
                         .padding(.horizontal, 16)
                 } else if otherInstructions.isEmpty {
-                    emptyInstructionCard
+                    AppShellInstructionCard(
+                        instruction: nil,
+                        identifier: "instruction_empty_state",
+                        action: nil
+                    )
                         .padding(.horizontal, 16)
                 }
 
@@ -82,43 +90,6 @@ private struct InstructionListView: View {
             .padding(.vertical, 16)
         }
         .background(Color(.systemGroupedBackground))
-    }
-
-    private var emptyInstructionCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("あなたへの指示")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Text("表示できる指示はまだありません")
-                .font(.title3)
-                .fontWeight(.semibold)
-            Text("担当エリア向け、またはあなた宛ての指示が届くとここに表示されます。")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
-        .accessibilityIdentifier("instruction_empty_state")
-    }
-
-    private func homeStyleInstructionCard(_ instruction: InstructionSummaryUiModel) -> some View {
-        Button {
-            onInstructionSelected(instruction.id)
-        } label: {
-            AppleInstructionHeroCard(
-                eyebrow: "あなたへの指示",
-                title: instruction.title,
-                bodyText: instruction.preview,
-                targetName: instruction.targetName,
-                priorityLabel: instruction.priorityLabel,
-                statusLabel: instruction.statusLabel,
-                locationLabel: instruction.locationLabel,
-                attachmentSummary: instruction.attachmentSummary,
-                unreadCount: Int(instruction.unreadCount)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("featured_instruction_card")
     }
 
     private func compactInstructionRow(_ instruction: InstructionSummaryUiModel) -> some View {
@@ -157,6 +128,22 @@ private struct InstructionListView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("instruction_row_\(instruction.id)")
+    }
+}
+
+private extension InstructionSummaryUiModel {
+    func asInstructionCardModel() -> InstructionCardModel {
+        InstructionCardModel(
+            id: id,
+            title: title,
+            bodyText: preview,
+            targetName: targetName,
+            priorityLabel: priorityLabel,
+            statusLabel: statusLabel,
+            locationLabel: locationLabel,
+            attachmentSummary: attachmentSummary,
+            unreadCount: Int(unreadCount)
+        )
     }
 }
 

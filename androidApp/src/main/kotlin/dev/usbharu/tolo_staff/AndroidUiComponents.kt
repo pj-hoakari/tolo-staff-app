@@ -279,6 +279,30 @@ internal fun FeaturedInstructionCard(
 }
 
 @Composable
+internal fun EmptyInstructionCard(
+    identifier: String,
+) {
+    SectionCard(
+        contentDescription = identifier,
+    ) {
+        Text(
+            "あなたへの指示",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Text(
+            "表示できるような内容はありません",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            "担当エリア向け、またはあなた宛ての指示が届くとここに表示されます。",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun InstructionMetaSummary(
     targetName: String?,
     locationLabel: String?,

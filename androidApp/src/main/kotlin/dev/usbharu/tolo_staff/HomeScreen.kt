@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
+import dev.usbharu.tolo_staff.feature.appshell.InstructionSummaryUiModel
 
 @Composable
 internal fun HomeOverviewContent(
@@ -210,17 +211,27 @@ private fun HomeInstructionOverviewCard(
     identifier: String,
     onClick: () -> Unit,
 ) {
-    InstructionHeroCard(
-        titleLabel = "あなたへの指示",
-        title = overview.currentInstructionTitle,
-        body = overview.currentInstruction,
-        targetName = overview.currentInstructionTargetName,
-        priorityLabel = overview.currentInstructionPriorityLabel,
-        statusLabel = overview.currentInstructionStatusLabel,
-        locationLabel = overview.currentInstructionLocationLabel,
-        attachmentSummary = overview.currentInstructionAttachmentSummary,
-        unreadCount = overview.currentInstructionUnreadCount,
-        identifier = identifier,
-        onClick = onClick,
+    if (overview.currentInstruction.isBlank()) {
+        EmptyInstructionCard(identifier = identifier)
+    } else {
+        FeaturedInstructionCard(
+            instruction = overview.asFeaturedInstructionSummary(),
+            identifier = identifier,
+            onClick = onClick,
+        )
+    }
+}
+
+private fun AppShellHomeOverview.asFeaturedInstructionSummary(): InstructionSummaryUiModel {
+    return InstructionSummaryUiModel(
+        id = currentInstructionId ?: "home-current-instruction",
+        title = currentInstructionTitle.orEmpty(),
+        targetName = currentInstructionTargetName.orEmpty(),
+        priorityLabel = currentInstructionPriorityLabel.orEmpty(),
+        statusLabel = currentInstructionStatusLabel.orEmpty(),
+        preview = currentInstruction,
+        locationLabel = currentInstructionLocationLabel,
+        attachmentSummary = currentInstructionAttachmentSummary,
+        unreadCount = currentInstructionUnreadCount,
     )
 }
