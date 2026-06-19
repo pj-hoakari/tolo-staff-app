@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddComment
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -152,6 +154,16 @@ fun ToloStaffAndroidContent(
                     )
                 )
             },
+            floatingActionButton = {
+                if (currentRoute == AppShellRoutes.CONTACTS_LIST) {
+                    FloatingActionButton(onClick = onContactNewThreadStarted) {
+                        Icon(
+                            Icons.Default.AddComment,
+                            contentDescription = "contact_new_thread_button"
+                        )
+                    }
+                }
+            },
             bottomBar = {
                 Column {
                     if (currentTab != AppTab.CONTACTS) {
@@ -235,7 +247,6 @@ fun ToloStaffAndroidContent(
                         ContactThreadListScreen(
                             state = state.contactsTab,
                             onThreadSelected = onContactThreadSelected,
-                            onNewThreadStarted = onContactNewThreadStarted,
                         )
                     }
                     composable(AppShellRoutes.CONTACTS_TARGET) {

@@ -16,14 +16,17 @@ struct ContactsTabRootView: View {
         NavigationStack {
             ContactThreadListView(
                 state: state,
-                onThreadSelected: onThreadSelected,
-                onNewThreadStarted: onNewThreadStarted
+                onThreadSelected: onThreadSelected
             )
             .navigationTitle("app_shell_contacts_title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(id: "current-staff-header", placement: .topBarLeading) {
                     CurrentStaffHeaderIconView(currentStaff: currentStaff)
+                }
+                ToolbarItem(id: "contact-new-thread", placement: .topBarTrailing) {
+                    Button("新しい連絡", systemImage: "square.and.pencil", action: onNewThreadStarted)
+                        .accessibilityIdentifier("contact_new_thread_button")
                 }
             }
             .navigationDestination(
@@ -71,15 +74,9 @@ struct ContactsTabRootView: View {
 private struct ContactThreadListView: View {
     let state: ContactsTabUiState
     let onThreadSelected: (String) -> Void
-    let onNewThreadStarted: () -> Void
 
     var body: some View {
         List {
-            Section {
-                Button("新しい連絡を作成", systemImage: "square.and.pencil", action: onNewThreadStarted)
-                    .accessibilityIdentifier("contact_new_thread_button")
-            }
-
             Section("現在の連絡") {
                 ForEach(state.threads.filter { !$0.isFormerAssignment }, id: \.id) { thread in
                     contactThreadRow(thread)

@@ -32,6 +32,7 @@ final class SampleScenarioTests: XCTestCase {
 
         tabBarButtons.element(boundBy: 3).tap()
         XCTAssertTrue(app.descendants(matching: .any)["contact_thread_list"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["contact_new_thread_button"].waitForExistence(timeout: 3))
 
         tabBarButtons.element(boundBy: 0).tap()
         XCTAssertTrue(app.descendants(matching: .any)["app_shell_home_event_card"].waitForExistence(timeout: 3))

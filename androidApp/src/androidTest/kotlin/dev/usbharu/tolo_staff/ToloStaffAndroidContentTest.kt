@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -88,11 +89,24 @@ class ToloStaffAndroidContentTest {
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.onNodeWithText("現在のスレッドと新規連絡の開始").assertExists()
 
-        composeRule.onNodeWithText("新規").performClick()
+        composeRule.onNodeWithContentDescription("contact_new_thread_button").performClick()
         composeRule.onNodeWithContentDescription("contact_target_selection").assertExists()
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.onNodeWithText("現在のスレッドと新規連絡の開始").assertExists()
+    }
+
+    @Test
+    fun contactNewThreadFabIsHiddenOutsideListScreen() {
+        setTestContent()
+
+        composeRule.onNodeWithText("連絡").performClick()
+        composeRule.onNodeWithContentDescription("contact_new_thread_button").performClick()
+        composeRule.onNodeWithContentDescription("contact_new_thread_button").assertDoesNotExist()
+
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.onNodeWithContentDescription("contact_thread_thread-1").performClick()
+        composeRule.onNodeWithContentDescription("contact_new_thread_button").assertDoesNotExist()
     }
 
     private fun setTestContent() {
