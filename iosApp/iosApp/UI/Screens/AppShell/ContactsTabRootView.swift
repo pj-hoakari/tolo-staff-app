@@ -49,7 +49,10 @@ struct ContactsTabRootView: View {
             }
             .navigationDestination(
                 isPresented: Binding(
-                    get: { state.selectedThread != nil },
+                    get: {
+                        state.selectedThread != nil &&
+                            state.selectedThreadBackDestination != .reportDetail
+                    },
                     set: { isPresented in
                         if !isPresented {
                             onBackToList()
@@ -172,7 +175,7 @@ private struct ContactTargetSelectionView: View {
     }
 }
 
-private struct ContactThreadDetailView: View {
+struct ContactThreadDetailView: View {
     let thread: ContactThreadDetailUiModel
     let onDraftChanged: (String) -> Void
     let onSendClicked: () -> Void

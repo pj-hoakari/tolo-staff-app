@@ -75,6 +75,31 @@ final class SampleViewTests: XCTestCase {
         XCTAssertNotNil(view)
     }
 
+    func testReportsDetailCanBeCreated() {
+        let report = ReportDetailUiModel(
+            reportId: "report-1",
+            threadId: "report-thread-1",
+            title: "導線報告",
+            summary: "南口の入場列は安定しています",
+            priorityLabel: "通常",
+            authorName: "田中",
+            targetLabel: "南口",
+            timeLabel: "2026-06-19T09:00:00Z",
+            isAuthoredByCurrentStaff: true,
+            detailPlaceholderMessage: "詳細情報は今後の API 連携で表示予定です。現在は概要のみ確認できます。"
+        )
+        let state = makeAppShellState(
+            selectedTab: AppTab.reports,
+            selectedReport: report
+        )
+
+        let view = AppShellContentView(state: state)
+
+        XCTAssertNotNil(view)
+        XCTAssertEqual(state.reportsTab.selectedReport?.reportId, "report-1")
+        XCTAssertEqual(state.reportsTab.selectedReport?.threadId, "report-thread-1")
+    }
+
     func testContactsTabCanBeCreated() {
         let state = makeAppShellState(selectedTab: AppTab.contacts)
 
@@ -122,7 +147,8 @@ final class SampleViewTests: XCTestCase {
     private func makeAppShellState(
         selectedTab: AppTab,
         homeOverview: AppShellHomeOverview? = nil,
-        instructionsTab: InstructionsTabUiState? = nil
+        instructionsTab: InstructionsTabUiState? = nil,
+        selectedReport: ReportDetailUiModel? = nil
     ) -> AppShellUiState {
         let overview = homeOverview ?? AppShellHomeOverview(
             eventName: "Tolo Staff Demo 2026",
@@ -183,6 +209,7 @@ final class SampleViewTests: XCTestCase {
                 ),
                 step: .typeSelection,
                 relatedReports: [],
+                selectedReport: selectedReport,
                 isLoadingReports: false,
                 reportsErrorMessage: nil
             ),

@@ -38,6 +38,30 @@ final class SampleScenarioTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["app_shell_home_event_card"].waitForExistence(timeout: 3))
     }
 
+    func testReportDetailOpensThreadWhenRelatedReportIsAvailable() throws {
+        let tabBarButtons = app.tabBars.buttons
+        XCTAssertGreaterThanOrEqual(tabBarButtons.count, 4)
+
+        tabBarButtons.element(boundBy: 2).tap()
+        let relatedReport = app.descendants(matching: .any)["related_report_report-1"]
+        try XCTSkipUnless(
+            relatedReport.waitForExistence(timeout: 2),
+            "関連報告の固定データがない環境ではこのシナリオをスキップする"
+        )
+
+        relatedReport.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["report_detail_screen"].waitForExistence(timeout: 3))
+
+        let openThreadButton = app.descendants(matching: .any)["report_detail_open_thread_button"]
+        XCTAssertTrue(openThreadButton.waitForExistence(timeout: 3))
+        openThreadButton.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["contact_thread_detail"].waitForExistence(timeout: 3))
+
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["report_detail_screen"].waitForExistence(timeout: 3))
+    }
+
     private func attachScreenshot(name: String) {
         screenshotCounter += 1
         let attachment = XCTAttachment(screenshot: app.screenshot())

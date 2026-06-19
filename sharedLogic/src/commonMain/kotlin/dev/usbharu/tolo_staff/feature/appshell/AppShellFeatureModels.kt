@@ -113,12 +113,26 @@ data class RelatedReportUiModel(
     val isAuthoredByCurrentStaff: Boolean = false,
 )
 
+data class ReportDetailUiModel(
+    val reportId: String,
+    val threadId: String,
+    val title: String,
+    val summary: String,
+    val priorityLabel: String,
+    val authorName: String,
+    val targetLabel: String,
+    val timeLabel: String? = null,
+    val isAuthoredByCurrentStaff: Boolean = false,
+    val detailPlaceholderMessage: String,
+)
+
 data class ReportsTabUiState(
     val reportTypes: List<ReportTypeUiModel> = emptyList(),
     val availablePlaces: List<ContactTargetUiModel> = emptyList(),
     val draft: ReportDraftUiModel = ReportDraftUiModel(),
     val step: ReportFlowStep = ReportFlowStep.TYPE_SELECTION,
     val relatedReports: List<RelatedReportUiModel> = emptyList(),
+    val selectedReport: ReportDetailUiModel? = null,
     val isLoadingReports: Boolean = false,
     val reportsErrorMessage: String? = null,
 )
@@ -153,6 +167,7 @@ enum class ContactThreadBackDestination {
     NONE,
     INSTRUCTIONS,
     REPORTS,
+    REPORT_DETAIL,
 }
 
 data class ContactsTabUiState(

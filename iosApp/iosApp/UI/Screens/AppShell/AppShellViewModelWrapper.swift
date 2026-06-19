@@ -54,6 +54,14 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onReportSelected(reportId: reportId)
     }
 
+    func onReportDetailClosed() {
+        viewModel.onReportDetailClosed()
+    }
+
+    func onReportThreadOpened() {
+        viewModel.onReportThreadOpened()
+    }
+
     func onReportCommentChanged(_ comment: String) {
         viewModel.onReportCommentChanged(comment: comment)
     }

@@ -381,6 +381,7 @@ class AppShellViewModel(
                     relatedReports = mergeRelatedReports(state.reportsTab.relatedReports, localCreatedReports),
                     step = ReportFlowStep.TYPE_SELECTION,
                     draft = ReportDraftUiModel(),
+                    selectedReport = null,
                 ),
                 selectedTab = AppTab.CONTACTS,
                 contactsTab = state.contactsTab.copy(
@@ -402,9 +403,21 @@ class AppShellViewModel(
 
     fun onReportSelected(reportId: String) {
         val report = currentState.reportsTab.relatedReports.firstOrNull { it.reportId == reportId } ?: return
-        val detail = contactDetailsById[report.threadId]
-            ?: localCreatedContactThreads[report.threadId]
-            ?: buildRelatedReportContactThread(report)
+        updateState { state ->
+            state.copy(
+                selectedTab = AppTab.REPORTS,
+                reportsTab = state.reportsTab.copy(
+                    selectedReport = report.toDetailUiModel()
+                )
+            )
+        }
+    }
+
+    fun onReportThreadOpened() {
+        val selectedReport = currentState.reportsTab.selectedReport ?: return
+        val detail = contactDetailsById[selectedReport.threadId]
+            ?: localCreatedContactThreads[selectedReport.threadId]
+            ?: buildRelatedReportContactThread(selectedReport)
         updateState { state ->
             state.copy(
                 selectedTab = AppTab.CONTACTS,
@@ -416,8 +429,16 @@ class AppShellViewModel(
                     selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
+                    selectedThreadBackDestination = ContactThreadBackDestination.REPORT_DETAIL,
                 )
+            )
+        }
+    }
+
+    fun onReportDetailClosed() {
+        updateState { state ->
+            state.copy(
+                reportsTab = state.reportsTab.copy(selectedReport = null)
             )
         }
     }
@@ -458,6 +479,7 @@ class AppShellViewModel(
                 selectedTab = when (state.contactsTab.selectedThreadBackDestination) {
                     ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
                     ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
+                    ContactThreadBackDestination.REPORT_DETAIL -> AppTab.REPORTS
                     ContactThreadBackDestination.NONE -> state.selectedTab
                 },
                 contactsTab = state.contactsTab.copy(
@@ -591,9 +613,17 @@ class AppShellViewModel(
                                 )
                             }
                         val mergedReports = mergeRelatedReports(remoteReports, localCreatedReports)
+                        val selectedReport = state.reportsTab.selectedReport
+                            ?.let { selected ->
+                                mergedReports
+                                    .firstOrNull { it.reportId == selected.reportId }
+                                    ?.toDetailUiModel()
+                                    ?: selected
+                            }
                         state.copy(
                             reportsTab = state.reportsTab.copy(
                                 relatedReports = mergedReports,
+                                selectedReport = selectedReport,
                                 isLoadingReports = false,
                                 reportsErrorMessage = null,
                             )
@@ -677,6 +707,13 @@ class AppShellViewModel(
                             availableStaff = staff,
                         )
                     }
+                    val selectedReport = state.reportsTab.selectedReport
+                        ?.let { selected ->
+                            resolvedReports
+                                .firstOrNull { it.reportId == selected.reportId }
+                                ?.toDetailUiModel()
+                                ?: selected
+                        }
                     state.copy(
                         homeOverview = snapshot.homeOverview,
                         currentPlacementName = snapshot.currentPlacementName,
@@ -688,6 +725,7 @@ class AppShellViewModel(
                             reportTypes = snapshot.reportTypes,
                             availablePlaces = snapshot.reportPlaces,
                             relatedReports = resolvedReports,
+                            selectedReport = selectedReport,
                             draft = state.reportsTab.draft.copy(
                                 selectedPlaceId = state.reportsTab.draft.selectedPlaceId?.takeIf { placeId ->
                                     snapshot.reportPlaces.any { it.id == placeId }
@@ -1071,6 +1109,28 @@ private fun buildRelatedReportContactThread(report: RelatedReportUiModel): Conta
     )
 }
 
+private fun buildRelatedReportContactThread(report: ReportDetailUiModel): ContactThreadDetailUiModel {
+    val target = ContactTargetUiModel(
+        id = report.threadId,
+        type = ContactTargetType.HEADQUARTERS,
+        displayName = report.targetLabel,
+    )
+    return ContactThreadDetailUiModel(
+        id = report.threadId,
+        title = report.title,
+        target = target,
+        messages = listOf(
+            ThreadMessageUiModel(
+                id = "${report.reportId}-summary",
+                senderName = report.authorName,
+                body = report.summary,
+                timeLabel = report.timeLabel,
+                isCurrentUser = report.isAuthoredByCurrentStaff,
+            )
+        ),
+    )
+}
+
 private fun AppShellHomeOverview.toFallbackInstructionSummary(): InstructionSummaryUiModel? {
     if (currentInstruction.isBlank()) {
         return null
@@ -1142,6 +1202,19 @@ private fun mergeRelatedReports(
     remote: List<RelatedReportUiModel>,
     local: List<RelatedReportUiModel>,
 ): List<RelatedReportUiModel> = (local + remote).distinctBy { it.reportId }
+
+private fun RelatedReportUiModel.toDetailUiModel(): ReportDetailUiModel = ReportDetailUiModel(
+    reportId = reportId,
+    threadId = threadId,
+    title = title,
+    summary = summary,
+    priorityLabel = priorityLabel,
+    authorName = authorName,
+    targetLabel = targetLabel,
+    timeLabel = timeLabel,
+    isAuthoredByCurrentStaff = isAuthoredByCurrentStaff,
+    detailPlaceholderMessage = "詳細情報は今後の API 連携で表示予定です。現在は概要のみ確認できます。",
+)
 
 private fun OperationMessage.toThreadMessageUiModel(
     currentStaffId: String,

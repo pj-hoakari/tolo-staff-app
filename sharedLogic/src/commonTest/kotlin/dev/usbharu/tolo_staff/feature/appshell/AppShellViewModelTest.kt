@@ -218,7 +218,7 @@ class AppShellViewModelTest {
     }
 
     @Test
-    fun `related reports load and can open thread in contacts`() = runTest {
+    fun `related reports load into detail and can open thread in contacts`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val dataSource = FakeOperationsStreamDataSource(
             staff = listOf(
@@ -278,15 +278,24 @@ class AppShellViewModelTest {
 
         viewModel.onReportSelected("report-1")
 
+        assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
+        assertEquals("導線報告", viewModel.uiState.value.reportsTab.selectedReport?.title)
+        assertEquals("南口の入場列は安定しています", viewModel.uiState.value.reportsTab.selectedReport?.summary)
+
+        viewModel.onReportThreadOpened()
+
         assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
         assertEquals("本部 / 南口", viewModel.uiState.value.contactsTab.selectedThread?.title)
         assertEquals(
-            ContactThreadBackDestination.REPORTS,
+            ContactThreadBackDestination.REPORT_DETAIL,
             viewModel.uiState.value.contactsTab.selectedThreadBackDestination
         )
         viewModel.onContactBackToList()
         assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
         assertEquals(null, viewModel.uiState.value.contactsTab.selectedThread)
+        assertEquals("導線報告", viewModel.uiState.value.reportsTab.selectedReport?.title)
+        viewModel.onReportDetailClosed()
+        assertEquals(null, viewModel.uiState.value.reportsTab.selectedReport)
         viewModel.clear()
     }
 

@@ -25,6 +25,7 @@ import dev.usbharu.tolo_staff.feature.appshell.InstructionDetailUiModel
 import dev.usbharu.tolo_staff.feature.appshell.InstructionSummaryUiModel
 import dev.usbharu.tolo_staff.feature.appshell.InstructionsTabUiState
 import dev.usbharu.tolo_staff.feature.appshell.ReportDraftUiModel
+import dev.usbharu.tolo_staff.feature.appshell.ReportDetailUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ReportFlowStep
 import dev.usbharu.tolo_staff.feature.appshell.RelatedReportUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ReportTypeUiModel
@@ -83,15 +84,17 @@ class ToloStaffAndroidContentTest {
     }
 
     @Test
-    fun relatedReportOpensContactThreadAndBackReturnsToReports() {
+    fun relatedReportOpensDetailThenContactThreadAndBackReturnsToDetail() {
         setTestContent()
 
         composeRule.onNodeWithText("報告").performClick()
         composeRule.onNodeWithContentDescription("related_report_report-1").performClick()
+        composeRule.onNodeWithContentDescription("report_detail_screen").assertExists()
+        composeRule.onNodeWithContentDescription("report_detail_open_thread_button").performClick()
         composeRule.onNodeWithContentDescription("contact_thread_detail").assertExists()
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        composeRule.onNodeWithText("本部へ送る報告種別を選択します。").assertExists()
+        composeRule.onNodeWithContentDescription("report_detail_screen").assertExists()
     }
 
     @Test
@@ -287,6 +290,30 @@ class ToloStaffAndroidContentTest {
                 },
                 onReportSelected = {
                     state = state.copy(
+                        selectedTab = AppTab.REPORTS,
+                        reportsTab = state.reportsTab.copy(
+                            selectedReport = ReportDetailUiModel(
+                                reportId = relatedReport.reportId,
+                                threadId = relatedReport.threadId,
+                                title = relatedReport.title,
+                                summary = relatedReport.summary,
+                                priorityLabel = relatedReport.priorityLabel,
+                                authorName = relatedReport.authorName,
+                                targetLabel = relatedReport.targetLabel,
+                                timeLabel = relatedReport.timeLabel,
+                                isAuthoredByCurrentStaff = true,
+                                detailPlaceholderMessage = "詳細情報は今後の API 連携で表示予定です。現在は概要のみ確認できます。",
+                            ),
+                        )
+                    )
+                },
+                onReportDetailClosed = {
+                    state = state.copy(
+                        reportsTab = state.reportsTab.copy(selectedReport = null),
+                    )
+                },
+                onReportThreadOpened = {
+                    state = state.copy(
                         selectedTab = AppTab.CONTACTS,
                         contactsTab = state.contactsTab.copy(
                             selectedThread = contactThread.copy(
@@ -307,7 +334,7 @@ class ToloStaffAndroidContentTest {
                                     )
                                 ),
                             ),
-                            selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
+                            selectedThreadBackDestination = ContactThreadBackDestination.REPORT_DETAIL,
                         )
                     )
                 },
@@ -390,6 +417,7 @@ class ToloStaffAndroidContentTest {
                             ContactThreadBackDestination.NONE -> state.selectedTab
                             ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
                             ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
+                            ContactThreadBackDestination.REPORT_DETAIL -> AppTab.REPORTS
                         },
                         contactsTab = state.contactsTab.copy(
                             selectedThread = null,

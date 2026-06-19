@@ -1,5 +1,6 @@
 package dev.usbharu.tolo_staff
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetType
 import dev.usbharu.tolo_staff.feature.appshell.InstructionProgressStatus
+import dev.usbharu.tolo_staff.feature.appshell.displayedSelectedTab
 
 @Composable
 fun ToloStaffAndroidContent(
@@ -47,6 +49,8 @@ fun ToloStaffAndroidContent(
     onInstructionStatusUpdated: (InstructionProgressStatus) -> Unit = {},
     onReportTypeSelected: (String) -> Unit = {},
     onReportSelected: (String) -> Unit = {},
+    onReportDetailClosed: () -> Unit = {},
+    onReportThreadOpened: () -> Unit = {},
     onReportCommentChanged: (String) -> Unit = {},
     onReportUrgencySelected: (String) -> Unit = {},
     onReportImageToggleChanged: (Boolean) -> Unit = {},
@@ -69,8 +73,28 @@ fun ToloStaffAndroidContent(
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
         val currentTab = routeToTab(currentRoute)
+        val displayedSelectedTab = state.displayedSelectedTab
         val targetRoute = state.navigationRoute()
         var previousRoute by remember { mutableStateOf<String?>(null) }
+        var pendingClosedRoute by remember { mutableStateOf<String?>(null) }
+
+        val closeReportDetail = {
+            pendingClosedRoute = AppShellRoutes.REPORTS_DETAIL
+            navController.popBackStack(AppShellRoutes.REPORTS_TYPE, inclusive = false)
+            onReportDetailClosed()
+        }
+        val closeReportThread = {
+            pendingClosedRoute = AppShellRoutes.REPORTS_THREAD
+            navController.popBackStack(AppShellRoutes.REPORTS_DETAIL, inclusive = false)
+            onContactBackToList()
+        }
+
+        BackHandler(enabled = currentRoute == AppShellRoutes.REPORTS_DETAIL) {
+            closeReportDetail()
+        }
+        BackHandler(enabled = currentRoute == AppShellRoutes.REPORTS_THREAD) {
+            closeReportThread()
+        }
 
         LaunchedEffect(targetRoute, currentRoute) {
             if (currentRoute != null && currentRoute == targetRoute) {
@@ -111,6 +135,20 @@ fun ToloStaffAndroidContent(
                     lastRoute == AppShellRoutes.REPORTS_PLACE && currentRoute == AppShellRoutes.REPORTS_DRAFT -> {
                         onReportBack()
                     }
+                    lastRoute == AppShellRoutes.REPORTS_DETAIL && currentRoute == AppShellRoutes.REPORTS_TYPE -> {
+                        if (pendingClosedRoute == AppShellRoutes.REPORTS_DETAIL) {
+                            pendingClosedRoute = null
+                        } else {
+                            onReportDetailClosed()
+                        }
+                    }
+                    lastRoute == AppShellRoutes.REPORTS_THREAD && currentRoute == AppShellRoutes.REPORTS_DETAIL -> {
+                        if (pendingClosedRoute == AppShellRoutes.REPORTS_THREAD) {
+                            pendingClosedRoute = null
+                        } else {
+                            onContactBackToList()
+                        }
+                    }
                     lastRoute == AppShellRoutes.CONTACTS_DETAIL && currentRoute == AppShellRoutes.CONTACTS_LIST -> {
                         onContactBackToList()
                     }
@@ -142,7 +180,15 @@ fun ToloStaffAndroidContent(
                                 modifier = Modifier.padding(start = 8.dp)
                             )
                         } else {
-                            IconButton(onClick = { navController.navigateUp() }) {
+                            IconButton(
+                                onClick = {
+                                    when (currentRoute) {
+                                        AppShellRoutes.REPORTS_DETAIL -> closeReportDetail()
+                                        AppShellRoutes.REPORTS_THREAD -> closeReportThread()
+                                        else -> navController.navigateUp()
+                                    }
+                                }
+                            ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                             }
                         }
@@ -170,7 +216,7 @@ fun ToloStaffAndroidContent(
                     NavigationBar {
                         appShellTabs().forEach { item ->
                             NavigationBarItem(
-                                selected = currentTab == item.tab,
+                                selected = displayedSelectedTab == item.tab,
                                 onClick = { onTabSelected(item.tab) },
                                 icon = { Icon(item.icon, contentDescription = null) },
                                 label = { Text(item.label) }
@@ -222,6 +268,23 @@ fun ToloStaffAndroidContent(
                             onReportSelected = onReportSelected,
                         )
                     }
+                    composable(AppShellRoutes.REPORTS_DETAIL) {
+                        state.reportsTab.selectedReport?.let { report ->
+                            ReportDetailScreen(
+                                report = report,
+                                onOpenThread = onReportThreadOpened,
+                            )
+                        }
+                    }
+                    composable(AppShellRoutes.REPORTS_THREAD) {
+                        state.contactsTab.selectedThread?.let { thread ->
+                            ContactThreadDetailScreen(
+                                thread = thread,
+                                onDraftChanged = onContactDraftChanged,
+                                onSendClicked = onContactSendClicked,
+                            )
+                        }
+                    }
                     composable(AppShellRoutes.REPORTS_DRAFT) {
                         ReportDraftInputScreen(
                             state = state.reportsTab,
@@ -268,7 +331,7 @@ fun ToloStaffAndroidContent(
 }
 
 private fun isRootRoute(route: String?): Boolean =
-    route == AppShellRoutes.HOME ||
+        route == AppShellRoutes.HOME ||
         route == AppShellRoutes.INSTRUCTIONS_LIST ||
         route == AppShellRoutes.REPORTS_TYPE ||
         route == AppShellRoutes.CONTACTS_LIST
@@ -282,6 +345,8 @@ private fun appBarTitle(
         AppShellRoutes.INSTRUCTIONS_LIST -> "指示"
         AppShellRoutes.INSTRUCTIONS_DETAIL -> "指示詳細"
         AppShellRoutes.REPORTS_TYPE -> "報告"
+        AppShellRoutes.REPORTS_DETAIL -> "報告詳細"
+        AppShellRoutes.REPORTS_THREAD -> state.contactsTab.selectedThread?.title ?: "連絡"
         AppShellRoutes.REPORTS_DRAFT -> reportTitleForStep(state.reportsTab.step)
         AppShellRoutes.REPORTS_PLACE -> "対象場所"
         AppShellRoutes.CONTACTS_LIST -> "連絡"

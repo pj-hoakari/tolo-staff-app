@@ -5,12 +5,18 @@ struct ReportsTabRootView: View {
     private enum ReportRoute: Hashable {
         case draft
         case placeSelection
+        case detail
+        case thread
     }
 
     let state: ReportsTabUiState
     let currentStaff: CurrentStaffUiModel
+    let selectedThread: ContactThreadDetailUiModel?
+    let selectedThreadBackDestination: ContactThreadBackDestination
     var onTypeSelected: (String) -> Void = { _ in }
     var onReportSelected: (String) -> Void = { _ in }
+    var onReportDetailClosed: () -> Void = {}
+    var onReportThreadOpened: () -> Void = {}
     var onCommentChanged: (String) -> Void = { _ in }
     var onUrgencySelected: (String) -> Void = { _ in }
     var onImageToggleChanged: (Bool) -> Void = { _ in }
@@ -19,6 +25,9 @@ struct ReportsTabRootView: View {
     var onPlaceSelected: (String) -> Void = { _ in }
     var onSubmitted: () -> Void = {}
     var onBack: () -> Void = {}
+    var onContactBackToList: () -> Void = {}
+    var onContactDraftChanged: (String) -> Void = { _ in }
+    var onContactSendClicked: () -> Void = {}
 
     var body: some View {
         NavigationStack(path: navigationPath) {
@@ -40,6 +49,25 @@ struct ReportsTabRootView: View {
                         reportPlaceSelection
                             .navigationTitle("対象場所")
                             .navigationBarTitleDisplayMode(.inline)
+                    case .detail:
+                        if let selectedReport = state.selectedReport {
+                            ReportDetailView(
+                                report: selectedReport,
+                                onOpenThread: onReportThreadOpened
+                            )
+                            .navigationTitle("報告詳細")
+                            .navigationBarTitleDisplayMode(.inline)
+                        }
+                    case .thread:
+                        if let selectedThread {
+                            ContactThreadDetailView(
+                                thread: selectedThread,
+                                onDraftChanged: onContactDraftChanged,
+                                onSendClicked: onContactSendClicked
+                            )
+                            .navigationTitle(selectedThread.title)
+                            .navigationBarTitleDisplayMode(.inline)
+                        }
                     }
                 }
         }
@@ -50,22 +78,44 @@ struct ReportsTabRootView: View {
             get: { navigationRoutes },
             set: { newValue in
                 guard newValue.count < navigationRoutes.count else { return }
-                for _ in 0..<(navigationRoutes.count - newValue.count) {
-                    onBack()
+                let removedRoutes = navigationRoutes.dropFirst(newValue.count).reversed()
+                for route in removedRoutes {
+                    switch route {
+                    case .draft, .placeSelection:
+                        onBack()
+                    case .detail:
+                        onReportDetailClosed()
+                    case .thread:
+                        onContactBackToList()
+                    }
                 }
             }
         )
     }
 
     private var navigationRoutes: [ReportRoute] {
+        var routes: [ReportRoute] = []
+
         switch state.step {
         case .typeSelection:
-            []
+            break
         case .draftInput:
-            [.draft]
+            routes.append(.draft)
         case .placeSelection:
-            [.draft, .placeSelection]
+            routes.append(.draft)
+            routes.append(.placeSelection)
         }
+
+        if state.selectedReport != nil {
+            routes.append(.detail)
+        }
+
+        if selectedThreadBackDestination == .reportDetail,
+           selectedThread != nil {
+            routes.append(.thread)
+        }
+
+        return routes
     }
 
     private var reportTypeSelection: some View {
@@ -223,5 +273,53 @@ struct ReportsTabRootView: View {
             .background(.thinMaterial)
         }
         .accessibilityIdentifier("report_place_selection")
+    }
+}
+
+struct ReportDetailView: View {
+    let report: ReportDetailUiModel
+    let onOpenThread: () -> Void
+
+    var body: some View {
+        List {
+            Section("概要") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(report.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .accessibilityIdentifier("report_detail_title")
+                    if !report.priorityLabel.isEmpty {
+                        Text(report.priorityLabel)
+                            .font(.caption)
+                            .foregroundStyle(.tint)
+                    }
+                    Text(report.summary)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("report_detail_summary")
+                    Text("\(report.targetLabel) / \(report.authorName)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let timeLabel = report.timeLabel {
+                        Text(timeLabel)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
+            Section("補足") {
+                Text(report.detailPlaceholderMessage)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("report_detail_placeholder")
+            }
+
+            Section {
+                Button("連絡スレッドを開く", action: onOpenThread)
+                    .accessibilityIdentifier("report_detail_open_thread_button")
+            }
+        }
+        .accessibilityIdentifier("report_detail_screen")
     }
 }

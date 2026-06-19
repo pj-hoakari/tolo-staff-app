@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Summarize
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
+import dev.usbharu.tolo_staff.feature.appshell.ContactThreadBackDestination
 import dev.usbharu.tolo_staff.feature.appshell.ReportFlowStep
 
 internal object AppShellRoutes {
@@ -15,6 +16,8 @@ internal object AppShellRoutes {
     const val INSTRUCTIONS_LIST = "instructions/list"
     const val INSTRUCTIONS_DETAIL = "instructions/detail"
     const val REPORTS_TYPE = "reports/type"
+    const val REPORTS_DETAIL = "reports/detail"
+    const val REPORTS_THREAD = "reports/thread"
     const val REPORTS_DRAFT = "reports/draft"
     const val REPORTS_PLACE = "reports/place"
     const val CONTACTS_LIST = "contacts/list"
@@ -37,7 +40,12 @@ internal fun appShellTabs(): List<AppShellTabItem> = listOf(
 )
 
 internal fun AppShellUiState.navigationRoute(): String =
-    when (selectedTab) {
+    if (
+        contactsTab.selectedThreadBackDestination == ContactThreadBackDestination.REPORT_DETAIL &&
+        contactsTab.selectedThread != null
+    ) {
+        AppShellRoutes.REPORTS_THREAD
+    } else when (selectedTab) {
         AppTab.HOME -> AppShellRoutes.HOME
         AppTab.INSTRUCTIONS -> if (instructionsTab.selectedInstruction == null) {
             AppShellRoutes.INSTRUCTIONS_LIST
@@ -45,7 +53,11 @@ internal fun AppShellUiState.navigationRoute(): String =
             AppShellRoutes.INSTRUCTIONS_DETAIL
         }
         AppTab.REPORTS -> when (reportsTab.step) {
-            ReportFlowStep.TYPE_SELECTION -> AppShellRoutes.REPORTS_TYPE
+            ReportFlowStep.TYPE_SELECTION -> if (reportsTab.selectedReport != null) {
+                AppShellRoutes.REPORTS_DETAIL
+            } else {
+                AppShellRoutes.REPORTS_TYPE
+            }
             ReportFlowStep.DRAFT_INPUT -> AppShellRoutes.REPORTS_DRAFT
             ReportFlowStep.PLACE_SELECTION -> AppShellRoutes.REPORTS_PLACE
         }

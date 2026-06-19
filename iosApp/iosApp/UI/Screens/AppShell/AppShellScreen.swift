@@ -21,6 +21,8 @@ struct AppShellScreen: View {
             onInstructionStatusUpdated: wrapper.onInstructionStatusUpdated,
             onReportTypeSelected: wrapper.onReportTypeSelected,
             onReportSelected: wrapper.onReportSelected,
+            onReportDetailClosed: wrapper.onReportDetailClosed,
+            onReportThreadOpened: wrapper.onReportThreadOpened,
             onReportCommentChanged: wrapper.onReportCommentChanged,
             onReportUrgencySelected: wrapper.onReportUrgencySelected,
             onReportImageToggleChanged: wrapper.onReportImageToggleChanged,
@@ -52,6 +54,8 @@ struct AppShellContentView: View {
     var onInstructionStatusUpdated: (InstructionProgressStatus) -> Void = { _ in }
     var onReportTypeSelected: (String) -> Void = { _ in }
     var onReportSelected: (String) -> Void = { _ in }
+    var onReportDetailClosed: () -> Void = {}
+    var onReportThreadOpened: () -> Void = {}
     var onReportCommentChanged: (String) -> Void = { _ in }
     var onReportUrgencySelected: (String) -> Void = { _ in }
     var onReportImageToggleChanged: (Bool) -> Void = { _ in }
@@ -69,15 +73,22 @@ struct AppShellContentView: View {
     var onContactSendClicked: () -> Void = {}
 
     var body: some View {
+        tabContainer
+    }
+
+    private var displayedSelectedTab: AppTab { state.displayedSelectedTab }
+
+    @ViewBuilder
+    private var tabContainer: some View {
         if #available(iOS 26.1, *) {
             tabs
-                .tabViewBottomAccessory(isEnabled: state.selectedTab != AppTab.contacts) {
+                .tabViewBottomAccessory(isEnabled: displayedSelectedTab != AppTab.contacts) {
                     PlacementBar(placementName: state.currentPlacementName)
                 }
         } else if #available(iOS 26.0, *) {
             tabs
                 .tabViewBottomAccessory {
-                    if state.selectedTab != AppTab.contacts {
+                    if displayedSelectedTab != AppTab.contacts {
                         PlacementBar(placementName: state.currentPlacementName)
                     }
                 }
@@ -89,7 +100,7 @@ struct AppShellContentView: View {
     private var tabs: some View {
         TabView(
             selection: Binding(
-                get: { state.selectedTab },
+                get: { displayedSelectedTab },
                 set: { onTabSelected($0) }
             )
         ) {
@@ -127,8 +138,12 @@ struct AppShellContentView: View {
                 ReportsTabRootView(
                     state: state.reportsTab,
                     currentStaff: state.currentStaff,
+                    selectedThread: state.contactsTab.selectedThread,
+                    selectedThreadBackDestination: state.contactsTab.selectedThreadBackDestination,
                     onTypeSelected: onReportTypeSelected,
                     onReportSelected: onReportSelected,
+                    onReportDetailClosed: onReportDetailClosed,
+                    onReportThreadOpened: onReportThreadOpened,
                     onCommentChanged: onReportCommentChanged,
                     onUrgencySelected: onReportUrgencySelected,
                     onImageToggleChanged: onReportImageToggleChanged,
@@ -136,7 +151,10 @@ struct AppShellContentView: View {
                     onContinueToPlaceSelection: onReportContinueToPlaceSelection,
                     onPlaceSelected: onReportPlaceSelected,
                     onSubmitted: onReportSubmitted,
-                    onBack: onReportBack
+                    onBack: onReportBack,
+                    onContactBackToList: onContactBackToList,
+                    onContactDraftChanged: onContactDraftChanged,
+                    onContactSendClicked: onContactSendClicked
                 )
             }
 
