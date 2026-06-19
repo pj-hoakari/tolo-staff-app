@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.Summarize
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
-import dev.usbharu.tolo_staff.feature.appshell.ContactThreadBackDestination
 import dev.usbharu.tolo_staff.feature.appshell.ReportFlowStep
 
 internal object AppShellRoutes {
@@ -40,12 +39,7 @@ internal fun appShellTabs(): List<AppShellTabItem> = listOf(
 )
 
 internal fun AppShellUiState.navigationRoute(): String =
-    if (
-        contactsTab.selectedThreadBackDestination == ContactThreadBackDestination.REPORT_DETAIL &&
-        contactsTab.selectedThread != null
-    ) {
-        AppShellRoutes.REPORTS_THREAD
-    } else when (selectedTab) {
+    when (selectedTab) {
         AppTab.HOME -> AppShellRoutes.HOME
         AppTab.INSTRUCTIONS -> if (instructionsTab.selectedInstruction == null) {
             AppShellRoutes.INSTRUCTIONS_LIST

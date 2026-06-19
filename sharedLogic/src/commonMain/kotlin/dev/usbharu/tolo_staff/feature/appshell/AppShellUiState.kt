@@ -16,14 +16,7 @@ data class AppShellUiState(
 )
 
 val AppShellUiState.displayedSelectedTab: AppTab
-    get() = if (
-        contactsTab.selectedThreadBackDestination == ContactThreadBackDestination.REPORT_DETAIL &&
-        contactsTab.selectedThread != null
-    ) {
-        AppTab.REPORTS
-    } else {
-        selectedTab
-    }
+    get() = selectedTab
 
 private fun dev.usbharu.tolo_staff.streaming.CurrentStaffMember.toUiModel(): CurrentStaffUiModel =
     CurrentStaffUiModel(
