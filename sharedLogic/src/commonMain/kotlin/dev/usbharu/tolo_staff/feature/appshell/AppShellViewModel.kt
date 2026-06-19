@@ -22,6 +22,7 @@ import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepositoryImpl
 import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
 import dev.usbharu.tolo_staff.streaming.isUnknown
+import dev.usbharu.tolo_staff.streaming.relevantTo
 import dev.usbharu.tolo_staff.streaming.sortedOperationMessages
 import dev.usbharu.tolo_staff.viewmodel.StateEffectViewModel
 import kotlinx.coroutines.Dispatchers
@@ -195,7 +196,44 @@ class AppShellViewModel(
         }
     }
 
-    fun onInstructionStatusUpdated(status: InstructionProgressStatus) = Unit
+    fun onInstructionStatusUpdated(status: InstructionProgressStatus) {
+        val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
+        val nextStatusLabel = status.toLabel()
+        updateState { state ->
+            val updatedSelectedInstruction = selectedInstruction.copy(statusLabel = nextStatusLabel)
+            state.copy(
+                homeOverview = if (state.homeOverview.currentInstructionId == selectedInstruction.id) {
+                    state.homeOverview.copy(currentInstructionStatusLabel = nextStatusLabel)
+                } else {
+                    state.homeOverview
+                },
+                instructionsTab = state.instructionsTab.copy(
+                    selectedInstruction = updatedSelectedInstruction,
+                    instructions = state.instructionsTab.instructions.map { instruction ->
+                        if (instruction.id == selectedInstruction.id) {
+                            instruction.copy(statusLabel = nextStatusLabel)
+                        } else {
+                            instruction
+                        }
+                    },
+                    featuredInstruction = state.instructionsTab.featuredInstruction?.let { instruction ->
+                        if (instruction.id == selectedInstruction.id) {
+                            instruction.copy(statusLabel = nextStatusLabel)
+                        } else {
+                            instruction
+                        }
+                    },
+                    otherInstructions = state.instructionsTab.otherInstructions.map { instruction ->
+                        if (instruction.id == selectedInstruction.id) {
+                            instruction.copy(statusLabel = nextStatusLabel)
+                        } else {
+                            instruction
+                        }
+                    },
+                )
+            )
+        }
+    }
 
     fun onReportTypeSelected(typeId: String) {
         val reportType = currentState.reportsTab.reportTypes.firstOrNull { it.id == typeId } ?: return
@@ -277,7 +315,51 @@ class AppShellViewModel(
         }
     }
 
-    fun onReportSubmitted() = Unit
+    fun onReportSubmitted() {
+        val reportsTab = currentState.reportsTab
+        val selectedType = reportsTab.reportTypes.firstOrNull { it.id == reportsTab.draft.selectedTypeId } ?: return
+        val selectedPlace = reportsTab.availablePlaces.firstOrNull { it.id == reportsTab.draft.selectedPlaceId } ?: return
+        val submittedSummary = buildString {
+            append(selectedType.title)
+            if (reportsTab.draft.comment.isNotBlank()) {
+                append(": ")
+                append(reportsTab.draft.comment)
+            }
+            if (reportsTab.draft.urgencyLabel.isNotBlank()) {
+                append(" [")
+                append(reportsTab.draft.urgencyLabel)
+                append("]")
+            }
+        }
+        val threadId = "report-${selectedType.id}-${selectedPlace.id}"
+        val currentStaff = currentState.currentStaff
+
+        updateState { state ->
+            state.copy(
+                reportsTab = state.reportsTab.copy(
+                    step = ReportFlowStep.THREAD,
+                    submittedThread = ReportThreadUiModel(
+                        id = threadId,
+                        title = "${selectedType.title} / ${selectedPlace.displayName}",
+                        targetLabel = "本部 -> ${selectedPlace.displayName}",
+                        lastSubmittedSummary = submittedSummary,
+                        messages = listOf(
+                            ThreadMessageUiModel(
+                                id = "$threadId-message",
+                                senderName = currentStaff.displayName,
+                                senderRoleLabel = currentStaff.roleLabel,
+                                body = submittedSummary,
+                                isCurrentUser = true,
+                            )
+                        )
+                    )
+                ),
+                homeOverview = state.homeOverview.copy(
+                    pendingReportLabel = "最新報告: ${selectedType.title}"
+                ),
+            )
+        }
+    }
 
     fun onReportBack() {
         updateState { state ->
@@ -430,7 +512,7 @@ class AppShellViewModel(
             dataSource.observePoints(),
             dataSource.observeStaff(),
             dataSource.observeAssignments(),
-            dataSource.observeRelevantInstructions(currentStaffId),
+            dataSource.observeInstructions(),
             dataSource.observeThreads(),
             dataSource.observeMessages(currentStaffId),
         ) { values ->
@@ -483,6 +565,7 @@ class AppShellViewModel(
                             isShowingThread = state.instructionsTab.isShowingThread && selectedInstruction != null,
                         ),
                         reportsTab = state.reportsTab.copy(
+                            reportTypes = snapshot.reportTypes,
                             availablePlaces = snapshot.reportPlaces,
                             draft = state.reportsTab.draft.copy(
                                 selectedPlaceId = state.reportsTab.draft.selectedPlaceId?.takeIf { placeId ->
@@ -527,13 +610,17 @@ class AppShellViewModel(
         threads: List<OperationThread>,
         messages: List<OperationMessage>,
     ): AppShellSnapshot {
+        val relevantInstructions = instructions.relevantTo(
+            currentStaffId = currentStaffId,
+            assignments = assignments,
+        )
         val instructionModels = buildInstructionModels(
             currentStaffId = currentStaffId,
             currentStaff = currentStaff,
             points = points,
             staff = staff,
             assignments = assignments,
-            instructions = instructions,
+            instructions = relevantInstructions,
             threads = threads,
             messages = messages,
         )
@@ -549,14 +636,18 @@ class AppShellViewModel(
             currentInstructionUnreadCount = 0,
             unreadContactCount = contactModels.contactsTab.threads.sumOf { it.unreadCount },
         )
+        val instructionSummaries = instructionModels.instructionsTab.instructions.ifEmpty {
+            homeOverview.toFallbackInstructionSummary()?.let(::listOf).orEmpty()
+        }
         return AppShellSnapshot(
             homeOverview = homeOverview,
             currentPlacementName = projection.second,
             instructionsTab = instructionModels.instructionsTab.withInstructions(
-                instructions = instructionModels.instructionsTab.instructions,
+                instructions = instructionSummaries,
                 featuredInstructionId = homeOverview.currentInstructionId,
             ),
             contactsTab = contactModels.contactsTab,
+            reportTypes = defaultReportTypes(),
             reportPlaces = points.map { point ->
                 ContactTargetUiModel(
                     id = point.pointId,
@@ -751,6 +842,32 @@ class AppShellViewModel(
                 OperationInstructionStatus.ACTIVE -> "対応中"
             }
 
+        fun InstructionProgressStatus.toLabel(): String =
+            when (this) {
+                InstructionProgressStatus.UNCONFIRMED -> "未確認"
+                InstructionProgressStatus.ACKNOWLEDGED -> "了解"
+                InstructionProgressStatus.IN_PROGRESS -> "対応中"
+                InstructionProgressStatus.COMPLETED -> "完了"
+            }
+
+        fun defaultReportTypes(): List<ReportTypeUiModel> = listOf(
+            ReportTypeUiModel(
+                id = "queue",
+                title = "導線報告",
+                detailText = "入場列や人の流れ、混雑状況を本部へ共有します。",
+            ),
+            ReportTypeUiModel(
+                id = "incident",
+                title = "トラブル報告",
+                detailText = "来場者対応や設備異常など、即時共有が必要な事項を報告します。",
+            ),
+            ReportTypeUiModel(
+                id = "handover",
+                title = "引き継ぎ報告",
+                detailText = "次の担当者や本部へ、現場状況と注意点を引き継ぎます。",
+            ),
+        )
+
         fun OperationInstruction.toTarget(
             pointsById: Map<String, OperationPoint>,
             staffById: Map<String, OperationStaff>,
@@ -780,11 +897,29 @@ class AppShellViewModel(
     }
 }
 
+private fun AppShellHomeOverview.toFallbackInstructionSummary(): InstructionSummaryUiModel? {
+    if (currentInstruction.isBlank()) {
+        return null
+    }
+    return InstructionSummaryUiModel(
+        id = currentInstructionId ?: "home-overview-instruction",
+        title = currentInstructionTitle ?: "あなたへの指示",
+        targetName = currentInstructionTargetName ?: "",
+        priorityLabel = currentInstructionPriorityLabel ?: "",
+        statusLabel = currentInstructionStatusLabel ?: "",
+        preview = currentInstruction,
+        locationLabel = currentInstructionLocationLabel,
+        attachmentSummary = currentInstructionAttachmentSummary,
+        unreadCount = currentInstructionUnreadCount,
+    )
+}
+
 private data class AppShellSnapshot(
     val homeOverview: AppShellHomeOverview,
     val currentPlacementName: String,
     val instructionsTab: InstructionsTabUiState,
     val contactsTab: ContactsTabUiState,
+    val reportTypes: List<ReportTypeUiModel>,
     val reportPlaces: List<ContactTargetUiModel>,
     val instructionDetailsById: Map<String, InstructionDetailUiModel>,
     val contactDetailsById: Map<String, ContactThreadDetailUiModel>,

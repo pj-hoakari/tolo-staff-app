@@ -26,7 +26,7 @@ class OperationsOverviewRepositoryImpl(
         return combine(
             dataSource.observePoints(),
             dataSource.observeAssignments(),
-            dataSource.observeRelevantInstructions(currentStaffId),
+            dataSource.observeInstructions(),
         ) { points, assignments, instructions ->
             logger.debug {
                 "Building overview projection: currentStaffId=$currentStaffId, points=${points.size}, assignments=${assignments.size}, instructions=${instructions.size}"
@@ -46,6 +46,10 @@ class OperationsOverviewRepositoryImpl(
         assignments: List<OperationAssignment>,
         instructions: List<OperationInstruction>,
     ): AppShellOperationsProjection {
+        val relevantInstructions = instructions.relevantTo(
+            currentStaffId = currentStaffId,
+            assignments = assignments,
+        )
         val currentAssignment = assignments
             .filter { it.staffId == currentStaffId }
             .sortedBy { it.status.priority }
@@ -53,11 +57,8 @@ class OperationsOverviewRepositoryImpl(
         val currentPoint = currentAssignment?.pointId?.let { pointId ->
             points.firstOrNull { it.pointId == pointId }
         }
-        val activeInstruction = instructions
+        val activeInstruction = relevantInstructions
             .filter { it.status == OperationInstructionStatus.ACTIVE }
-            .filter { instruction ->
-                currentPoint?.pointId in instruction.pointIds || currentStaffId in instruction.staffIds
-            }
             .maxWithOrNull(
                 compareBy<OperationInstruction> { it.updatedAt }
                     .thenBy { it.instructionId }
@@ -101,4 +102,20 @@ class OperationsOverviewRepositoryImpl(
             OperationAssignmentStatus.EN_ROUTE -> 1
             OperationAssignmentStatus.PENDING -> 2
         }
+}
+
+internal fun List<OperationInstruction>.relevantTo(
+    currentStaffId: String,
+    assignments: List<OperationAssignment>,
+): List<OperationInstruction> {
+    val assignedPointIds = assignments
+        .asSequence()
+        .filter { it.staffId == currentStaffId }
+        .map { it.pointId }
+        .toSet()
+
+    return filter { instruction ->
+        currentStaffId in instruction.staffIds ||
+            instruction.pointIds.any(assignedPointIds::contains)
+    }
 }

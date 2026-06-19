@@ -6,7 +6,7 @@ import SharedLogic
 
 final class SampleViewTests: XCTestCase {
     func testAppShellContentViewCanBeCreated() {
-        let state = AppShellUiState(selectedTab: AppTab.home)
+        let state = makeAppShellState(selectedTab: AppTab.home)
 
         let view = AppShellContentView(state: state)
 
@@ -14,17 +14,61 @@ final class SampleViewTests: XCTestCase {
     }
 
     func testInstructionsTabCanBeCreated() {
-        let state = AppShellUiState(selectedTab: AppTab.instructions)
+        let featuredInstruction = InstructionSummaryUiModel(
+            id: "instruction-gate-a",
+            title: "Aゲート前の列を右側へ誘導",
+            targetName: "Aゲート担当",
+            priorityLabel: "高",
+            statusLabel: "対応中",
+            preview: "来場者導線を確保し、右側へ寄せてください。",
+            locationLabel: nil,
+            attachmentSummary: nil,
+            unreadCount: 1
+        )
+        let state = makeAppShellState(
+            selectedTab: AppTab.instructions,
+            homeOverview: AppShellHomeOverview(
+                eventName: "Tolo Staff Demo 2026",
+                eventTime: "Firestore Streaming Demo",
+                placementName: "Gate A",
+                placementDetail: "North entrance",
+                currentInstruction: featuredInstruction.preview,
+                currentInstructionTitle: featuredInstruction.title,
+                currentInstructionTargetName: featuredInstruction.targetName,
+                currentInstructionPriorityLabel: featuredInstruction.priorityLabel,
+                currentInstructionStatusLabel: featuredInstruction.statusLabel,
+                currentInstructionLocationLabel: nil,
+                currentInstructionAttachmentSummary: nil,
+                currentInstructionUnreadCount: Int32(featuredInstruction.unreadCount),
+                mapState: AppShellMapState(
+                    venueName: "Gate A",
+                    latitude: 35.0,
+                    longitude: 139.0,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01
+                ),
+                currentInstructionId: featuredInstruction.id,
+                unreadContactCount: 0,
+                pendingReportLabel: ""
+            ),
+            instructionsTab: InstructionsTabUiState(
+                instructions: [featuredInstruction],
+                featuredInstruction: featuredInstruction,
+                otherInstructions: [],
+                selectedInstruction: nil,
+                isShowingThread: false
+            )
+        )
 
         let view = AppShellContentView(state: state)
 
         XCTAssertNotNil(view)
-        XCTAssertNil(state.instructionsTab.featuredInstruction)
+        XCTAssertEqual(state.instructionsTab.featuredInstruction?.id, "instruction-gate-a")
         XCTAssertEqual(state.instructionsTab.otherInstructions.count, 0)
     }
 
     func testReportsTabCanBeCreated() {
-        let state = AppShellUiState(selectedTab: AppTab.reports)
+        let state = makeAppShellState(selectedTab: AppTab.reports)
 
         let view = AppShellContentView(state: state)
 
@@ -32,7 +76,7 @@ final class SampleViewTests: XCTestCase {
     }
 
     func testContactsTabCanBeCreated() {
-        let state = AppShellUiState(selectedTab: AppTab.contacts)
+        let state = makeAppShellState(selectedTab: AppTab.contacts)
 
         let view = AppShellContentView(state: state)
 
@@ -40,7 +84,7 @@ final class SampleViewTests: XCTestCase {
     }
 
     func disabled_testAppShellContentSnapshotSmoke() {
-        let state = AppShellUiState(selectedTab: AppTab.home)
+        let state = makeAppShellState(selectedTab: AppTab.home)
 
         assertSnapshot(
             of: AppShellContentView(state: state).frame(width: 390, height: 844),
@@ -72,6 +116,85 @@ final class SampleViewTests: XCTestCase {
             of: SampleContentView(state: state).frame(width: 390, height: 844),
             as: .image(layout: .fixed(width: 390, height: 844)),
             record: true
+        )
+    }
+
+    private func makeAppShellState(
+        selectedTab: AppTab,
+        homeOverview: AppShellHomeOverview? = nil,
+        instructionsTab: InstructionsTabUiState? = nil
+    ) -> AppShellUiState {
+        let overview = homeOverview ?? AppShellHomeOverview(
+            eventName: "Tolo Staff Demo 2026",
+            eventTime: "Firestore Streaming Demo",
+            placementName: "Gate A",
+            placementDetail: "North entrance",
+            currentInstruction: "Shift update: Move barricades",
+            currentInstructionTitle: "Shift update",
+            currentInstructionTargetName: "Gate A",
+            currentInstructionPriorityLabel: "高",
+            currentInstructionStatusLabel: "対応中",
+            currentInstructionLocationLabel: nil,
+            currentInstructionAttachmentSummary: nil,
+            currentInstructionUnreadCount: 1,
+            mapState: AppShellMapState(
+                venueName: "Gate A",
+                latitude: 35.0,
+                longitude: 139.0,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01
+            ),
+            currentInstructionId: "instruction-gate-a",
+            unreadContactCount: 0,
+            pendingReportLabel: ""
+        )
+
+        let currentStaff = CurrentStaffUiModel(
+            staffId: "tanaka",
+            displayName: "田中",
+            roleLabel: "Aゲート担当"
+        )
+
+        return AppShellUiState(
+            homeOverview: overview,
+            currentPlacementName: overview.placementName,
+            currentStaff: currentStaff,
+            availableStaff: [currentStaff],
+            selectedTab: selectedTab,
+            instructionsTab: instructionsTab ?? InstructionsTabUiState(
+                instructions: [],
+                featuredInstruction: nil,
+                otherInstructions: [],
+                selectedInstruction: nil,
+                isShowingThread: false
+            ),
+            reportsTab: ReportsTabUiState(
+                reportTypes: [],
+                availablePlaces: [],
+                draft: ReportDraftUiModel(
+                    selectedTypeId: nil,
+                    templateText: "",
+                    comment: "",
+                    selectedPlaceId: nil,
+                    selectedPlaceName: nil,
+                    urgencyLabel: "",
+                    includesImage: false,
+                    includesLocation: false
+                ),
+                step: .typeSelection,
+                submittedThread: nil
+            ),
+            contactsTab: ContactsTabUiState(
+                threads: [],
+                selectedThread: nil,
+                availableTargets: [],
+                selectedTargetType: nil,
+                isChoosingTargetType: false,
+                formerAssignments: [],
+                shouldReturnToInstructionOnBack: false
+            ),
+            isLoading: false,
+            errorMessage: nil
         )
     }
 }

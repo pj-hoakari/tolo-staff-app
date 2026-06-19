@@ -56,6 +56,62 @@ class OperationsOverviewRepositoryTest {
         assertEquals("Shift update: Move barricades", projection.homeOverview.currentInstruction)
         assertEquals("inst-1", projection.homeOverview.currentInstructionId)
     }
+
+    @Test
+    fun `relevant instructions include assigned area and direct mention only`() {
+        val assignments = listOf(
+            OperationAssignment(
+                updatedAt = "",
+                reason = "assignment.updated",
+                entityId = "assign-1",
+                assignId = "assign-1",
+                pointId = "gate-a",
+                staffId = "tanaka",
+                status = OperationAssignmentStatus.ACTIVE
+            )
+        )
+        val instructions = listOf(
+            OperationInstruction(
+                updatedAt = "",
+                reason = "instruction.updated",
+                entityId = "inst-area",
+                instructionId = "inst-area",
+                pointIds = listOf("gate-a"),
+                staffIds = emptyList(),
+                title = "Area",
+                description = "",
+                status = OperationInstructionStatus.ACTIVE
+            ),
+            OperationInstruction(
+                updatedAt = "",
+                reason = "instruction.updated",
+                entityId = "inst-direct",
+                instructionId = "inst-direct",
+                pointIds = emptyList(),
+                staffIds = listOf("tanaka"),
+                title = "Direct",
+                description = "",
+                status = OperationInstructionStatus.ACTIVE
+            ),
+            OperationInstruction(
+                updatedAt = "",
+                reason = "instruction.updated",
+                entityId = "inst-other",
+                instructionId = "inst-other",
+                pointIds = listOf("gate-b"),
+                staffIds = listOf("sato"),
+                title = "Other",
+                description = "",
+                status = OperationInstructionStatus.ACTIVE
+            )
+        )
+
+        val relevantIds = instructions
+            .relevantTo(currentStaffId = "tanaka", assignments = assignments)
+            .map { it.instructionId }
+
+        assertEquals(listOf("inst-area", "inst-direct"), relevantIds)
+    }
 }
 
 private class FakeOperationsStreamDataSource(

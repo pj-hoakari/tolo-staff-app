@@ -2,6 +2,7 @@ import XCTest
 
 final class SampleScenarioTests: XCTestCase {
     private let app = XCUIApplication()
+    private var screenshotCounter = 0
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -23,8 +24,8 @@ final class SampleScenarioTests: XCTestCase {
 
         tabBarButtons.element(boundBy: 1).tap()
         XCTAssertTrue(app.descendants(matching: .any)["featured_instruction_card"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.descendants(matching: .any)["instruction_row_instruction-patrol"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["instruction_other_list"].waitForExistence(timeout: 3))
+        attachScreenshot(name: "instructions-tab")
 
         tabBarButtons.element(boundBy: 2).tap()
         XCTAssertTrue(app.descendants(matching: .any)["report_type_queue"].waitForExistence(timeout: 3))
@@ -34,5 +35,13 @@ final class SampleScenarioTests: XCTestCase {
 
         tabBarButtons.element(boundBy: 0).tap()
         XCTAssertTrue(app.descendants(matching: .any)["app_shell_home_event_card"].waitForExistence(timeout: 3))
+    }
+
+    private func attachScreenshot(name: String) {
+        screenshotCounter += 1
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "\(screenshotCounter)-\(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

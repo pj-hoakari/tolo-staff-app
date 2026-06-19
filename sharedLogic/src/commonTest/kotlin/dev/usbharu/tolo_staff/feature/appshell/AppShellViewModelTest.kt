@@ -61,9 +61,9 @@ class AppShellViewModelTest {
         assertEquals("Shift update: Move barricades", viewModel.uiState.value.homeOverview.currentInstruction)
         assertEquals("instruction-gate-a", viewModel.uiState.value.homeOverview.currentInstructionId)
         assertEquals(null, viewModel.uiState.value.instructionsTab.selectedInstruction)
-        assertEquals(null, viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
+        assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
         assertEquals(emptyList(), viewModel.uiState.value.instructionsTab.otherInstructions.map { it.id })
-        assertEquals(0, viewModel.uiState.value.reportsTab.reportTypes.size)
+        assertEquals(3, viewModel.uiState.value.reportsTab.reportTypes.size)
         assertEquals(0, viewModel.uiState.value.contactsTab.threads.size)
         assertEquals(AppTab.HOME, viewModel.uiState.value.selectedTab)
         assertEquals(false, viewModel.uiState.value.isLoading)
@@ -130,7 +130,7 @@ class AppShellViewModelTest {
             coroutineContext = dispatcher
         )
 
-        assertEquals(null, viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
+        assertEquals("missing-id", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
         assertEquals(emptyList(), viewModel.uiState.value.instructionsTab.otherInstructions.map { it.id })
 
         viewModel.clear()
@@ -171,22 +171,96 @@ class AppShellViewModelTest {
     }
 
     @Test
-    fun `report flow stays inactive without dynamic report metadata`() = runTest {
+    fun `report flow progresses to submitted thread`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            points = listOf(
+                OperationPoint(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "gate-a",
+                    pointId = "gate-a",
+                    name = "Gate A",
+                    description = "North entrance",
+                )
+            )
+        )
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
             currentStaffSession = createSession(dispatcher),
             coroutineContext = dispatcher
         )
 
         viewModel.onReportTypeSelected("queue")
         viewModel.onReportCommentChanged("最後尾が歩道へ伸びています")
+        viewModel.onReportUrgencySelected("高")
         viewModel.onReportContinueToPlaceSelection()
+        viewModel.onReportPlaceSelected("gate-a")
         viewModel.onReportSubmitted()
 
-        assertEquals(ReportFlowStep.TYPE_SELECTION, viewModel.uiState.value.reportsTab.step)
-        assertEquals(null, viewModel.uiState.value.reportsTab.draft.selectedPlaceName)
-        assertEquals(null, viewModel.uiState.value.reportsTab.submittedThread)
+        assertEquals(ReportFlowStep.THREAD, viewModel.uiState.value.reportsTab.step)
+        assertEquals("Gate A", viewModel.uiState.value.reportsTab.draft.selectedPlaceName)
+        assertEquals("導線報告 / Gate A", viewModel.uiState.value.reportsTab.submittedThread?.title)
+        assertEquals(
+            "導線報告: 最後尾が歩道へ伸びています [高]",
+            viewModel.uiState.value.reportsTab.submittedThread?.lastSubmittedSummary
+        )
+        viewModel.clear()
+    }
+
+    @Test
+    fun `instruction status update is reflected in selected and featured instruction`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            points = listOf(
+                OperationPoint(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "gate-a",
+                    pointId = "gate-a",
+                    name = "Gate A",
+                    description = "North entrance",
+                )
+            ),
+            instructions = listOf(
+                OperationInstruction(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "instruction-gate-a",
+                    instructionId = "instruction-gate-a",
+                    title = "Shift update",
+                    description = "Move barricades",
+                    pointIds = listOf("gate-a"),
+                    staffIds = listOf("tanaka"),
+                    status = dev.usbharu.tolo_staff.streaming.OperationInstructionStatus.ACTIVE,
+                )
+            )
+        )
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        currentInstruction = "Move barricades",
+                        currentInstructionId = "instruction-gate-a",
+                    ),
+                    currentPlacementName = "Gate A"
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            dataSource = dataSource,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onInstructionSelected("instruction-gate-a")
+        viewModel.onInstructionStatusUpdated(InstructionProgressStatus.COMPLETED)
+
+        assertEquals("完了", viewModel.uiState.value.instructionsTab.selectedInstruction?.statusLabel)
+        assertEquals("完了", viewModel.uiState.value.instructionsTab.featuredInstruction?.statusLabel)
+        assertEquals("完了", viewModel.uiState.value.homeOverview.currentInstructionStatusLabel)
         viewModel.clear()
     }
 
@@ -380,7 +454,7 @@ class AppShellViewModelTest {
         assertEquals("佐藤", viewModel.uiState.value.currentStaff.displayName)
         assertEquals("Patrol", viewModel.uiState.value.currentPlacementName)
         assertEquals("Sato instruction", viewModel.uiState.value.homeOverview.currentInstruction)
-        assertEquals(null, viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
+        assertEquals("home-overview-instruction", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
         assertEquals(null, viewModel.uiState.value.instructionsTab.selectedInstruction)
 
         viewModel.clear()
