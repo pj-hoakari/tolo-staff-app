@@ -53,6 +53,8 @@ class OperationsOverviewRepositoryTest {
         val projection = repository.observeOverview("tanaka").first()
 
         assertEquals("Gate A", projection.currentPlacementName)
+        assertEquals("assign-1", projection.currentAssignmentId)
+        assertEquals(OperationAssignmentStatus.ACTIVE, projection.currentAssignmentStatus)
         assertEquals("North entrance", projection.homeOverview.placementDetail)
         assertEquals("Shift update: Move barricades", projection.homeOverview.currentInstruction)
         assertEquals("inst-1", projection.homeOverview.currentInstructionId)

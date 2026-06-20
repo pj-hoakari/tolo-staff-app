@@ -49,7 +49,8 @@ final class SampleViewTests: XCTestCase {
                 ),
                 currentInstructionId: featuredInstruction.id,
                 unreadContactCount: 0,
-                pendingReportLabel: ""
+                pendingReportLabel: "",
+                placementStatus: makePlacementStatus(placementName: "Gate A", phase: .active)
             ),
             instructionsTab: InstructionsTabUiState(
                 instructions: [featuredInstruction],
@@ -106,6 +107,22 @@ final class SampleViewTests: XCTestCase {
         let view = AppShellContentView(state: state)
 
         XCTAssertNotNil(view)
+    }
+
+    func testPlacementBarCanBeCreatedForEachPhase() {
+        let pending = PlacementBar(
+            placementStatus: makePlacementStatus(placementName: "Gate A", phase: .pendingChange)
+        )
+        let enRoute = PlacementBar(
+            placementStatus: makePlacementStatus(placementName: "Gate B", phase: .enRoute)
+        )
+        let active = PlacementBar(
+            placementStatus: makePlacementStatus(placementName: "Gate C", phase: .active)
+        )
+
+        XCTAssertNotNil(pending)
+        XCTAssertNotNil(enRoute)
+        XCTAssertNotNil(active)
     }
 
     func testContactsThreadWithRichReportMessageCanBeCreated() {
@@ -225,7 +242,8 @@ final class SampleViewTests: XCTestCase {
             ),
             currentInstructionId: "instruction-gate-a",
             unreadContactCount: 0,
-            pendingReportLabel: ""
+            pendingReportLabel: "",
+            placementStatus: makePlacementStatus(placementName: "Gate A", phase: .active)
         )
 
         let currentStaff = CurrentStaffUiModel(
@@ -279,5 +297,49 @@ final class SampleViewTests: XCTestCase {
             isLoading: false,
             errorMessage: nil
         )
+    }
+
+    private func makePlacementStatus(
+        placementName: String,
+        phase: PlacementPhase
+    ) -> PlacementStatusUiModel {
+        switch phase {
+        case .pendingChange:
+            return PlacementStatusUiModel(
+                assignId: "assign-\(placementName)",
+                placementName: placementName,
+                phase: phase,
+                headline: "配置が変更されました",
+                buttonLabel: "確認しました",
+                showsActionButton: true
+            )
+        case .enRoute:
+            return PlacementStatusUiModel(
+                assignId: "assign-\(placementName)",
+                placementName: placementName,
+                phase: phase,
+                headline: "「\(placementName)」へ移動中",
+                buttonLabel: "到着",
+                showsActionButton: true
+            )
+        case .active:
+            return PlacementStatusUiModel(
+                assignId: "assign-\(placementName)",
+                placementName: placementName,
+                phase: phase,
+                headline: "現在の配置",
+                buttonLabel: nil,
+                showsActionButton: false
+            )
+        default:
+            return PlacementStatusUiModel(
+                assignId: "assign-\(placementName)",
+                placementName: placementName,
+                phase: .active,
+                headline: "現在の配置",
+                buttonLabel: nil,
+                showsActionButton: false
+            )
+        }
     }
 }

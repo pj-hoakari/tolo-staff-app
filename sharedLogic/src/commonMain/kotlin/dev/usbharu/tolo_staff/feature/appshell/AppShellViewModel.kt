@@ -12,6 +12,7 @@ import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.NoOpOperationsStreamDataSource
 import dev.usbharu.tolo_staff.streaming.OperationAssignment
+import dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus
 import dev.usbharu.tolo_staff.streaming.OperationInstruction
 import dev.usbharu.tolo_staff.streaming.OperationInstructionStatus
 import dev.usbharu.tolo_staff.streaming.OperationMessage
@@ -42,6 +43,7 @@ class AppShellViewModel(
     private val contactChatService: ContactChatService = NoOpContactChatService(),
     private val currentStaffSession: CurrentStaffSession = MockCurrentStaffSession(),
     private val reportRepository: ReportRepository = NoOpReportRepository(),
+    private val assignmentStatusService: AssignmentStatusService = NoOpAssignmentStatusService(),
     coroutineContext: CoroutineContext = Dispatchers.Default
 ) : StateEffectViewModel<AppShellUiState, Unit>(
     initialState = initialState(
@@ -61,6 +63,8 @@ class AppShellViewModel(
     private var instructionThreadIdsByInstructionId: Map<String, String> = emptyMap()
     private var localCreatedReports: List<RelatedReportUiModel> = emptyList()
     private var localCreatedContactThreads: Map<String, ContactThreadDetailUiModel> = emptyMap()
+    private var placementPhaseOverridesByAssignId: Map<String, PlacementPhase> = emptyMap()
+    private var lastObservedPlacementAssignId: String? = null
 
     init {
         staffSessionJob = combine(
@@ -126,6 +130,8 @@ class AppShellViewModel(
                 if (didChange || readinessChanged) {
                     localCreatedReports = emptyList()
                     localCreatedContactThreads = emptyMap()
+                    placementPhaseOverridesByAssignId = emptyMap()
+                    lastObservedPlacementAssignId = null
                     logger.info {
                         "Refreshing overview observation: staffId=${currentStaff.staffId}, readinessChanged=$readinessChanged"
                     }
@@ -153,6 +159,14 @@ class AppShellViewModel(
             ?: return
         onInstructionSelected(selectedInstructionId)
         updateState { it.copy(selectedTab = AppTab.INSTRUCTIONS) }
+    }
+
+    fun onPlacementChangeConfirmed() {
+        advancePlacementPhase(PlacementPhase.EN_ROUTE)
+    }
+
+    fun onPlacementArrivalConfirmed() {
+        advancePlacementPhase(PlacementPhase.ACTIVE)
     }
 
     fun onInstructionSelected(instructionId: String) {
@@ -736,7 +750,7 @@ class AppShellViewModel(
                 val snapshot = buildSnapshot(
                     currentStaffId = currentStaffId,
                     currentStaff = currentState.currentStaff,
-                    projection = projection.homeOverview to projection.currentPlacementName,
+                    projection = projection,
                     points = points,
                     staff = staff,
                     assignments = assignments,
@@ -831,7 +845,7 @@ class AppShellViewModel(
     private fun buildSnapshot(
         currentStaffId: String,
         currentStaff: CurrentStaffUiModel,
-        projection: Pair<AppShellHomeOverview, String>,
+        projection: dev.usbharu.tolo_staff.streaming.AppShellOperationsProjection,
         points: List<OperationPoint>,
         staff: List<OperationStaff>,
         assignments: List<OperationAssignment>,
@@ -861,7 +875,8 @@ class AppShellViewModel(
             threads = threads,
             messages = messages,
         )
-        val homeOverview = projection.first.copy(
+        val homeOverview = projection.homeOverview.copy(
+            placementStatus = resolvePlacementStatus(projection),
             currentInstructionUnreadCount = 0,
             unreadContactCount = contactModels.contactsTab.threads.sumOf { it.unreadCount },
         )
@@ -870,7 +885,7 @@ class AppShellViewModel(
         }
         return AppShellSnapshot(
             homeOverview = homeOverview,
-            currentPlacementName = projection.second,
+            currentPlacementName = projection.currentPlacementName,
             instructionsTab = instructionModels.instructionsTab.withInstructions(
                 instructions = instructionSummaries,
                 featuredInstructionId = homeOverview.currentInstructionId,
@@ -888,6 +903,78 @@ class AppShellViewModel(
             instructionDetailsById = instructionModels.detailsById,
             contactDetailsById = contactModels.detailsById,
             instructionThreadIdsByInstructionId = instructionModels.threadIdByInstructionId,
+        )
+    }
+
+    private fun advancePlacementPhase(targetPhase: PlacementPhase) {
+        val placementStatus = currentState.homeOverview.placementStatus
+        val assignId = placementStatus.assignId ?: return
+        if (placementStatus.phase.priority >= targetPhase.priority) {
+            return
+        }
+        placementPhaseOverridesByAssignId = placementPhaseOverridesByAssignId + (assignId to targetPhase)
+        updateState { state ->
+            state.copy(
+                homeOverview = state.homeOverview.copy(
+                    placementStatus = placementStatusFor(
+                        assignId = assignId,
+                        placementName = placementStatus.placementName,
+                        phase = targetPhase,
+                    )
+                ),
+                errorMessage = null,
+            )
+        }
+
+        val targetStatus = targetPhase.toOperationAssignmentStatus()
+        viewModelScope.launch {
+            runCatching { assignmentStatusService.updateStatus(assignId, targetStatus) }
+                .onFailure { throwable ->
+                    logger.warn(throwable) {
+                        "Failed to update assignment status: assignId=$assignId, targetStatus=$targetStatus"
+                    }
+                    updateState { state ->
+                        state.copy(
+                            errorMessage = throwable.message ?: "配置ステータスの更新に失敗しました",
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun resolvePlacementStatus(
+        projection: dev.usbharu.tolo_staff.streaming.AppShellOperationsProjection,
+    ): PlacementStatusUiModel {
+        val assignId = projection.currentAssignmentId
+        val placementName = projection.currentPlacementName
+        if (assignId != lastObservedPlacementAssignId) {
+            placementPhaseOverridesByAssignId = placementPhaseOverridesByAssignId
+                .filterKeys { it == assignId }
+            lastObservedPlacementAssignId = assignId
+        }
+        val serverPhase = projection.currentAssignmentStatus?.toPlacementPhase() ?: PlacementPhase.ACTIVE
+        if (assignId == null) {
+            placementPhaseOverridesByAssignId = emptyMap()
+            return placementStatusFor(
+                assignId = null,
+                placementName = placementName,
+                phase = serverPhase,
+            )
+        }
+        val overridePhase = placementPhaseOverridesByAssignId[assignId]
+        val effectivePhase = when {
+            overridePhase == null -> serverPhase
+            overridePhase.priority <= serverPhase.priority -> {
+                placementPhaseOverridesByAssignId = placementPhaseOverridesByAssignId - assignId
+                serverPhase
+            }
+
+            else -> overridePhase
+        }
+        return placementStatusFor(
+            assignId = assignId,
+            placementName = placementName,
+            phase = effectivePhase,
         )
     }
 
@@ -1125,6 +1212,13 @@ class AppShellViewModel(
         }
     }
 }
+
+private val PlacementPhase.priority: Int
+    get() = when (this) {
+        PlacementPhase.PENDING_CHANGE -> 0
+        PlacementPhase.EN_ROUTE -> 1
+        PlacementPhase.ACTIVE -> 2
+    }
 
 private fun mergeLocalContactThreads(
     baseThreads: List<ContactThreadSummaryUiModel>,

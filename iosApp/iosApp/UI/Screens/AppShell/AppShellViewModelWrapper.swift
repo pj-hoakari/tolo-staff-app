@@ -30,6 +30,14 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onHomeInstructionSelected()
     }
 
+    func onPlacementChangeConfirmed() {
+        viewModel.onPlacementChangeConfirmed()
+    }
+
+    func onPlacementArrivalConfirmed() {
+        viewModel.onPlacementArrivalConfirmed()
+    }
+
     func onInstructionSelected(_ instructionId: String) {
         viewModel.onInstructionSelected(instructionId: instructionId)
     }

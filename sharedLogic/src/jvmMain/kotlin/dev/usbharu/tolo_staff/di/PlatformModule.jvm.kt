@@ -1,5 +1,7 @@
 package dev.usbharu.tolo_staff.di
 
+import dev.usbharu.tolo_staff.feature.appshell.AssignmentStatusService
+import dev.usbharu.tolo_staff.feature.appshell.NoOpAssignmentStatusService
 import dev.usbharu.tolo_staff.feature.appshell.NoOpReportRepository
 import dev.usbharu.tolo_staff.feature.appshell.ReportRepository
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
@@ -16,4 +18,5 @@ actual fun platformModule(): Module = module {
     single<OperationsStreamDataSource> { NoOpOperationsStreamDataSource() }
     single<ContactChatService> { NoOpContactChatService() }
     single<ReportRepository> { NoOpReportRepository() }
+    single<AssignmentStatusService> { NoOpAssignmentStatusService() }
 }

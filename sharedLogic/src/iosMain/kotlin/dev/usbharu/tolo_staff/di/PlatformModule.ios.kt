@@ -1,5 +1,7 @@
 package dev.usbharu.tolo_staff.di
 
+import dev.usbharu.tolo_staff.feature.appshell.AssignmentStatusService
+import dev.usbharu.tolo_staff.feature.appshell.GrpcAssignmentStatusService
 import dev.usbharu.tolo_staff.feature.appshell.GrpcReportRepository
 import dev.usbharu.tolo_staff.feature.appshell.ReportRepository
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
@@ -23,6 +25,7 @@ actual fun platformModule(): Module = module {
         GrpcCommunicationClient(host = config.host, port = config.port)
     }
     single<ReportRepository> { GrpcReportRepository(grpcClient = get()) }
+    single<AssignmentStatusService> { GrpcAssignmentStatusService(grpcClient = get()) }
     single<OperationsPollingRemoteDataSource> { GrpcOperationsPollingRemoteDataSource(grpcClient = get()) }
     single<OperationsStreamDataSource> {
         check(get<OperationsReadMode>() == OperationsReadMode.POLLING)

@@ -13,6 +13,8 @@ struct AppShellScreen: View {
             state: wrapper.state,
             onTabSelected: wrapper.onTabSelected,
             onHomeInstructionSelected: wrapper.onHomeInstructionSelected,
+            onPlacementChangeConfirmed: wrapper.onPlacementChangeConfirmed,
+            onPlacementArrivalConfirmed: wrapper.onPlacementArrivalConfirmed,
             onOpenReportFromHome: { wrapper.onTabSelected(.reports) },
             onOpenContactsFromHome: { wrapper.onTabSelected(.contacts) },
             onInstructionSelected: wrapper.onInstructionSelected,
@@ -47,6 +49,8 @@ struct AppShellContentView: View {
     let state: AppShellUiState
     var onTabSelected: (AppTab) -> Void = { _ in }
     var onHomeInstructionSelected: () -> Void = {}
+    var onPlacementChangeConfirmed: () -> Void = {}
+    var onPlacementArrivalConfirmed: () -> Void = {}
     var onOpenReportFromHome: () -> Void = {}
     var onOpenContactsFromHome: () -> Void = {}
     var onInstructionSelected: (String) -> Void = { _ in }
@@ -85,13 +89,21 @@ struct AppShellContentView: View {
         if #available(iOS 26.1, *) {
             tabs
                 .tabViewBottomAccessory(isEnabled: displayedSelectedTab != AppTab.contacts) {
-                    PlacementBar(placementName: state.currentPlacementName)
+                    PlacementBar(
+                        placementStatus: state.homeOverview.placementStatus,
+                        onPlacementChangeConfirmed: onPlacementChangeConfirmed,
+                        onPlacementArrivalConfirmed: onPlacementArrivalConfirmed
+                    )
                 }
         } else if #available(iOS 26.0, *) {
             tabs
                 .tabViewBottomAccessory {
                     if displayedSelectedTab != AppTab.contacts {
-                        PlacementBar(placementName: state.currentPlacementName)
+                        PlacementBar(
+                            placementStatus: state.homeOverview.placementStatus,
+                            onPlacementChangeConfirmed: onPlacementChangeConfirmed,
+                            onPlacementArrivalConfirmed: onPlacementArrivalConfirmed
+                        )
                     }
                 }
         } else {
@@ -179,17 +191,177 @@ struct AppShellContentView: View {
 }
 
 struct PlacementBar: View {
-    let placementName: String
+    let placementStatus: PlacementStatusUiModel
+    var onPlacementChangeConfirmed: () -> Void = {}
+    var onPlacementArrivalConfirmed: () -> Void = {}
 
     var body: some View {
-        LabeledContent("app_shell_placement_header") {
-            Text(placementName)
-                .fontWeight(.semibold)
-                .accessibilityIdentifier("app_shell_placement_name")
+        HStack(spacing: 12) {
+            Image(systemName: symbolName)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(iconColor)
+                .symbolEffect(.bounce, value: placementStatus.phase)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(placementStatus.headline)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                if placementStatus.phase == .active {
+                    Text(placementStatus.placementName)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("app_shell_placement_name")
+                } else {
+                    Text(placementStatus.placementName)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("app_shell_placement_name")
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            if placementStatus.showsActionButton, let buttonLabel = placementStatus.buttonLabel {
+                Button(action: handleButtonTap) {
+                    Label(buttonLabel, systemImage: buttonSymbolName)
+                        .font(.footnote.weight(.semibold))
+                }
+                .buttonStyle(PlacementActionButtonStyle(phase: placementStatus.phase))
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .opacity
+                    )
+                )
+            }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 10)
-        .background(.bar)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(backgroundStyle)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(borderColor)
+                .frame(height: 1)
+        }
+        .contentShape(Rectangle())
+        .id("\(placementStatus.assignId ?? "none")-\(placementStatus.phase)")
+        .transition(
+            .asymmetric(
+                insertion: .move(edge: .bottom).combined(with: .opacity),
+                removal: .opacity
+            )
+        )
+        .animation(.spring(duration: 0.45, bounce: 0.14), value: placementStatus.phase)
+    }
+
+    private var symbolName: String {
+        switch placementStatus.phase {
+        case .pendingChange:
+            return "bell.badge"
+        case .enRoute:
+            return "figure.walk.motion"
+        case .active:
+            return "mappin.circle.fill"
+        default:
+            return "mappin.circle.fill"
+        }
+    }
+
+    private var buttonSymbolName: String {
+        switch placementStatus.phase {
+        case .pendingChange:
+            return "checkmark.circle.fill"
+        case .enRoute:
+            return "flag.checkered.circle.fill"
+        case .active:
+            return "checkmark.circle.fill"
+        default:
+            return "checkmark.circle.fill"
+        }
+    }
+
+    private var iconColor: Color {
+        switch placementStatus.phase {
+        case .pendingChange:
+            return Color.orange
+        case .enRoute:
+            return Color.accentColor
+        case .active:
+            return Color.accentColor
+        default:
+            return Color.accentColor
+        }
+    }
+
+    private var backgroundStyle: AnyShapeStyle {
+        switch placementStatus.phase {
+        case .pendingChange:
+            return AnyShapeStyle(Color.orange.opacity(0.16))
+        case .enRoute:
+            return AnyShapeStyle(Color.accentColor.opacity(0.14))
+        case .active:
+            return AnyShapeStyle(Color.clear)
+        default:
+            return AnyShapeStyle(Color.clear)
+        }
+    }
+
+    private var borderColor: Color {
+        switch placementStatus.phase {
+        case .pendingChange:
+            return Color.orange.opacity(0.18)
+        case .enRoute:
+            return Color.accentColor.opacity(0.16)
+        case .active:
+            return Color.primary.opacity(0.08)
+        default:
+            return Color.primary.opacity(0.08)
+        }
+    }
+
+    private func handleButtonTap() {
+        switch placementStatus.phase {
+        case .pendingChange:
+            onPlacementChangeConfirmed()
+        case .enRoute:
+            onPlacementArrivalConfirmed()
+        case .active:
+            break
+        default:
+            break
+        }
+    }
+}
+
+private struct PlacementActionButtonStyle: ButtonStyle {
+    let phase: PlacementPhase
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(buttonBackground, in: Capsule())
+            .foregroundStyle(buttonForeground)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.spring(duration: 0.22, bounce: 0.28), value: configuration.isPressed)
+    }
+
+    private var buttonBackground: Color {
+        switch phase {
+        case .pendingChange:
+            return Color.orange
+        case .enRoute:
+            return Color.accentColor
+        case .active:
+            return Color.accentColor
+        default:
+            return Color.accentColor
+        }
+    }
+
+    private var buttonForeground: Color {
+        Color.white
     }
 }
 

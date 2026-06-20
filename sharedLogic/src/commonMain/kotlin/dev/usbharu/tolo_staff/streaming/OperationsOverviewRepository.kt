@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.combine
 data class AppShellOperationsProjection(
     val homeOverview: AppShellHomeOverview,
     val currentPlacementName: String,
+    val currentAssignmentId: String? = null,
+    val currentAssignmentStatus: OperationAssignmentStatus? = null,
 )
 
 interface OperationsOverviewRepository {
@@ -96,7 +98,9 @@ class OperationsOverviewRepositoryImpl(
                 mapState = AppShellMapState(),
                 currentInstructionId = activeInstruction?.instructionId,
             ),
-            currentPlacementName = placementName
+            currentPlacementName = placementName,
+            currentAssignmentId = currentAssignment?.assignId,
+            currentAssignmentStatus = currentAssignment?.status,
         )
     }
 

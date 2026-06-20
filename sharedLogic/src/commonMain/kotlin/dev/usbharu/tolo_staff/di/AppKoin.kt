@@ -22,6 +22,7 @@ val coreModule = module {
             contactChatService = get(),
             currentStaffSession = get(),
             reportRepository = get(),
+            assignmentStatusService = get(),
         )
     }
     factory { ContactChatViewModel(service = get(), currentStaffSession = get()) }

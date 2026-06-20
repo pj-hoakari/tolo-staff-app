@@ -124,6 +124,11 @@ message ListAssignmentsResponse {
   repeated Assignment assignments = 1;
 }
 
+message UpdateAssignmentStatusRequest {
+  string assign_id = 1;
+  AssignmentStatus status = 2;
+}
+
 message ListThreadsResponse {
   repeated Thread threads = 1;
 }
@@ -203,6 +208,7 @@ service StaffRpc {
 
 service AssignmentRpc {
   rpc ListAssignments(google.protobuf.Empty) returns (ListAssignmentsResponse);
+  rpc UpdateAssignmentStatus(UpdateAssignmentStatusRequest) returns (Assignment);
 }
 
 service MessageRpc {

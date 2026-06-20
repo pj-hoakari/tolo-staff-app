@@ -16,6 +16,7 @@ import dev.usbharu.tolo_staff.streaming.OperationStaff
 import dev.usbharu.tolo_staff.streaming.OperationThread
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
+import dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,6 +61,8 @@ class AppShellViewModelTest {
         assertEquals("North entrance", viewModel.uiState.value.homeOverview.placementDetail)
         assertEquals("Shift update: Move barricades", viewModel.uiState.value.homeOverview.currentInstruction)
         assertEquals("instruction-gate-a", viewModel.uiState.value.homeOverview.currentInstructionId)
+        assertEquals(PlacementPhase.ACTIVE, viewModel.uiState.value.homeOverview.placementStatus.phase)
+        assertEquals("現在の配置", viewModel.uiState.value.homeOverview.placementStatus.headline)
         assertEquals(null, viewModel.uiState.value.instructionsTab.selectedInstruction)
         assertEquals("instruction-gate-a", viewModel.uiState.value.instructionsTab.featuredInstruction?.id)
         assertEquals(emptyList(), viewModel.uiState.value.instructionsTab.otherInstructions.map { it.id })
@@ -88,6 +91,184 @@ class AppShellViewModelTest {
             viewModel.onTabSelected(tab)
             assertEquals(tab, viewModel.uiState.value.selectedTab)
         }
+
+        viewModel.clear()
+    }
+
+    @Test
+    fun `pending assignment maps to pending change placement status`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        placementName = "Gate B",
+                        placementDetail = "South entrance",
+                    ),
+                    currentPlacementName = "Gate B",
+                    currentAssignmentId = "assign-pending",
+                    currentAssignmentStatus = dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus.PENDING,
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        assertEquals(PlacementPhase.PENDING_CHANGE, viewModel.uiState.value.homeOverview.placementStatus.phase)
+        assertEquals("配置が変更されました", viewModel.uiState.value.homeOverview.placementStatus.headline)
+        assertEquals("確認しました", viewModel.uiState.value.homeOverview.placementStatus.buttonLabel)
+        assertTrue(viewModel.uiState.value.homeOverview.placementStatus.showsActionButton)
+
+        viewModel.clear()
+    }
+
+    @Test
+    fun `en route assignment maps to moving placement status`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        placementName = "Gate C",
+                    ),
+                    currentPlacementName = "Gate C",
+                    currentAssignmentId = "assign-route",
+                    currentAssignmentStatus = dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus.EN_ROUTE,
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        assertEquals(PlacementPhase.EN_ROUTE, viewModel.uiState.value.homeOverview.placementStatus.phase)
+        assertEquals("「Gate C」へ移動中", viewModel.uiState.value.homeOverview.placementStatus.headline)
+        assertEquals("到着", viewModel.uiState.value.homeOverview.placementStatus.buttonLabel)
+        assertTrue(viewModel.uiState.value.homeOverview.placementStatus.showsActionButton)
+
+        viewModel.clear()
+    }
+
+    @Test
+    fun `placement confirmation advances local state to en route then active`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        placementName = "Gate D",
+                    ),
+                    currentPlacementName = "Gate D",
+                    currentAssignmentId = "assign-local",
+                    currentAssignmentStatus = dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus.PENDING,
+                )
+            )
+        )
+        val assignmentStatusService = FakeAssignmentStatusService()
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            assignmentStatusService = assignmentStatusService,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onPlacementChangeConfirmed()
+        assertEquals(PlacementPhase.EN_ROUTE, viewModel.uiState.value.homeOverview.placementStatus.phase)
+        assertEquals("到着", viewModel.uiState.value.homeOverview.placementStatus.buttonLabel)
+
+        viewModel.onPlacementArrivalConfirmed()
+        assertEquals(PlacementPhase.ACTIVE, viewModel.uiState.value.homeOverview.placementStatus.phase)
+        assertFalse(viewModel.uiState.value.homeOverview.placementStatus.showsActionButton)
+
+        assertEquals(
+            listOf(
+                "assign-local" to OperationAssignmentStatus.EN_ROUTE,
+                "assign-local" to OperationAssignmentStatus.ACTIVE,
+            ),
+            assignmentStatusService.updatedStatuses,
+        )
+
+        viewModel.clear()
+    }
+
+    @Test
+    fun `placement status update failure surfaces error message`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        placementName = "Gate G",
+                    ),
+                    currentPlacementName = "Gate G",
+                    currentAssignmentId = "assign-fail",
+                    currentAssignmentStatus = dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus.PENDING,
+                )
+            )
+        )
+        val assignmentStatusService = FakeAssignmentStatusService(errorMessage = "network error")
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            assignmentStatusService = assignmentStatusService,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onPlacementChangeConfirmed()
+
+        assertEquals(
+            listOf("assign-fail" to OperationAssignmentStatus.EN_ROUTE),
+            assignmentStatusService.updatedStatuses,
+        )
+        assertEquals("network error", viewModel.uiState.value.errorMessage)
+
+        viewModel.clear()
+    }
+
+    @Test
+    fun `new assignment clears local placement override`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        placementName = "Gate E",
+                    ),
+                    currentPlacementName = "Gate E",
+                    currentAssignmentId = "assign-old",
+                    currentAssignmentStatus = dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus.PENDING,
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onPlacementChangeConfirmed()
+        assertEquals(PlacementPhase.EN_ROUTE, viewModel.uiState.value.homeOverview.placementStatus.phase)
+
+        repository.emit(
+            "tanaka",
+            AppShellOperationsProjection(
+                homeOverview = AppShellHomeOverview(
+                    placementName = "Gate F",
+                ),
+                currentPlacementName = "Gate F",
+                currentAssignmentId = "assign-new",
+                currentAssignmentStatus = dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus.PENDING,
+            )
+        )
+
+        assertEquals("assign-new", viewModel.uiState.value.homeOverview.placementStatus.assignId)
+        assertEquals(PlacementPhase.PENDING_CHANGE, viewModel.uiState.value.homeOverview.placementStatus.phase)
+        assertEquals("配置が変更されました", viewModel.uiState.value.homeOverview.placementStatus.headline)
 
         viewModel.clear()
     }
@@ -937,12 +1118,19 @@ private class FakeOperationsOverviewRepository(
     )
 ) : OperationsOverviewRepository {
     val observedStaffIds = mutableListOf<String>()
+    private val projectionFlows = projections.mapValues { MutableStateFlow(it.value) }.toMutableMap()
 
     override fun observeOverview(currentStaffId: String): Flow<AppShellOperationsProjection> {
         observedStaffIds += currentStaffId
-        return flowOf(
-            projections[currentStaffId] ?: projections.getValue("tanaka")
-        )
+        return projectionFlows.getOrPut(currentStaffId) {
+            MutableStateFlow(projections[currentStaffId] ?: projections.getValue("tanaka"))
+        }
+    }
+
+    fun emit(currentStaffId: String, projection: AppShellOperationsProjection) {
+        projectionFlows.getOrPut(currentStaffId) {
+            MutableStateFlow(projection)
+        }.value = projection
     }
 }
 
@@ -965,6 +1153,17 @@ private class FakeReportRepository(
     override suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport> {
         errorMessage?.let { error(it) }
         return reports
+    }
+}
+
+private class FakeAssignmentStatusService(
+    private val errorMessage: String? = null,
+) : AssignmentStatusService {
+    val updatedStatuses = mutableListOf<Pair<String, OperationAssignmentStatus>>()
+
+    override suspend fun updateStatus(assignId: String, status: OperationAssignmentStatus) {
+        updatedStatuses += assignId to status
+        errorMessage?.let { error(it) }
     }
 }
 
