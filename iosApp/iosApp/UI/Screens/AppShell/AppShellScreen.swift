@@ -32,6 +32,7 @@ struct AppShellScreen: View {
             onReportSubmitted: wrapper.onReportSubmitted,
             onReportBack: wrapper.onReportBack,
             onContactThreadSelected: wrapper.onContactThreadSelected,
+            onContactReportMessageSelected: wrapper.onContactReportMessageSelected,
             onContactBackToList: wrapper.onContactBackToList,
             onContactNewThreadStarted: wrapper.onContactNewThreadStarted,
             onContactTargetTypeSelected: wrapper.onContactTargetTypeSelected,
@@ -65,6 +66,7 @@ struct AppShellContentView: View {
     var onReportSubmitted: () -> Void = {}
     var onReportBack: () -> Void = {}
     var onContactThreadSelected: (String) -> Void = { _ in }
+    var onContactReportMessageSelected: (String) -> Void = { _ in }
     var onContactBackToList: () -> Void = {}
     var onContactNewThreadStarted: () -> Void = {}
     var onContactTargetTypeSelected: (ContactTargetType) -> Void = { _ in }
@@ -163,6 +165,7 @@ struct AppShellContentView: View {
                     state: state.contactsTab,
                     currentStaff: state.currentStaff,
                     onThreadSelected: onContactThreadSelected,
+                    onReportSelected: onContactReportMessageSelected,
                     onBackToList: onContactBackToList,
                     onNewThreadStarted: onContactNewThreadStarted,
                     onTargetTypeSelected: onContactTargetTypeSelected,

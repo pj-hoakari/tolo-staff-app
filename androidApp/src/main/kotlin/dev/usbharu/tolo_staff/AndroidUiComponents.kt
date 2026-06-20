@@ -9,15 +9,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MarkEmailUnread
 import androidx.compose.material3.Button
@@ -478,61 +479,162 @@ internal fun ContactTypeChip(title: String, selected: Boolean, action: () -> Uni
 }
 
 @Composable
-internal fun ThreadMessageBubble(message: ThreadMessageUiModel) {
-    Row(Modifier.fillMaxWidth()) {
-        if (message.isCurrentUser) {
-            Spacer(Modifier.weight(1f))
+internal fun ThreadMessageBubble(
+    message: ThreadMessageUiModel,
+    onReportSelected: (String) -> Unit = {},
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (message.isCurrentUser) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
         }
-
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = when {
-                    message.isSystemEvent -> MaterialTheme.colorScheme.surfaceVariant
-                    message.isCurrentUser -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.secondaryContainer
-                }
-            ),
-            modifier = Modifier
-                .fillMaxWidth(0.82f)
-                .semantics { contentDescription = "contact_chat_message_${message.id}" }
-        ) {
+    ) {
+        if (message.reportId != null && message.reportTitle != null && message.reportSummary != null) {
             Column(
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.82f)
+                    .semantics { contentDescription = "contact_chat_message_${message.id}" },
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = message.senderRoleLabel?.let { "${message.senderName} ($it)" } ?: message.senderName,
-                    color = if (message.isCurrentUser) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium
                 )
-                Text(
-                    text = message.body,
-                    color = if (message.isCurrentUser) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    }
+                ContactReportMessageCard(
+                    message = message,
+                    onReportSelected = onReportSelected,
                 )
-                message.timeLabel?.let {
+            }
+        } else {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = when {
+                        message.isSystemEvent -> MaterialTheme.colorScheme.surfaceVariant
+                        message.isCurrentUser -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    }
+                ),
+                modifier = Modifier
+                    .fillMaxWidth(0.82f)
+                    .semantics { contentDescription = "contact_chat_message_${message.id}" }
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
-                        text = it,
+                        text = message.senderRoleLabel?.let { "${message.senderName} ($it)" } ?: message.senderName,
                         color = if (message.isCurrentUser) {
                             MaterialTheme.colorScheme.onPrimary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.labelMedium
                     )
+                    Text(
+                        text = message.body,
+                        color = if (message.isCurrentUser) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        }
+                    )
+                    message.timeLabel?.let {
+                        Text(
+                            text = it,
+                            color = if (message.isCurrentUser) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 }
             }
         }
+    }
+}
 
-        if (!message.isCurrentUser) {
-            Spacer(Modifier.weight(1f))
+@Composable
+private fun ContactReportMessageCard(
+    message: ThreadMessageUiModel,
+    onReportSelected: (String) -> Unit,
+) {
+    val reportId = message.reportId ?: return
+    val reportTitle = message.reportTitle ?: return
+    val reportSummary = message.reportSummary ?: return
+    val reportAuthorName = message.reportAuthorName ?: return
+    val reportTargetLabel = message.reportTargetLabel ?: return
+
+    Surface(
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onReportSelected(reportId) }
+            .semantics { contentDescription = "contact_report_message_$reportId" },
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "報告",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = reportTitle,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            message.reportPriorityLabel?.takeIf { it.isNotBlank() }?.let { priorityLabel ->
+                Text(
+                    text = priorityLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = reportSummary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "$reportTargetLabel / $reportAuthorName",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            message.reportTimeLabel?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

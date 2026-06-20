@@ -98,6 +98,10 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onContactThreadSelected(threadId: threadId)
     }
 
+    func onContactReportMessageSelected(_ reportId: String) {
+        viewModel.onContactReportMessageSelected(reportId: reportId)
+    }
+
     func onContactBackToList() {
         viewModel.onContactBackToList()
     }

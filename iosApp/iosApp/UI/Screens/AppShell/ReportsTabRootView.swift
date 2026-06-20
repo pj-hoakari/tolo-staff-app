@@ -62,6 +62,7 @@ struct ReportsTabRootView: View {
                         if let selectedThread {
                             ContactThreadDetailView(
                                 thread: selectedThread,
+                                onReportSelected: { _ in },
                                 onDraftChanged: onContactDraftChanged,
                                 onSendClicked: onContactSendClicked
                             )

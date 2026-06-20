@@ -290,12 +290,139 @@ class AppShellViewModelTest {
             ContactThreadBackDestination.REPORT_DETAIL,
             viewModel.uiState.value.contactsTab.selectedThreadBackDestination
         )
+        assertEquals("report-1", viewModel.uiState.value.contactsTab.selectedThread?.messages?.singleOrNull()?.reportId)
+        assertEquals("導線報告", viewModel.uiState.value.contactsTab.selectedThread?.messages?.singleOrNull()?.reportTitle)
         viewModel.onContactBackToList()
         assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
         assertEquals(null, viewModel.uiState.value.contactsTab.selectedThread)
         assertEquals("導線報告", viewModel.uiState.value.reportsTab.selectedReport?.title)
         viewModel.onReportDetailClosed()
         assertEquals(null, viewModel.uiState.value.reportsTab.selectedReport)
+        viewModel.clear()
+    }
+
+    @Test
+    fun `contact report message opens report detail and closing detail returns to same thread`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            staff = listOf(
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "tanaka",
+                    staffId = "tanaka",
+                    name = "田中",
+                    roles = listOf("Aゲート担当"),
+                )
+            ),
+            threads = listOf(
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "report-thread-1",
+                    threadId = "report-thread-1",
+                    members = listOf("tanaka", "hq"),
+                    displayTitle = "本部 / 南口",
+                )
+            ),
+            messages = listOf(
+                OperationMessage(
+                    updatedAt = "2026-06-19T09:00:00Z",
+                    reason = "test",
+                    entityId = "report-message-1",
+                    messageId = "report-message-1",
+                    threadId = "report-thread-1",
+                    staffId = "tanaka",
+                    messageType = OperationMessageType.REPORT,
+                    reportId = "report-1",
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            reportRepository = FakeReportRepository(
+                reports = listOf(
+                    RelevantReport(
+                        reportId = "report-1",
+                        threadId = "report-thread-1",
+                        authorStaffId = "tanaka",
+                        title = "導線報告",
+                        summary = "南口の入場列は安定しています",
+                        priorityLabel = "通常",
+                        createdAtLabel = "2026-06-19T09:00:00Z",
+                    )
+                )
+            ),
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onContactThreadSelected("report-thread-1")
+        viewModel.onContactReportMessageSelected("report-1")
+
+        assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
+        assertEquals("導線報告", viewModel.uiState.value.reportsTab.selectedReport?.title)
+        assertEquals("report-thread-1", viewModel.uiState.value.reportsTab.openedFromContactThreadId)
+
+        viewModel.onReportDetailClosed()
+
+        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
+        assertEquals("report-thread-1", viewModel.uiState.value.contactsTab.selectedThread?.id)
+        assertEquals(null, viewModel.uiState.value.reportsTab.selectedReport)
+        assertEquals(null, viewModel.uiState.value.reportsTab.openedFromContactThreadId)
+        viewModel.clear()
+    }
+
+    @Test
+    fun `report messages without related report fall back to plain message rendering data`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            staff = listOf(
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "tanaka",
+                    staffId = "tanaka",
+                    name = "田中",
+                )
+            ),
+            threads = listOf(
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "report-thread-missing",
+                    threadId = "report-thread-missing",
+                    members = listOf("tanaka", "hq"),
+                )
+            ),
+            messages = listOf(
+                OperationMessage(
+                    updatedAt = "2026-06-19T09:00:00Z",
+                    reason = "test",
+                    entityId = "report-message-missing",
+                    messageId = "report-message-missing",
+                    threadId = "report-thread-missing",
+                    staffId = "tanaka",
+                    messageType = OperationMessageType.REPORT,
+                    reportId = "missing-report",
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            reportRepository = FakeReportRepository(),
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onContactThreadSelected("report-thread-missing")
+
+        val message = viewModel.uiState.value.contactsTab.selectedThread?.messages?.singleOrNull()
+        assertEquals("missing-report", message?.reportId)
+        assertEquals(null, message?.reportTitle)
+        assertEquals("報告が共有されました: missing-report", message?.body)
         viewModel.clear()
     }
 

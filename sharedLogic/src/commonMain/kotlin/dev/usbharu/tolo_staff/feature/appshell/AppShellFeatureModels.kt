@@ -41,6 +41,14 @@ data class ThreadMessageUiModel(
     val timeLabel: String? = null,
     val isCurrentUser: Boolean = false,
     val isSystemEvent: Boolean = false,
+    val reportId: String? = null,
+    val reportTitle: String? = null,
+    val reportSummary: String? = null,
+    val reportPriorityLabel: String? = null,
+    val reportAuthorName: String? = null,
+    val reportTargetLabel: String? = null,
+    val reportTimeLabel: String? = null,
+    val reportIsAuthoredByCurrentStaff: Boolean = false,
 )
 
 data class InstructionParticipantStatusUiModel(
@@ -133,6 +141,7 @@ data class ReportsTabUiState(
     val step: ReportFlowStep = ReportFlowStep.TYPE_SELECTION,
     val relatedReports: List<RelatedReportUiModel> = emptyList(),
     val selectedReport: ReportDetailUiModel? = null,
+    val openedFromContactThreadId: String? = null,
     val isLoadingReports: Boolean = false,
     val reportsErrorMessage: String? = null,
 )

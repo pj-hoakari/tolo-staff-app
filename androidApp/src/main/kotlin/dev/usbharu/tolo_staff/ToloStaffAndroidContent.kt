@@ -61,6 +61,7 @@ fun ToloStaffAndroidContent(
     onReportSubmitted: () -> Unit = {},
     onReportBack: () -> Unit = {},
     onContactThreadSelected: (String) -> Unit = {},
+    onContactReportMessageSelected: (String) -> Unit = {},
     onContactBackToList: () -> Unit = {},
     onContactNewThreadStarted: () -> Unit = {},
     onContactTargetTypeSelected: (ContactTargetType) -> Unit = {},
@@ -331,6 +332,7 @@ fun ToloStaffAndroidContent(
                         state.contactsTab.selectedThread?.let { thread ->
                             ContactThreadDetailScreen(
                                 thread = thread,
+                                onReportSelected = onContactReportMessageSelected,
                                 onDraftChanged = onContactDraftChanged,
                                 onSendClicked = onContactSendClicked,
                             )

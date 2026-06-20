@@ -98,6 +98,20 @@ class ToloStaffAndroidContentTest {
     }
 
     @Test
+    fun reportMessageInContactThreadOpensReportDetailAndBackReturnsToThread() {
+        setTestContent()
+
+        composeRule.onNodeWithText("報告").performClick()
+        composeRule.onNodeWithContentDescription("related_report_report-1").performClick()
+        composeRule.onNodeWithContentDescription("report_detail_open_thread_button").performClick()
+        composeRule.onNodeWithContentDescription("contact_report_message_report-1").performClick()
+        composeRule.onNodeWithContentDescription("report_detail_screen").assertExists()
+
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.onNodeWithContentDescription("contact_thread_detail").assertExists()
+    }
+
+    @Test
     fun contactsDetailAndTargetSelectionReturnOnSystemBack() {
         setTestContent()
 
@@ -308,9 +322,22 @@ class ToloStaffAndroidContentTest {
                     )
                 },
                 onReportDetailClosed = {
-                    state = state.copy(
-                        reportsTab = state.reportsTab.copy(selectedReport = null),
-                    )
+                    state = if (state.reportsTab.openedFromContactThreadId != null) {
+                        state.copy(
+                            selectedTab = AppTab.CONTACTS,
+                            reportsTab = state.reportsTab.copy(
+                                selectedReport = null,
+                                openedFromContactThreadId = null,
+                            ),
+                            contactsTab = state.contactsTab.copy(
+                                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
+                            )
+                        )
+                    } else {
+                        state.copy(
+                            reportsTab = state.reportsTab.copy(selectedReport = null),
+                        )
+                    }
                 },
                 onReportThreadOpened = {
                     state = state.copy(
@@ -331,6 +358,14 @@ class ToloStaffAndroidContentTest {
                                         body = relatedReport.summary,
                                         timeLabel = relatedReport.timeLabel,
                                         isCurrentUser = true,
+                                        reportId = relatedReport.reportId,
+                                        reportTitle = relatedReport.title,
+                                        reportSummary = relatedReport.summary,
+                                        reportPriorityLabel = relatedReport.priorityLabel,
+                                        reportAuthorName = relatedReport.authorName,
+                                        reportTargetLabel = relatedReport.targetLabel,
+                                        reportTimeLabel = relatedReport.timeLabel,
+                                        reportIsAuthoredByCurrentStaff = true,
                                     )
                                 ),
                             ),
@@ -384,6 +419,13 @@ class ToloStaffAndroidContentTest {
                                         senderName = "田中",
                                         body = "巡回報告 [通常]",
                                         isCurrentUser = true,
+                                        reportId = "report-report-1-place-1",
+                                        reportTitle = "巡回報告",
+                                        reportSummary = "巡回報告 [通常]",
+                                        reportPriorityLabel = "通常",
+                                        reportAuthorName = "田中",
+                                        reportTargetLabel = "南口",
+                                        reportIsAuthoredByCurrentStaff = true,
                                     )
                                 ),
                             ),
@@ -411,21 +453,54 @@ class ToloStaffAndroidContentTest {
                         ),
                     )
                 },
-                onContactBackToList = {
+                onContactReportMessageSelected = {
                     state = state.copy(
-                        selectedTab = when (state.contactsTab.selectedThreadBackDestination) {
-                            ContactThreadBackDestination.NONE -> state.selectedTab
-                            ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
-                            ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
-                            ContactThreadBackDestination.REPORT_DETAIL -> AppTab.REPORTS
-                        },
-                        contactsTab = state.contactsTab.copy(
-                            selectedThread = null,
-                            isChoosingTargetType = false,
-                            selectedTargetType = null,
-                            selectedThreadBackDestination = ContactThreadBackDestination.NONE,
-                        )
+                        selectedTab = AppTab.REPORTS,
+                        reportsTab = state.reportsTab.copy(
+                            selectedReport = ReportDetailUiModel(
+                                reportId = relatedReport.reportId,
+                                threadId = relatedReport.threadId,
+                                title = relatedReport.title,
+                                summary = relatedReport.summary,
+                                priorityLabel = relatedReport.priorityLabel,
+                                authorName = relatedReport.authorName,
+                                targetLabel = relatedReport.targetLabel,
+                                timeLabel = relatedReport.timeLabel,
+                                isAuthoredByCurrentStaff = true,
+                                detailPlaceholderMessage = "詳細情報は今後の API 連携で表示予定です。現在は概要のみ確認できます。",
+                            ),
+                            openedFromContactThreadId = state.contactsTab.selectedThread?.id,
+                        ),
                     )
+                },
+                onContactBackToList = {
+                    state = if (state.reportsTab.openedFromContactThreadId != null) {
+                        state.copy(
+                            selectedTab = AppTab.CONTACTS,
+                            reportsTab = state.reportsTab.copy(
+                                selectedReport = null,
+                                openedFromContactThreadId = null,
+                            ),
+                            contactsTab = state.contactsTab.copy(
+                                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
+                            )
+                        )
+                    } else {
+                        state.copy(
+                            selectedTab = when (state.contactsTab.selectedThreadBackDestination) {
+                                ContactThreadBackDestination.NONE -> state.selectedTab
+                                ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
+                                ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
+                                ContactThreadBackDestination.REPORT_DETAIL -> AppTab.REPORTS
+                            },
+                            contactsTab = state.contactsTab.copy(
+                                selectedThread = null,
+                                isChoosingTargetType = false,
+                                selectedTargetType = null,
+                                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
+                            )
+                        )
+                    }
                 },
                 onContactNewThreadStarted = {
                     state = state.copy(

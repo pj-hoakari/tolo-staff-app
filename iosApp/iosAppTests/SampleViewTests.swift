@@ -108,6 +108,58 @@ final class SampleViewTests: XCTestCase {
         XCTAssertNotNil(view)
     }
 
+    func testContactsThreadWithRichReportMessageCanBeCreated() {
+        let reportMessage = ThreadMessageUiModel(
+            id: "report-message-1",
+            senderName: "田中",
+            senderRoleLabel: "Aゲート担当",
+            body: "報告が共有されました: report-1",
+            timeLabel: "2026-06-20T09:00:00Z",
+            isCurrentUser: true,
+            isSystemEvent: true,
+            reportId: "report-1",
+            reportTitle: "導線報告",
+            reportSummary: "南口の入場列は安定しています",
+            reportPriorityLabel: "通常",
+            reportAuthorName: "田中",
+            reportTargetLabel: "南口",
+            reportTimeLabel: "2026-06-20T09:00:00Z",
+            reportIsAuthoredByCurrentStaff: true
+        )
+        let contactsTab = ContactsTabUiState(
+            threads: [],
+            selectedThread: ContactThreadDetailUiModel(
+                id: "report-thread-1",
+                title: "本部 / 南口",
+                target: ContactTargetUiModel(
+                    id: "report-thread-1",
+                    type: .headquarters,
+                    displayName: "本部 / 南口",
+                    subtitle: nil
+                ),
+                messages: [reportMessage],
+                draftMessage: "",
+                canReply: true,
+                isFormerAssignment: false
+            ),
+            availableTargets: [],
+            selectedTargetType: nil,
+            isChoosingTargetType: false,
+            formerAssignments: [],
+            selectedThreadBackDestination: .none
+        )
+        let state = makeAppShellState(
+            selectedTab: AppTab.contacts,
+            contactsTab: contactsTab
+        )
+
+        let view = AppShellContentView(state: state)
+
+        XCTAssertNotNil(view)
+        XCTAssertEqual(state.contactsTab.selectedThread?.messages.first?.reportId, "report-1")
+        XCTAssertEqual(state.contactsTab.selectedThread?.messages.first?.reportTitle, "導線報告")
+    }
+
     func disabled_testAppShellContentSnapshotSmoke() {
         let state = makeAppShellState(selectedTab: AppTab.home)
 
@@ -148,7 +200,8 @@ final class SampleViewTests: XCTestCase {
         selectedTab: AppTab,
         homeOverview: AppShellHomeOverview? = nil,
         instructionsTab: InstructionsTabUiState? = nil,
-        selectedReport: ReportDetailUiModel? = nil
+        selectedReport: ReportDetailUiModel? = nil,
+        contactsTab: ContactsTabUiState? = nil
     ) -> AppShellUiState {
         let overview = homeOverview ?? AppShellHomeOverview(
             eventName: "Tolo Staff Demo 2026",
@@ -210,10 +263,11 @@ final class SampleViewTests: XCTestCase {
                 step: .typeSelection,
                 relatedReports: [],
                 selectedReport: selectedReport,
+                openedFromContactThreadId: nil,
                 isLoadingReports: false,
                 reportsErrorMessage: nil
             ),
-            contactsTab: ContactsTabUiState(
+            contactsTab: contactsTab ?? ContactsTabUiState(
                 threads: [],
                 selectedThread: nil,
                 availableTargets: [],

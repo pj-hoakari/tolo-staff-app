@@ -113,6 +113,7 @@ internal fun ContactTargetSelectionScreen(
 @Composable
 internal fun ContactThreadDetailScreen(
     thread: ContactThreadDetailUiModel,
+    onReportSelected: (String) -> Unit,
     onDraftChanged: (String) -> Unit,
     onSendClicked: () -> Unit,
 ) {
@@ -136,7 +137,10 @@ internal fun ContactThreadDetailScreen(
                 }
             }
             items(thread.messages, key = { it.id }) { message ->
-                ThreadMessageBubble(message)
+                ThreadMessageBubble(
+                    message = message,
+                    onReportSelected = onReportSelected,
+                )
             }
         }
 

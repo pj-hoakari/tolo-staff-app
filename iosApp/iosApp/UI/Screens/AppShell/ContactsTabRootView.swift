@@ -5,6 +5,7 @@ struct ContactsTabRootView: View {
     let state: ContactsTabUiState
     let currentStaff: CurrentStaffUiModel
     var onThreadSelected: (String) -> Void = { _ in }
+    var onReportSelected: (String) -> Void = { _ in }
     var onBackToList: () -> Void = {}
     var onNewThreadStarted: () -> Void = {}
     var onTargetTypeSelected: (ContactTargetType) -> Void = { _ in }
@@ -63,6 +64,7 @@ struct ContactsTabRootView: View {
                 if let selectedThread = state.selectedThread {
                     ContactThreadDetailView(
                         thread: selectedThread,
+                        onReportSelected: onReportSelected,
                         onDraftChanged: onDraftChanged,
                         onSendClicked: onSendClicked
                     )
@@ -177,6 +179,7 @@ private struct ContactTargetSelectionView: View {
 
 struct ContactThreadDetailView: View {
     let thread: ContactThreadDetailUiModel
+    let onReportSelected: (String) -> Void
     let onDraftChanged: (String) -> Void
     let onSendClicked: () -> Void
 
@@ -204,7 +207,10 @@ struct ContactThreadDetailView: View {
                     }
 
                     ForEach(thread.messages, id: \.id) { message in
-                        ThreadMessageBubble(message: message)
+                        ThreadMessageBubble(
+                            message: message,
+                            onReportSelected: onReportSelected
+                        )
                     }
                 }
                 .padding(16)
@@ -250,6 +256,7 @@ struct ContactThreadDetailView: View {
 
 struct ThreadMessageBubble: View {
     let message: ThreadMessageUiModel
+    let onReportSelected: (String) -> Void
 
     var body: some View {
         HStack {
@@ -269,16 +276,73 @@ struct ThreadMessageBubble: View {
                     }
                 }
 
-                Text(message.body)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .foregroundStyle(message.isCurrentUser ? .white : .primary)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(message.isCurrentUser ? Color.accentColor : Color.blue.opacity(0.10))
-                    )
+                if let reportId = message.reportId,
+                   let reportTitle = message.reportTitle,
+                   let reportSummary = message.reportSummary,
+                   let reportAuthorName = message.reportAuthorName,
+                   let reportTargetLabel = message.reportTargetLabel {
+                    Button {
+                        onReportSelected(reportId)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("報告")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.tint)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(reportTitle)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                            if let reportPriorityLabel = message.reportPriorityLabel,
+                               !reportPriorityLabel.isEmpty {
+                                Text(reportPriorityLabel)
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.orange)
+                            }
+                            Text(reportSummary)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                            Text("\(reportTargetLabel) / \(reportAuthorName)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if let reportTimeLabel = message.reportTimeLabel {
+                                Text(reportTimeLabel)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.blue.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.blue.opacity(0.18), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("contact_report_message_\(reportId)")
+                } else {
+                    Text(message.body)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .foregroundStyle(message.isCurrentUser ? .white : .primary)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(message.isCurrentUser ? Color.accentColor : Color.blue.opacity(0.10))
+                        )
+                }
 
-                if let timeLabel = message.timeLabel {
+                if message.reportId == nil, let timeLabel = message.timeLabel {
                     Text(timeLabel)
                         .font(.caption2)
                         .foregroundStyle(.secondary)

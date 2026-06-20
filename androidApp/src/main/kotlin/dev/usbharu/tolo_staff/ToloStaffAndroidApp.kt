@@ -38,6 +38,7 @@ fun ToloStaffAndroidApp(
         onReportSubmitted = viewModel::onReportSubmitted,
         onReportBack = viewModel::onReportBack,
         onContactThreadSelected = viewModel::onContactThreadSelected,
+        onContactReportMessageSelected = viewModel::onContactReportMessageSelected,
         onContactBackToList = viewModel::onContactBackToList,
         onContactNewThreadStarted = viewModel::onContactNewThreadStarted,
         onContactTargetTypeSelected = viewModel::onContactTargetTypeSelected,
