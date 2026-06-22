@@ -14,7 +14,7 @@ import org.koin.dsl.module
 
 val coreModule = module {
     single<CurrentStaffSession> { MockCurrentStaffSession(dataSource = get()) }
-    single<OperationsOverviewRepository> { OperationsOverviewRepositoryImpl(dataSource = get()) }
+    single<OperationsOverviewRepository> { OperationsOverviewRepositoryImpl(dataSource = get(), eventRepository = get()) }
     factory {
         AppShellViewModel(
             overviewRepository = get(),

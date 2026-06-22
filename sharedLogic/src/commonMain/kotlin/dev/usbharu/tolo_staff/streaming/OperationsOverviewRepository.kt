@@ -2,6 +2,9 @@ package dev.usbharu.tolo_staff.streaming
 
 import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
 import dev.usbharu.tolo_staff.feature.appshell.AppShellMapState
+import dev.usbharu.tolo_staff.feature.appshell.EventRepository
+import dev.usbharu.tolo_staff.feature.appshell.NoOpEventRepository
+import dev.usbharu.tolo_staff.feature.appshell.OperationEvent
 import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -19,6 +22,7 @@ interface OperationsOverviewRepository {
 
 class OperationsOverviewRepositoryImpl(
     private val dataSource: OperationsStreamDataSource,
+    private val eventRepository: EventRepository = NoOpEventRepository(),
 ) : OperationsOverviewRepository {
     private val logger = AppLogger.withTag("OperationsOverviewRepository")
 
@@ -29,7 +33,8 @@ class OperationsOverviewRepositoryImpl(
             dataSource.observePoints(),
             dataSource.observeAssignments(),
             dataSource.observeInstructions(),
-        ) { points, assignments, instructions ->
+            eventRepository.observeCurrentEvent(),
+        ) { points, assignments, instructions, currentEvent ->
             logger.debug {
                 "Building overview projection: currentStaffId=$currentStaffId, points=${points.size}, assignments=${assignments.size}, instructions=${instructions.size}"
             }
@@ -38,6 +43,7 @@ class OperationsOverviewRepositoryImpl(
                 points = points,
                 assignments = assignments,
                 instructions = instructions,
+                currentEvent = currentEvent,
             )
         }
     }
@@ -47,6 +53,7 @@ class OperationsOverviewRepositoryImpl(
         points: List<OperationPoint>,
         assignments: List<OperationAssignment>,
         instructions: List<OperationInstruction>,
+        currentEvent: OperationEvent = OperationEvent(),
     ): AppShellOperationsProjection {
         val relevantInstructions = instructions.relevantTo(
             currentStaffId = currentStaffId,
@@ -88,6 +95,8 @@ class OperationsOverviewRepositoryImpl(
 
         return AppShellOperationsProjection(
             homeOverview = AppShellHomeOverview(
+                eventName = currentEvent.name,
+                eventTime = currentEvent.toEventTimeLabel(),
                 placementName = placementName,
                 placementDetail = placementDetail,
                 currentInstruction = instructionText,
@@ -95,7 +104,13 @@ class OperationsOverviewRepositoryImpl(
                 currentInstructionTargetName = instructionTargetName,
                 currentInstructionStatusLabel = activeInstruction?.status?.toStatusLabel(),
                 currentInstructionLocationLabel = instructionLocationLabel,
-                mapState = AppShellMapState(),
+                mapState = AppShellMapState(
+                    venueName = currentEvent.venueName,
+                    latitude = currentEvent.latitude,
+                    longitude = currentEvent.longitude,
+                    latitudeDelta = currentEvent.latitudeDelta,
+                    longitudeDelta = currentEvent.longitudeDelta,
+                ),
                 currentInstructionId = activeInstruction?.instructionId,
             ),
             currentPlacementName = placementName,
@@ -123,6 +138,9 @@ class OperationsOverviewRepositoryImpl(
             OperationAssignmentStatus.PENDING -> 2
         }
 }
+
+private fun OperationEvent.toEventTimeLabel(): String =
+    formatEventTimeLabel(startTimeIso, endTimeIso)
 
 internal fun List<OperationInstruction>.relevantTo(
     currentStaffId: String,

@@ -20,11 +20,9 @@ struct HomeTabContentView: View {
                         .accessibilityIdentifier("app_shell_home_error")
                 }
 
-                HomeTextCard(
-                    titleKey: "app_shell_home_event_card_title",
-                    systemImage: "calendar",
-                    primaryText: overview.eventName,
-                    secondaryText: overview.eventTime
+                HomeEventCard(
+                    eventName: overview.eventName,
+                    eventTime: overview.eventTime
                 )
                 .accessibilityIdentifier("app_shell_home_event_card")
 
@@ -131,67 +129,78 @@ private struct HomeQuickActionsCard: View {
     }
 }
 
-private struct HomeTextCard: View {
-    let titleKey: LocalizedStringKey
-    let systemImage: String
-    let primaryText: String
-    let secondaryText: String?
-    var action: (() -> Void)? = nil
+private struct HomeEventCard: View {
+    let eventName: String
+    let eventTime: String?
 
     var body: some View {
-        Group {
-            if let action {
-                Button(action: action) {
-                    content
-                }
-                .buttonStyle(.plain)
-            } else {
-                content
+        VStack(alignment: .leading, spacing: 8) {
+            Label("app_shell_home_event_card_title", systemImage: "calendar")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Text(eventName)
+                .font(.title3)
+                .bold()
+                .foregroundStyle(.primary)
+
+            if let eventTime, !eventTime.isEmpty {
+                EventTimeChip(text: eventTime)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
     }
+}
 
-    private var content: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(titleKey, systemImage: systemImage)
-                .font(.headline)
-                .foregroundStyle(.secondary)
+private struct EventTimeChip: View {
+    let text: String
 
-            Text(primaryText)
-                .font(.title3)
-                .bold()
-                .foregroundStyle(.primary)
-
-            if let secondaryText {
-                Text(secondaryText)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-            }
-        }
+    var body: some View {
+        Label(text, systemImage: "clock.fill")
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.blue)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.blue.opacity(0.12), in: Capsule())
     }
 }
 
 private struct HomePlacementMapCard: View {
     let overview: AppShellHomeOverview
 
+    @State private var position: MapCameraPosition = .automatic
+
+    private static let fallbackCoordinate = CLLocationCoordinate2D(
+        latitude: 35.6895,
+        longitude: 139.6917
+    )
+
     private var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(
+        guard overview.mapState.latitude != 0 || overview.mapState.longitude != 0 else {
+            return Self.fallbackCoordinate
+        }
+        return CLLocationCoordinate2D(
             latitude: overview.mapState.latitude,
             longitude: overview.mapState.longitude
         )
     }
 
     private var region: MKCoordinateRegion {
-        MKCoordinateRegion(
+        let minimumSpan: CLLocationDegrees = 0.005
+        return MKCoordinateRegion(
             center: coordinate,
             span: MKCoordinateSpan(
-                latitudeDelta: overview.mapState.latitudeDelta,
-                longitudeDelta: overview.mapState.longitudeDelta
+                latitudeDelta: max(overview.mapState.latitudeDelta, minimumSpan),
+                longitudeDelta: max(overview.mapState.longitudeDelta, minimumSpan)
             )
         )
+    }
+
+    private var mapFingerprint: String {
+        "\(overview.mapState.latitude):\(overview.mapState.longitude):\(overview.mapState.latitudeDelta):\(overview.mapState.longitudeDelta)"
     }
 
     var body: some View {
@@ -211,12 +220,18 @@ private struct HomePlacementMapCard: View {
                     .foregroundStyle(.secondary)
             }
 
-            Map(initialPosition: .region(region)) {
+            Map(position: $position) {
                 Marker(overview.mapState.venueName, coordinate: coordinate)
             }
             .frame(minHeight: 180)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .allowsHitTesting(false)
+            .onAppear {
+                position = .region(region)
+            }
+            .onChange(of: mapFingerprint) { _, _ in
+                position = .region(region)
+            }
 
             Text(overview.mapState.venueName)
                 .font(.body)

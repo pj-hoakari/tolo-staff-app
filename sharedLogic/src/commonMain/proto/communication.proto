@@ -238,3 +238,19 @@ service ReportRpc {
   rpc UpdateReport(UpdateReportRequest) returns (Report);
   rpc DeleteReport(ReportIdRequest) returns (google.protobuf.Empty);
 }
+
+message Event {
+  string event_id = 1;
+  string name = 2;
+  string venue_name = 3;
+  double latitude = 4;
+  double longitude = 5;
+  double latitude_delta = 6;
+  double longitude_delta = 7;
+  google.protobuf.Timestamp start_time = 8;
+  google.protobuf.Timestamp end_time = 9;
+}
+
+service EventRpc {
+  rpc GetCurrentEvent(google.protobuf.Empty) returns (Event);
+}

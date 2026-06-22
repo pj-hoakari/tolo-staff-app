@@ -1,6 +1,7 @@
 package dev.usbharu.tolo_staff.streaming
 
 import dev.usbharu.tolo.communication.grpc.AssignmentRpc
+import dev.usbharu.tolo.communication.grpc.EventRpc
 import dev.usbharu.tolo.communication.grpc.InstructionRpc
 import dev.usbharu.tolo.communication.grpc.MessageRpc
 import dev.usbharu.tolo.communication.grpc.PointRpc
@@ -31,4 +32,5 @@ class GrpcCommunicationClient(
     val threadService: ThreadRpc by lazy { client.withService<ThreadRpc>() }
     val messageService: MessageRpc by lazy { client.withService<MessageRpc>() }
     val reportService: ReportRpc by lazy { client.withService<ReportRpc>() }
+    val eventService: EventRpc by lazy { client.withService<EventRpc>() }
 }

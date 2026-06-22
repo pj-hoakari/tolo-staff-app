@@ -48,6 +48,7 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.datetime)
             api(libs.kotlinx.rpc.grpc.core)
             api(libs.kotlinx.rpc.protobuf.core)
             implementation(libs.kotlinx.rpc.grpc.client)
