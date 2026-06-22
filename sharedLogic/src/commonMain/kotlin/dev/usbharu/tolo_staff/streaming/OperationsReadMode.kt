@@ -3,6 +3,7 @@ package dev.usbharu.tolo_staff.streaming
 enum class OperationsReadMode {
     FIRESTORE,
     POLLING,
+    GRPC,
 }
 
 data class OperationsPollingConfig(

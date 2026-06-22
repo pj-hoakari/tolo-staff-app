@@ -123,6 +123,34 @@ message AssignmentIdRequest {
   string assign_id = 1;
 }
 
+enum ChangeEntityType {
+  CHANGE_ENTITY_TYPE_UNSPECIFIED = 0;
+  CHANGE_ENTITY_TYPE_POINT = 1;
+  CHANGE_ENTITY_TYPE_STAFF = 2;
+  CHANGE_ENTITY_TYPE_ASSIGNMENT = 3;
+  CHANGE_ENTITY_TYPE_THREAD = 4;
+  CHANGE_ENTITY_TYPE_MESSAGE = 5;
+  CHANGE_ENTITY_TYPE_INSTRUCTION = 6;
+  CHANGE_ENTITY_TYPE_REPORT = 7;
+}
+
+enum ChangeOperation {
+  CHANGE_OPERATION_UNSPECIFIED = 0;
+  CHANGE_OPERATION_CREATED = 1;
+  CHANGE_OPERATION_UPDATED = 2;
+  CHANGE_OPERATION_DELETED = 3;
+}
+
+message ChangeHead {
+  int64 version = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  ChangeEntityType entity_type = 3;
+  string entity_id = 4;
+  string reason = 5;
+  string thread_id = 6;
+  ChangeOperation operation = 7;
+}
+
 message PageRequest {
   int32 page_size = 1;
   string page_token = 2;
@@ -295,4 +323,9 @@ message Event {
 
 service EventRpc {
   rpc GetCurrentEvent(google.protobuf.Empty) returns (Event);
+}
+
+service ChangeHeadRpc {
+  rpc GetGlobalChangeHead(google.protobuf.Empty) returns (ChangeHead);
+  rpc GetStaffChangeHead(StaffIdRequest) returns (ChangeHead);
 }
