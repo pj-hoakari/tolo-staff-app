@@ -42,7 +42,7 @@ class GrpcContactChatService(
         logger.info { "observeMessages started: roomId=$roomId, currentStaffId=$currentStaffId" }
         dataSource.start()
         return combine(
-            dataSource.observeMessages(currentStaffId),
+            dataSource.observeThreadMessages(roomId, currentStaffId),
             dataSource.observeStaff(),
         ) { messages, staff ->
             messages

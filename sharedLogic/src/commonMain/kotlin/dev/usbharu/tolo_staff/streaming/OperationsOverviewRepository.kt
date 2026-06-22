@@ -32,7 +32,7 @@ class OperationsOverviewRepositoryImpl(
         return combine(
             dataSource.observePoints(),
             dataSource.observeAssignments(),
-            dataSource.observeInstructions(),
+            dataSource.observeRelevantInstructions(currentStaffId),
             eventRepository.observeCurrentEvent(),
         ) { points, assignments, instructions, currentEvent ->
             logger.debug {

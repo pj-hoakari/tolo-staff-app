@@ -594,18 +594,16 @@ class AppShellViewModel(
 
     private fun loadRelatedReports(currentStaffId: String) {
         reportLoadJob?.cancel()
-        reportLoadJob = viewModelScope.launch {
-            updateState { state ->
-                state.copy(
-                    reportsTab = state.reportsTab.copy(
-                        isLoadingReports = true,
-                        reportsErrorMessage = null,
-                    )
+        updateState { state ->
+            state.copy(
+                reportsTab = state.reportsTab.copy(
+                    isLoadingReports = true,
+                    reportsErrorMessage = null,
                 )
-            }
-
-            runCatching { reportRepository.listRelevantReports(currentStaffId) }
-                .onSuccess { reports ->
+            )
+        }
+        reportLoadJob = reportRepository.observeRelevantReports(currentStaffId)
+            .onEach { reports ->
                     updateState { state ->
                         val remoteReports = reports
                             .sortedByDescending { it.createdAtLabel.orEmpty() }
@@ -649,7 +647,7 @@ class AppShellViewModel(
                         )
                     }
                 }
-                .onFailure { throwable ->
+            .catch { throwable ->
                     logger.warn(throwable) {
                         "Failed to load related reports: currentStaffId=$currentStaffId"
                     }
@@ -662,7 +660,7 @@ class AppShellViewModel(
                         )
                     }
                 }
-        }
+            .launchIn(viewModelScope)
     }
 
     private fun observeOverview(currentStaffId: String) {
@@ -674,7 +672,7 @@ class AppShellViewModel(
             dataSource.observePoints(),
             dataSource.observeStaff(),
             dataSource.observeAssignments(),
-            dataSource.observeInstructions(),
+            dataSource.observeRelevantInstructions(currentStaffId),
             dataSource.observeThreads(),
             dataSource.observeMessages(currentStaffId),
         ) { values ->

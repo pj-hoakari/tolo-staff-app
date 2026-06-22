@@ -9,19 +9,28 @@ import dev.usbharu.tolo.communication.grpc.AssignmentStatus
 import dev.usbharu.tolo.communication.grpc.Instruction
 import dev.usbharu.tolo.communication.grpc.InstructionRpc
 import dev.usbharu.tolo.communication.grpc.InstructionStatus
+import dev.usbharu.tolo.communication.grpc.ListAssignmentsRequest
+import dev.usbharu.tolo.communication.grpc.ListMessagesRequest
+import dev.usbharu.tolo.communication.grpc.ListRelevantInstructionsRequest
+import dev.usbharu.tolo.communication.grpc.ListThreadsRequest
 import dev.usbharu.tolo.communication.grpc.Message
 import dev.usbharu.tolo.communication.grpc.MessageRpc
+import dev.usbharu.tolo.communication.grpc.PageRequest
 import dev.usbharu.tolo.communication.grpc.Point
 import dev.usbharu.tolo.communication.grpc.PointRpc
 import dev.usbharu.tolo.communication.grpc.Staff
-import dev.usbharu.tolo.communication.grpc.StaffIdRequest
 import dev.usbharu.tolo.communication.grpc.StaffRpc
 import dev.usbharu.tolo.communication.grpc.Thread
-import dev.usbharu.tolo.communication.grpc.ThreadIdRequest
+import dev.usbharu.tolo.communication.grpc.ThreadMessagesRequest
 import dev.usbharu.tolo.communication.grpc.ThreadRpc
 import dev.usbharu.tolo.communication.grpc.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlin.time.Instant
+
+data class PagedResult<T>(
+    val items: List<T>,
+    val nextPageToken: String? = null,
+)
 
 class GrpcOperationsPollingRemoteDataSource(
     private val grpcClient: GrpcCommunicationClient,
@@ -39,8 +48,9 @@ class GrpcOperationsPollingRemoteDataSource(
             .also { logger.debug { "Fetched staff via gRPC: count=${it.size}" } }
 
     override suspend fun listAssignments(): List<OperationAssignment> =
-        grpcClient.assignmentService.ListAssignments(Empty {}).assignments
-            .map { it.toOperationAssignment() }
+        paginate { pageToken ->
+            listAssignmentsPage(pageToken = pageToken)
+        }
             .also { logger.debug { "Fetched assignments via gRPC: count=${it.size}" } }
 
     override suspend fun listInstructions(): List<OperationInstruction> =
@@ -49,12 +59,9 @@ class GrpcOperationsPollingRemoteDataSource(
             .also { logger.debug { "Fetched instructions via gRPC: count=${it.size}" } }
 
     override suspend fun listRelevantInstructions(staffId: String): List<OperationInstruction> =
-        grpcClient.instructionService.ListRelevantInstructions(
-            StaffIdRequest {
-                this.staffId = staffId
-            }
-        ).instructions
-            .map { it.toOperationInstruction() }
+        paginate { pageToken ->
+            listRelevantInstructionsPage(staffId = staffId, pageToken = pageToken)
+        }
             .also {
                 logger.debug {
                     "Fetched relevant instructions via gRPC: staffId=$staffId, count=${it.size}"
@@ -62,23 +69,122 @@ class GrpcOperationsPollingRemoteDataSource(
             }
 
     override suspend fun listThreads(): List<OperationThread> =
-        grpcClient.threadService.ListThreads(Empty {}).threads
-            .map { it.toOperationThread() }
+        paginate { pageToken ->
+            listThreadsPage(pageToken = pageToken)
+        }
             .also { logger.debug { "Fetched threads via gRPC: count=${it.size}" } }
 
     override suspend fun listMessages(): List<OperationMessage> =
-        grpcClient.messageService.ListMessages(Empty {}).messages
-            .map { it.toOperationMessage() }
+        paginate { pageToken ->
+            listMessagesPage(pageToken = pageToken)
+        }
             .also { logger.debug { "Fetched messages via gRPC: count=${it.size}" } }
 
     override suspend fun listThreadMessages(threadId: String): List<OperationMessage> =
-        grpcClient.threadService.ListThreadMessages(
-            ThreadIdRequest {
-                this.threadId = threadId
+        paginate { pageToken ->
+            listThreadMessagesPage(threadId = threadId, pageToken = pageToken)
+        }.also { logger.debug { "Fetched thread messages via gRPC: threadId=$threadId, count=${it.size}" } }
+
+    suspend fun listAssignmentsPage(
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+        pageToken: String = "",
+    ): PagedResult<OperationAssignment> =
+        grpcClient.assignmentService.ListAssignments(
+            ListAssignmentsRequest {
+                page = pageRequest(pageSize, pageToken)
             }
-        ).messages
-            .map { it.toOperationMessage() }
-            .also { logger.debug { "Fetched thread messages via gRPC: threadId=$threadId, count=${it.size}" } }
+        ).let { response ->
+            PagedResult(
+                items = response.assignments.map { it.toOperationAssignment() },
+                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
+            )
+        }
+
+    suspend fun listRelevantInstructionsPage(
+        staffId: String,
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+        pageToken: String = "",
+    ): PagedResult<OperationInstruction> =
+        grpcClient.instructionService.ListRelevantInstructions(
+            ListRelevantInstructionsRequest {
+                this.staffId = staffId
+                page = pageRequest(pageSize, pageToken)
+            }
+        ).let { response ->
+            PagedResult(
+                items = response.instructions.map { it.toOperationInstruction() },
+                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
+            )
+        }
+
+    suspend fun listThreadsPage(
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+        pageToken: String = "",
+    ): PagedResult<OperationThread> =
+        grpcClient.threadService.ListThreads(
+            ListThreadsRequest {
+                page = pageRequest(pageSize, pageToken)
+            }
+        ).let { response ->
+            PagedResult(
+                items = response.threads.map { it.toOperationThread() },
+                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
+            )
+        }
+
+    suspend fun listMessagesPage(
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+        pageToken: String = "",
+    ): PagedResult<OperationMessage> =
+        grpcClient.messageService.ListMessages(
+            ListMessagesRequest {
+                page = pageRequest(pageSize, pageToken)
+            }
+        ).let { response ->
+            PagedResult(
+                items = response.messages.map { it.toOperationMessage() },
+                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
+            )
+        }
+
+    suspend fun listThreadMessagesPage(
+        threadId: String,
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+        pageToken: String = "",
+    ): PagedResult<OperationMessage> =
+        grpcClient.threadService.ListThreadMessages(
+            ThreadMessagesRequest {
+                this.threadId = threadId
+                page = pageRequest(pageSize, pageToken)
+            }
+        ).let { response ->
+            PagedResult(
+                items = response.messages.map { it.toOperationMessage() },
+                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
+            )
+        }
+
+    private suspend fun <T> paginate(
+        fetchPage: suspend (pageToken: String) -> PagedResult<T>,
+    ): List<T> {
+        val items = mutableListOf<T>()
+        var nextPageToken = ""
+        do {
+            val page = fetchPage(nextPageToken)
+            items += page.items
+            nextPageToken = page.nextPageToken.orEmpty()
+        } while (nextPageToken.isNotBlank())
+        return items
+    }
+
+    private fun pageRequest(pageSize: Int, pageToken: String): PageRequest = PageRequest {
+        this.pageSize = pageSize
+        this.pageToken = pageToken
+    }
+
+    private companion object {
+        const val DEFAULT_PAGE_SIZE = 100
+    }
 }
 
 internal fun Point.toOperationPoint(): OperationPoint = OperationPoint(

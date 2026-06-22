@@ -20,6 +20,7 @@ import dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -1302,6 +1303,11 @@ private class FakeReportRepository(
     ),
     private val submitErrorMessage: String? = null,
 ) : ReportRepository {
+    override fun observeRelevantReports(currentStaffId: String): Flow<List<RelevantReport>> = flow {
+        errorMessage?.let { error(it) }
+        emit(reports)
+    }
+
     override suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport> {
         errorMessage?.let { error(it) }
         return reports

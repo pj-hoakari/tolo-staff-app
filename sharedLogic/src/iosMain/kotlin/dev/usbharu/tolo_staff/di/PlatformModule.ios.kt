@@ -10,6 +10,8 @@ import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.PollingContactChatService
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
 import dev.usbharu.tolo_staff.streaming.GrpcOperationsPollingRemoteDataSource
+import dev.usbharu.tolo_staff.streaming.NoOpOperationsChangeNotifier
+import dev.usbharu.tolo_staff.streaming.OperationsChangeNotifier
 import dev.usbharu.tolo_staff.streaming.OperationsPollingRemoteDataSource
 import dev.usbharu.tolo_staff.streaming.OperationsReadMode
 import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
@@ -26,7 +28,8 @@ actual fun platformModule(): Module = module {
         val config = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>()
         GrpcCommunicationClient(host = config.host, port = config.port)
     }
-    single<ReportRepository> { GrpcReportRepository(grpcClient = get()) }
+    single<OperationsChangeNotifier> { NoOpOperationsChangeNotifier() }
+    single<ReportRepository> { GrpcReportRepository(grpcClient = get(), changeNotifier = get()) }
     single<EventRepository> { GrpcEventRepository(grpcClient = get()) }
     single<AssignmentStatusService> { GrpcAssignmentStatusService(grpcClient = get()) }
     single<OperationsPollingRemoteDataSource> { GrpcOperationsPollingRemoteDataSource(grpcClient = get()) }

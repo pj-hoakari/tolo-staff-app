@@ -2,15 +2,23 @@ package dev.usbharu.tolo_staff.feature.appshell
 
 import com.google.protobuf.kotlin.invoke
 import dev.usbharu.tolo.communication.grpc.CreateReportRequest
+import dev.usbharu.tolo.communication.grpc.ListRelevantReportsRequest
+import dev.usbharu.tolo.communication.grpc.PageRequest
 import dev.usbharu.tolo.communication.grpc.Report
 import dev.usbharu.tolo.communication.grpc.ReportPriority
-import dev.usbharu.tolo.communication.grpc.StaffIdRequest
 import dev.usbharu.tolo.communication.grpc.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
+import dev.usbharu.tolo_staff.streaming.NoOpOperationsChangeNotifier
+import dev.usbharu.tolo_staff.streaming.OperationEntityType
+import dev.usbharu.tolo_staff.streaming.OperationsChangeNotifier
 import dev.usbharu.tolo_staff.streaming.toIsoString
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 interface ReportRepository {
+    fun observeRelevantReports(currentStaffId: String): Flow<List<RelevantReport>>
+
     suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport>
 
     suspend fun submitReport(
@@ -38,6 +46,8 @@ data class SubmittedReport(
 )
 
 class NoOpReportRepository : ReportRepository {
+    override fun observeRelevantReports(currentStaffId: String): Flow<List<RelevantReport>> = flow { emit(emptyList()) }
+
     override suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport> = emptyList()
 
     override suspend fun submitReport(
@@ -51,14 +61,21 @@ class NoOpReportRepository : ReportRepository {
 class GrpcReportRepository(
     private val fetchRelevantReports: suspend (String) -> List<RelevantReport>,
     private val submitReportRequest: suspend (String, String, String, String) -> SubmittedReport,
+    private val changeNotifier: OperationsChangeNotifier = NoOpOperationsChangeNotifier(),
 ) : ReportRepository {
     private val logger = AppLogger.withTag("GrpcReportRepository")
 
-    constructor(grpcClient: GrpcCommunicationClient) : this(
+    constructor(
+        grpcClient: GrpcCommunicationClient,
+        changeNotifier: OperationsChangeNotifier = NoOpOperationsChangeNotifier(),
+    ) : this(
         fetchRelevantReports = { currentStaffId ->
             grpcClient.reportService.ListRelevantReports(
-                StaffIdRequest {
+                ListRelevantReportsRequest {
                     staffId = currentStaffId
+                    page = PageRequest {
+                        pageSize = DEFAULT_PAGE_SIZE
+                    }
                 }
             ).reports.map { it.toRelevantReport() }
         },
@@ -71,8 +88,18 @@ class GrpcReportRepository(
                     priorityLabel = priorityLabel,
                 )
             ).toSubmittedReport()
-        }
+        },
+        changeNotifier = changeNotifier,
     )
+
+    override fun observeRelevantReports(currentStaffId: String): Flow<List<RelevantReport>> = flow {
+        emit(listRelevantReports(currentStaffId))
+        changeNotifier.observeStaff(currentStaffId).collect { change ->
+            if (change.entityType == OperationEntityType.REPORT) {
+                emit(listRelevantReports(currentStaffId))
+            }
+        }
+    }
 
     override suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport> =
         fetchRelevantReports(currentStaffId)
@@ -147,3 +174,5 @@ internal fun buildCreateReportRequest(
         priority = priorityLabel.toReportPriority()
     }
 }
+
+private const val DEFAULT_PAGE_SIZE = 50

@@ -110,8 +110,44 @@ message ThreadIdRequest {
   string thread_id = 1;
 }
 
+message ThreadMessagesRequest {
+  string thread_id = 1;
+  PageRequest page = 2;
+}
+
 message StaffIdRequest {
   string staff_id = 1;
+}
+
+message AssignmentIdRequest {
+  string assign_id = 1;
+}
+
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListThreadsRequest {
+  PageRequest page = 1;
+}
+
+message ListAssignmentsRequest {
+  PageRequest page = 1;
+}
+
+message ListMessagesRequest {
+  PageRequest page = 1;
+}
+
+message ListRelevantInstructionsRequest {
+  string staff_id = 1;
+  PageRequest page = 2;
+}
+
+message ListRelevantReportsRequest {
+  string staff_id = 1;
+  PageRequest page = 2;
 }
 
 message ListPointsResponse {
@@ -124,6 +160,7 @@ message ListStaffResponse {
 
 message ListAssignmentsResponse {
   repeated Assignment assignments = 1;
+  string next_page_token = 2;
 }
 
 message UpdateAssignmentStatusRequest {
@@ -133,6 +170,7 @@ message UpdateAssignmentStatusRequest {
 
 message ListThreadsResponse {
   repeated Thread threads = 1;
+  string next_page_token = 2;
 }
 
 message CreateThreadRequest {
@@ -149,6 +187,7 @@ message MessageIdRequest {
 
 message ListMessagesResponse {
   repeated Message messages = 1;
+  string next_page_token = 2;
 }
 
 message CreateMessageRequest {
@@ -165,6 +204,7 @@ message InstructionIdRequest {
 
 message ListInstructionsResponse {
   repeated Instruction instructions = 1;
+  string next_page_token = 2;
 }
 
 message CreateInstructionRequest {
@@ -181,6 +221,7 @@ message ReportIdRequest {
 
 message ListReportsResponse {
   repeated Report reports = 1;
+  string next_page_token = 2;
 }
 
 message CreateReportRequest {
@@ -192,9 +233,9 @@ message UpdateReportRequest {
 }
 
 service ThreadRpc {
-  rpc ListThreads(google.protobuf.Empty) returns (ListThreadsResponse);
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
   rpc GetThread(ThreadIdRequest) returns (Thread);
-  rpc ListThreadMessages(ThreadIdRequest) returns (ListMessagesResponse);
+  rpc ListThreadMessages(ThreadMessagesRequest) returns (ListMessagesResponse);
   rpc CreateThread(CreateThreadRequest) returns (Thread);
   rpc UpdateThread(UpdateThreadRequest) returns (Thread);
   rpc DeleteThread(ThreadIdRequest) returns (google.protobuf.Empty);
@@ -209,12 +250,13 @@ service StaffRpc {
 }
 
 service AssignmentRpc {
-  rpc ListAssignments(google.protobuf.Empty) returns (ListAssignmentsResponse);
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse);
+  rpc GetAssignment(AssignmentIdRequest) returns (Assignment);
   rpc UpdateAssignmentStatus(UpdateAssignmentStatusRequest) returns (Assignment);
 }
 
 service MessageRpc {
-  rpc ListMessages(google.protobuf.Empty) returns (ListMessagesResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
   rpc GetMessage(MessageIdRequest) returns (Message);
   rpc CreateMessage(CreateMessageRequest) returns (Message);
   rpc UpdateMessage(UpdateMessageRequest) returns (Message);
@@ -224,7 +266,7 @@ service MessageRpc {
 service InstructionRpc {
   rpc ListInstructions(google.protobuf.Empty) returns (ListInstructionsResponse);
   rpc GetInstruction(InstructionIdRequest) returns (Instruction);
-  rpc ListRelevantInstructions(StaffIdRequest) returns (ListInstructionsResponse);
+  rpc ListRelevantInstructions(ListRelevantInstructionsRequest) returns (ListInstructionsResponse);
   rpc CreateInstruction(CreateInstructionRequest) returns (Instruction);
   rpc UpdateInstruction(UpdateInstructionRequest) returns (Instruction);
   rpc DeleteInstruction(InstructionIdRequest) returns (google.protobuf.Empty);
@@ -233,7 +275,7 @@ service InstructionRpc {
 service ReportRpc {
   rpc ListReports(google.protobuf.Empty) returns (ListReportsResponse);
   rpc GetReport(ReportIdRequest) returns (Report);
-  rpc ListRelevantReports(StaffIdRequest) returns (ListReportsResponse);
+  rpc ListRelevantReports(ListRelevantReportsRequest) returns (ListReportsResponse);
   rpc CreateReport(CreateReportRequest) returns (Report);
   rpc UpdateReport(UpdateReportRequest) returns (Report);
   rpc DeleteReport(ReportIdRequest) returns (google.protobuf.Empty);
