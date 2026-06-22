@@ -172,13 +172,6 @@ data class FormerAssignmentUiModel(
     val canReply: Boolean = true,
 )
 
-enum class ContactThreadBackDestination {
-    NONE,
-    INSTRUCTIONS,
-    REPORTS,
-    REPORT_DETAIL,
-}
-
 data class ContactsTabUiState(
     val threads: List<ContactThreadSummaryUiModel> = emptyList(),
     val selectedThread: ContactThreadDetailUiModel? = null,
@@ -186,5 +179,4 @@ data class ContactsTabUiState(
     val selectedTargetType: ContactTargetType? = null,
     val isChoosingTargetType: Boolean = false,
     val formerAssignments: List<FormerAssignmentUiModel> = emptyList(),
-    val selectedThreadBackDestination: ContactThreadBackDestination = ContactThreadBackDestination.NONE,
 )

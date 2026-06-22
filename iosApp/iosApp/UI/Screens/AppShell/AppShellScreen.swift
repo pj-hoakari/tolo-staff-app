@@ -152,8 +152,6 @@ struct AppShellContentView: View {
                 ReportsTabRootView(
                     state: state.reportsTab,
                     currentStaff: state.currentStaff,
-                    selectedThread: state.contactsTab.selectedThread,
-                    selectedThreadBackDestination: state.contactsTab.selectedThreadBackDestination,
                     onTypeSelected: onReportTypeSelected,
                     onReportSelected: onReportSelected,
                     onReportDetailClosed: onReportDetailClosed,
@@ -165,10 +163,7 @@ struct AppShellContentView: View {
                     onContinueToPlaceSelection: onReportContinueToPlaceSelection,
                     onPlaceSelected: onReportPlaceSelected,
                     onSubmitted: onReportSubmitted,
-                    onBack: onReportBack,
-                    onContactBackToList: onContactBackToList,
-                    onContactDraftChanged: onContactDraftChanged,
-                    onContactSendClicked: onContactSendClicked
+                    onBack: onReportBack
                 )
             }
 

@@ -50,10 +50,7 @@ struct ContactsTabRootView: View {
             }
             .navigationDestination(
                 isPresented: Binding(
-                    get: {
-                        state.selectedThread != nil &&
-                            state.selectedThreadBackDestination != .reportDetail
-                    },
+                    get: { state.selectedThread != nil },
                     set: { isPresented in
                         if !isPresented {
                             onBackToList()

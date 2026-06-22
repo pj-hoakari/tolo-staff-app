@@ -1,6 +1,5 @@
 package dev.usbharu.tolo_staff
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -34,7 +33,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
-import dev.usbharu.tolo_staff.feature.appshell.ContactThreadBackDestination
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetType
 import dev.usbharu.tolo_staff.feature.appshell.InstructionProgressStatus
 import dev.usbharu.tolo_staff.feature.appshell.displayedSelectedTab
@@ -76,44 +74,11 @@ fun ToloStaffAndroidContent(
         val currentRoute = backStackEntry?.destination?.route
         val currentTab = routeToTab(currentRoute)
         val displayedSelectedTab = state.displayedSelectedTab
-        val isShowingReportContextThread =
-            currentRoute == AppShellRoutes.CONTACTS_DETAIL &&
-                state.contactsTab.selectedThreadBackDestination == ContactThreadBackDestination.REPORT_DETAIL &&
-                state.contactsTab.selectedThread != null
         val targetRoute = state.navigationRoute()
         var previousRoute by remember { mutableStateOf<String?>(null) }
-        var pendingClosedRoute by remember { mutableStateOf<String?>(null) }
-
-        val closeReportDetail = {
-            pendingClosedRoute = AppShellRoutes.REPORTS_DETAIL
-            navController.popBackStack(AppShellRoutes.REPORTS_TYPE, inclusive = false)
-            onReportDetailClosed()
-        }
-        val closeReportThread = {
-            pendingClosedRoute = AppShellRoutes.CONTACTS_DETAIL
-            navController.popBackStack(AppShellRoutes.REPORTS_DETAIL, inclusive = false)
-            onContactBackToList()
-        }
-
-        BackHandler(enabled = currentRoute == AppShellRoutes.REPORTS_DETAIL) {
-            closeReportDetail()
-        }
-        BackHandler(enabled = isShowingReportContextThread) {
-            closeReportThread()
-        }
 
         LaunchedEffect(targetRoute, currentRoute) {
             if (currentRoute != null && currentRoute == targetRoute) {
-                return@LaunchedEffect
-            }
-            if (
-                currentRoute == AppShellRoutes.REPORTS_DETAIL &&
-                targetRoute == AppShellRoutes.CONTACTS_DETAIL &&
-                state.contactsTab.selectedThreadBackDestination == ContactThreadBackDestination.REPORT_DETAIL
-            ) {
-                navController.navigate(AppShellRoutes.CONTACTS_DETAIL) {
-                    launchSingleTop = true
-                }
                 return@LaunchedEffect
             }
             val targetTab = routeToTab(targetRoute)
@@ -152,18 +117,7 @@ fun ToloStaffAndroidContent(
                         onReportBack()
                     }
                     lastRoute == AppShellRoutes.REPORTS_DETAIL && currentRoute == AppShellRoutes.REPORTS_TYPE -> {
-                        if (pendingClosedRoute == AppShellRoutes.REPORTS_DETAIL) {
-                            pendingClosedRoute = null
-                        } else {
-                            onReportDetailClosed()
-                        }
-                    }
-                    lastRoute == AppShellRoutes.CONTACTS_DETAIL && currentRoute == AppShellRoutes.REPORTS_DETAIL -> {
-                        if (pendingClosedRoute == AppShellRoutes.CONTACTS_DETAIL) {
-                            pendingClosedRoute = null
-                        } else {
-                            onContactBackToList()
-                        }
+                        onReportDetailClosed()
                     }
                     lastRoute == AppShellRoutes.CONTACTS_DETAIL && currentRoute == AppShellRoutes.CONTACTS_LIST -> {
                         onContactBackToList()
@@ -199,14 +153,6 @@ fun ToloStaffAndroidContent(
                             IconButton(
                                 onClick = {
                                     when (currentRoute) {
-                                        AppShellRoutes.REPORTS_DETAIL -> closeReportDetail()
-                                        AppShellRoutes.CONTACTS_DETAIL -> {
-                                            if (isShowingReportContextThread) {
-                                                closeReportThread()
-                                            } else {
-                                                navController.navigateUp()
-                                            }
-                                        }
                                         else -> navController.navigateUp()
                                     }
                                 }

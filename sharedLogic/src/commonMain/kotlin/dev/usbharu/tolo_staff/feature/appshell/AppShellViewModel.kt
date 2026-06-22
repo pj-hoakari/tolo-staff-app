@@ -193,7 +193,6 @@ class AppShellViewModel(
                     selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    selectedThreadBackDestination = ContactThreadBackDestination.INSTRUCTIONS,
                 )
             )
         }
@@ -353,75 +352,110 @@ class AppShellViewModel(
                 append("]")
             }
         }
-        val threadId = "report-${selectedType.id}-${selectedPlace.id}"
         val currentStaff = currentState.currentStaff
-        val submittedThread = ContactThreadDetailUiModel(
-            id = threadId,
-            title = "${selectedType.title} / ${selectedPlace.displayName}",
-            target = ContactTargetUiModel(
-                id = selectedPlace.id,
-                type = ContactTargetType.PLACE,
-                displayName = selectedPlace.displayName,
-                subtitle = "本部"
-            ),
-            messages = listOf(
-                ThreadMessageUiModel(
-                    id = "$threadId-message",
-                    senderName = currentStaff.displayName,
-                    senderRoleLabel = currentStaff.roleLabel,
-                    body = submittedSummary,
-                    timeLabel = null,
-                    isCurrentUser = true,
-                    reportId = threadId,
-                    reportTitle = selectedType.title,
-                    reportSummary = submittedSummary,
-                    reportPriorityLabel = reportsTab.draft.urgencyLabel,
-                    reportAuthorName = currentStaff.displayName,
-                    reportTargetLabel = selectedPlace.displayName,
-                    reportTimeLabel = null,
-                    reportIsAuthoredByCurrentStaff = true,
-                )
-            ),
-            canReply = true,
-        )
-        val submittedReport = RelatedReportUiModel(
-            reportId = threadId,
-            threadId = threadId,
-            title = selectedType.title,
-            summary = submittedSummary,
-            priorityLabel = reportsTab.draft.urgencyLabel,
-            authorStaffId = currentStaff.staffId,
-            authorName = currentStaff.displayName,
-            targetLabel = selectedPlace.displayName,
-            isAuthoredByCurrentStaff = true,
-        )
-        localCreatedReports = mergeRelatedReports(localCreatedReports, listOf(submittedReport))
-        localCreatedContactThreads = localCreatedContactThreads + (threadId to submittedThread)
-
         updateState { state ->
             state.copy(
                 reportsTab = state.reportsTab.copy(
-                    relatedReports = mergeRelatedReports(state.reportsTab.relatedReports, localCreatedReports),
-                    step = ReportFlowStep.TYPE_SELECTION,
-                    draft = ReportDraftUiModel(),
-                    selectedReport = null,
-                    openedFromContactThreadId = null,
+                    isLoadingReports = true,
+                    reportsErrorMessage = null,
                 ),
-                selectedTab = AppTab.CONTACTS,
-                contactsTab = state.contactsTab.copy(
-                    threads = mergeLocalContactThreads(
-                        baseThreads = state.contactsTab.threads,
-                        localThreads = localCreatedContactThreads,
-                    ),
-                    selectedThread = submittedThread,
-                    isChoosingTargetType = false,
-                    selectedTargetType = null,
-                    selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
-                ),
-                homeOverview = state.homeOverview.copy(
-                    pendingReportLabel = "最新報告: ${selectedType.title}"
-                ),
+                errorMessage = null,
             )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                reportRepository.submitReport(
+                    currentStaffId = currentStaff.staffId,
+                    title = selectedType.title,
+                    summary = submittedSummary,
+                    priorityLabel = reportsTab.draft.urgencyLabel,
+                )
+            }.onSuccess { submittedReport ->
+                val submittedThread = ContactThreadDetailUiModel(
+                    id = submittedReport.threadId,
+                    title = "${selectedType.title} / ${selectedPlace.displayName}",
+                    target = ContactTargetUiModel(
+                        id = selectedPlace.id,
+                        type = ContactTargetType.PLACE,
+                        displayName = selectedPlace.displayName,
+                        subtitle = "本部"
+                    ),
+                    messages = listOf(
+                        ThreadMessageUiModel(
+                            id = "${submittedReport.reportId}-message",
+                            senderName = currentStaff.displayName,
+                            senderRoleLabel = currentStaff.roleLabel,
+                            body = submittedSummary,
+                            timeLabel = submittedReport.createdAtLabel,
+                            isCurrentUser = true,
+                            reportId = submittedReport.reportId,
+                            reportTitle = selectedType.title,
+                            reportSummary = submittedSummary,
+                            reportPriorityLabel = reportsTab.draft.urgencyLabel,
+                            reportAuthorName = currentStaff.displayName,
+                            reportTargetLabel = selectedPlace.displayName,
+                            reportTimeLabel = submittedReport.createdAtLabel,
+                            reportIsAuthoredByCurrentStaff = true,
+                        )
+                    ),
+                    canReply = true,
+                )
+                val reportUiModel = RelatedReportUiModel(
+                    reportId = submittedReport.reportId,
+                    threadId = submittedReport.threadId,
+                    title = selectedType.title,
+                    summary = submittedSummary,
+                    priorityLabel = reportsTab.draft.urgencyLabel,
+                    authorStaffId = currentStaff.staffId,
+                    authorName = currentStaff.displayName,
+                    targetLabel = selectedPlace.displayName,
+                    timeLabel = submittedReport.createdAtLabel,
+                    isAuthoredByCurrentStaff = true,
+                )
+                localCreatedReports = mergeRelatedReports(localCreatedReports, listOf(reportUiModel))
+                localCreatedContactThreads = localCreatedContactThreads + (submittedReport.threadId to submittedThread)
+
+                updateState { state ->
+                    state.copy(
+                        reportsTab = state.reportsTab.copy(
+                            relatedReports = mergeRelatedReports(state.reportsTab.relatedReports, localCreatedReports),
+                            step = ReportFlowStep.TYPE_SELECTION,
+                            draft = ReportDraftUiModel(),
+                            selectedReport = null,
+                            openedFromContactThreadId = null,
+                            isLoadingReports = false,
+                            reportsErrorMessage = null,
+                        ),
+                        selectedTab = AppTab.CONTACTS,
+                        contactsTab = state.contactsTab.copy(
+                            threads = mergeLocalContactThreads(
+                                baseThreads = state.contactsTab.threads,
+                                localThreads = localCreatedContactThreads,
+                            ),
+                            selectedThread = submittedThread,
+                            isChoosingTargetType = false,
+                            selectedTargetType = null,
+                        ),
+                        homeOverview = state.homeOverview.copy(
+                            pendingReportLabel = "最新報告: ${selectedType.title}"
+                        ),
+                        errorMessage = null,
+                    )
+                }
+            }.onFailure { throwable ->
+                logger.warn(throwable) {
+                    "Failed to submit report: currentStaffId=${currentStaff.staffId}, reportType=${selectedType.id}, placeId=${selectedPlace.id}"
+                }
+                updateState { state ->
+                    state.copy(
+                        reportsTab = state.reportsTab.copy(
+                            isLoadingReports = false,
+                            reportsErrorMessage = throwable.message ?: "報告の送信に失敗しました",
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -468,7 +502,6 @@ class AppShellViewModel(
                     selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    selectedThreadBackDestination = ContactThreadBackDestination.REPORT_DETAIL,
                 )
             )
         }
@@ -491,7 +524,6 @@ class AppShellViewModel(
                         selectedThread = sourceThread,
                         isChoosingTargetType = false,
                         selectedTargetType = null,
-                        selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                     )
                 )
             } else {
@@ -525,11 +557,11 @@ class AppShellViewModel(
         val detail = contactDetailsById[threadId] ?: localCreatedContactThreads[threadId] ?: return
         updateState {
             it.copy(
+                selectedTab = AppTab.CONTACTS,
                 contactsTab = it.contactsTab.copy(
                     selectedThread = detail,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                 )
             )
         }
@@ -538,17 +570,11 @@ class AppShellViewModel(
     fun onContactBackToList() {
         updateState { state ->
             state.copy(
-                selectedTab = when (state.contactsTab.selectedThreadBackDestination) {
-                    ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
-                    ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
-                    ContactThreadBackDestination.REPORT_DETAIL -> AppTab.REPORTS
-                    ContactThreadBackDestination.NONE -> state.selectedTab
-                },
+                selectedTab = AppTab.CONTACTS,
                 contactsTab = state.contactsTab.copy(
                     selectedThread = null,
                     isChoosingTargetType = false,
                     selectedTargetType = null,
-                    selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                 )
             )
         }
@@ -564,7 +590,6 @@ class AppShellViewModel(
                     selectedThread = null,
                     isChoosingTargetType = true,
                     selectedTargetType = null,
-                    selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                 )
             )
         }
@@ -819,11 +844,6 @@ class AppShellViewModel(
                             selectedThread = selectedThread,
                             selectedTargetType = selectedTargetType,
                             isChoosingTargetType = state.contactsTab.isChoosingTargetType && snapshot.contactsTab.availableTargets.isNotEmpty(),
-                            selectedThreadBackDestination = if (selectedThread != null) {
-                                state.contactsTab.selectedThreadBackDestination
-                            } else {
-                                ContactThreadBackDestination.NONE
-                            },
                         ),
                         isLoading = false,
                         errorMessage = null,
@@ -1126,7 +1146,6 @@ class AppShellViewModel(
                 selectedTargetType = null,
                 isChoosingTargetType = false,
                 formerAssignments = emptyList(),
-                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
             ),
             detailsById = detailsById,
         )

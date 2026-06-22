@@ -14,7 +14,6 @@ import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
 import dev.usbharu.tolo_staff.feature.appshell.AppShellMapState
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
-import dev.usbharu.tolo_staff.feature.appshell.ContactThreadBackDestination
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetType
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ContactThreadDetailUiModel
@@ -66,7 +65,7 @@ class ToloStaffAndroidContentTest {
     }
 
     @Test
-    fun reportsSubmissionOpensContactThreadAndBackReturnsToReports() {
+    fun reportsSubmissionOpensContactThreadAndBackReturnsToContactList() {
         setTestContent()
 
         composeRule.onNodeWithText("報告").performClick()
@@ -80,11 +79,11 @@ class ToloStaffAndroidContentTest {
         composeRule.onNodeWithContentDescription("contact_thread_detail").assertExists()
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        composeRule.onNodeWithText("本部へ送る報告種別を選択します。").assertExists()
+        composeRule.onNodeWithText("現在のスレッドと新規連絡の開始").assertExists()
     }
 
     @Test
-    fun relatedReportOpensDetailThenContactThreadAndBackReturnsToDetail() {
+    fun relatedReportOpensDetailThenContactThreadAndBackReturnsToContactList() {
         setTestContent()
 
         composeRule.onNodeWithText("報告").performClick()
@@ -94,7 +93,21 @@ class ToloStaffAndroidContentTest {
         composeRule.onNodeWithContentDescription("contact_thread_detail").assertExists()
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        composeRule.onNodeWithContentDescription("report_detail_screen").assertExists()
+        composeRule.onNodeWithText("現在のスレッドと新規連絡の開始").assertExists()
+    }
+
+    @Test
+    fun instructionDetailOpensThreadAndBackReturnsToContactList() {
+        setTestContent()
+
+        composeRule.onNodeWithText("指示").performClick()
+        composeRule.onNodeWithContentDescription("instruction_row_instruction-2").performClick()
+        composeRule.onNodeWithText("指示詳細").assertExists()
+        composeRule.onNodeWithText("スレッドを見る").performClick()
+        composeRule.onNodeWithContentDescription("contact_thread_detail").assertExists()
+
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.onNodeWithText("現在のスレッドと新規連絡の開始").assertExists()
     }
 
     @Test
@@ -280,7 +293,6 @@ class ToloStaffAndroidContentTest {
                         selectedTab = AppTab.CONTACTS,
                         contactsTab = state.contactsTab.copy(
                             selectedThread = contactThread,
-                            selectedThreadBackDestination = ContactThreadBackDestination.INSTRUCTIONS,
                         ),
                     )
                 },
@@ -329,9 +341,6 @@ class ToloStaffAndroidContentTest {
                                 selectedReport = null,
                                 openedFromContactThreadId = null,
                             ),
-                            contactsTab = state.contactsTab.copy(
-                                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
-                            )
                         )
                     } else {
                         state.copy(
@@ -369,7 +378,6 @@ class ToloStaffAndroidContentTest {
                                     )
                                 ),
                             ),
-                            selectedThreadBackDestination = ContactThreadBackDestination.REPORT_DETAIL,
                         )
                     )
                 },
@@ -429,7 +437,6 @@ class ToloStaffAndroidContentTest {
                                     )
                                 ),
                             ),
-                            selectedThreadBackDestination = ContactThreadBackDestination.REPORTS,
                         )
                     )
                 },
@@ -449,7 +456,6 @@ class ToloStaffAndroidContentTest {
                         selectedTab = AppTab.CONTACTS,
                         contactsTab = state.contactsTab.copy(
                             selectedThread = contactThread,
-                            selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                         ),
                     )
                 },
@@ -481,23 +487,14 @@ class ToloStaffAndroidContentTest {
                                 selectedReport = null,
                                 openedFromContactThreadId = null,
                             ),
-                            contactsTab = state.contactsTab.copy(
-                                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
-                            )
                         )
                     } else {
                         state.copy(
-                            selectedTab = when (state.contactsTab.selectedThreadBackDestination) {
-                                ContactThreadBackDestination.NONE -> state.selectedTab
-                                ContactThreadBackDestination.INSTRUCTIONS -> AppTab.INSTRUCTIONS
-                                ContactThreadBackDestination.REPORTS -> AppTab.REPORTS
-                                ContactThreadBackDestination.REPORT_DETAIL -> AppTab.REPORTS
-                            },
+                            selectedTab = AppTab.CONTACTS,
                             contactsTab = state.contactsTab.copy(
                                 selectedThread = null,
                                 isChoosingTargetType = false,
                                 selectedTargetType = null,
-                                selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                             )
                         )
                     }
@@ -507,7 +504,6 @@ class ToloStaffAndroidContentTest {
                         selectedTab = AppTab.CONTACTS,
                         contactsTab = state.contactsTab.copy(
                             isChoosingTargetType = true,
-                            selectedThreadBackDestination = ContactThreadBackDestination.NONE,
                         ),
                     )
                 },

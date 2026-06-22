@@ -59,7 +59,29 @@ final class SampleScenarioTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["contact_thread_detail"].waitForExistence(timeout: 3))
 
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["report_detail_screen"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["contact_thread_list"].waitForExistence(timeout: 3))
+    }
+
+    func testInstructionThreadBackReturnsToContactList() throws {
+        let tabBarButtons = app.tabBars.buttons
+        XCTAssertGreaterThanOrEqual(tabBarButtons.count, 4)
+
+        tabBarButtons.element(boundBy: 1).tap()
+        let instruction = app.descendants(matching: .any)["instruction_row_instruction-2"]
+        try XCTSkipUnless(
+            instruction.waitForExistence(timeout: 2),
+            "指示の固定データがない環境ではこのシナリオをスキップする"
+        )
+
+        instruction.tap()
+        let openThreadButton = app.buttons["スレッドを見る"]
+        XCTAssertTrue(openThreadButton.waitForExistence(timeout: 3))
+        openThreadButton.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["contact_thread_detail"].waitForExistence(timeout: 3))
+
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["contact_thread_list"].waitForExistence(timeout: 3))
     }
 
     func testReportMessageInContactThreadOpensReportDetailAndBackReturnsToThread() throws {

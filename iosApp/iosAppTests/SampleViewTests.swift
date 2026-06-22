@@ -162,8 +162,7 @@ final class SampleViewTests: XCTestCase {
             availableTargets: [],
             selectedTargetType: nil,
             isChoosingTargetType: false,
-            formerAssignments: [],
-            selectedThreadBackDestination: .none
+            formerAssignments: []
         )
         let state = makeAppShellState(
             selectedTab: AppTab.contacts,
@@ -291,8 +290,7 @@ final class SampleViewTests: XCTestCase {
                 availableTargets: [],
                 selectedTargetType: nil,
                 isChoosingTargetType: false,
-                formerAssignments: [],
-                selectedThreadBackDestination: .none
+                formerAssignments: []
             ),
             isLoading: false,
             errorMessage: nil

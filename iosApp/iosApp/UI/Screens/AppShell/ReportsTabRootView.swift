@@ -6,13 +6,10 @@ struct ReportsTabRootView: View {
         case draft
         case placeSelection
         case detail
-        case thread
     }
 
     let state: ReportsTabUiState
     let currentStaff: CurrentStaffUiModel
-    let selectedThread: ContactThreadDetailUiModel?
-    let selectedThreadBackDestination: ContactThreadBackDestination
     var onTypeSelected: (String) -> Void = { _ in }
     var onReportSelected: (String) -> Void = { _ in }
     var onReportDetailClosed: () -> Void = {}
@@ -25,9 +22,6 @@ struct ReportsTabRootView: View {
     var onPlaceSelected: (String) -> Void = { _ in }
     var onSubmitted: () -> Void = {}
     var onBack: () -> Void = {}
-    var onContactBackToList: () -> Void = {}
-    var onContactDraftChanged: (String) -> Void = { _ in }
-    var onContactSendClicked: () -> Void = {}
 
     var body: some View {
         NavigationStack(path: navigationPath) {
@@ -58,17 +52,6 @@ struct ReportsTabRootView: View {
                             .navigationTitle("報告詳細")
                             .navigationBarTitleDisplayMode(.inline)
                         }
-                    case .thread:
-                        if let selectedThread {
-                            ContactThreadDetailView(
-                                thread: selectedThread,
-                                onReportSelected: { _ in },
-                                onDraftChanged: onContactDraftChanged,
-                                onSendClicked: onContactSendClicked
-                            )
-                            .navigationTitle(selectedThread.title)
-                            .navigationBarTitleDisplayMode(.inline)
-                        }
                     }
                 }
         }
@@ -86,8 +69,6 @@ struct ReportsTabRootView: View {
                         onBack()
                     case .detail:
                         onReportDetailClosed()
-                    case .thread:
-                        onContactBackToList()
                     }
                 }
             }
@@ -109,11 +90,6 @@ struct ReportsTabRootView: View {
 
         if state.selectedReport != nil {
             routes.append(.detail)
-        }
-
-        if selectedThreadBackDestination == .reportDetail,
-           selectedThread != nil {
-            routes.append(.thread)
         }
 
         return routes

@@ -335,6 +335,84 @@ class AppShellViewModelTest {
     }
 
     @Test
+    fun `opening instruction thread switches to contacts and selects thread`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            points = listOf(
+                OperationPoint(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "gate-a",
+                    pointId = "gate-a",
+                    name = "Gate A",
+                    description = "North entrance",
+                )
+            ),
+            instructions = listOf(
+                OperationInstruction(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "instruction-gate-a",
+                    instructionId = "instruction-gate-a",
+                    title = "Shift update",
+                    description = "Move barricades",
+                    pointIds = listOf("gate-a"),
+                    staffIds = listOf("tanaka"),
+                    status = dev.usbharu.tolo_staff.streaming.OperationInstructionStatus.ACTIVE,
+                )
+            ),
+            threads = listOf(
+                OperationThread(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "thread-gate-a",
+                    threadId = "thread-gate-a",
+                    members = listOf("tanaka", "hq"),
+                    displayTitle = "本部 / Gate A",
+                )
+            ),
+            messages = listOf(
+                OperationMessage(
+                    updatedAt = "2026-06-19T09:00:00Z",
+                    reason = "test",
+                    entityId = "message-gate-a",
+                    messageId = "message-gate-a",
+                    threadId = "thread-gate-a",
+                    instructionId = "instruction-gate-a",
+                    staffId = "hq",
+                    messageType = OperationMessageType.SIMPLE,
+                    text = "南口の状況を共有してください",
+                )
+            )
+        )
+        val repository = FakeOperationsOverviewRepository(
+            projections = mapOf(
+                "tanaka" to AppShellOperationsProjection(
+                    homeOverview = AppShellHomeOverview(
+                        currentInstruction = "Move barricades",
+                        currentInstructionId = "instruction-gate-a",
+                    ),
+                    currentPlacementName = "Gate A"
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = repository,
+            dataSource = dataSource,
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onInstructionSelected("instruction-gate-a")
+        viewModel.onInstructionThreadOpened()
+
+        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
+        assertEquals("thread-gate-a", viewModel.uiState.value.contactsTab.selectedThread?.id)
+        assertEquals("本部 / Gate A", viewModel.uiState.value.contactsTab.selectedThread?.title)
+        viewModel.clear()
+    }
+
+    @Test
     fun `closing contact thread keeps selection empty when no instruction thread was opened`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(
@@ -345,7 +423,7 @@ class AppShellViewModelTest {
 
         viewModel.onContactBackToList()
 
-        assertEquals(AppTab.HOME, viewModel.uiState.value.selectedTab)
+        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
         assertEquals(null, viewModel.uiState.value.instructionsTab.selectedInstruction?.id)
         assertEquals(null, viewModel.uiState.value.contactsTab.selectedThread)
         viewModel.clear()
@@ -369,7 +447,12 @@ class AppShellViewModelTest {
         val viewModel = AppShellViewModel(
             overviewRepository = FakeOperationsOverviewRepository(),
             dataSource = dataSource,
-            reportRepository = FakeReportRepository(),
+            reportRepository = FakeReportRepository(
+                submittedReport = SubmittedReport(
+                    reportId = "report-created-1",
+                    threadId = "thread-created-1",
+                )
+            ),
             currentStaffSession = createSession(dispatcher),
             coroutineContext = dispatcher
         )
@@ -389,12 +472,57 @@ class AppShellViewModelTest {
             "導線報告: 最後尾が歩道へ伸びています [高]",
             viewModel.uiState.value.contactsTab.selectedThread?.messages?.lastOrNull()?.body
         )
-        assertEquals("report-queue-gate-a", viewModel.uiState.value.reportsTab.relatedReports.first().reportId)
-        assertEquals(
-            ContactThreadBackDestination.REPORTS,
-            viewModel.uiState.value.contactsTab.selectedThreadBackDestination
+        assertEquals("report-created-1", viewModel.uiState.value.reportsTab.relatedReports.first().reportId)
+        assertTrue(viewModel.uiState.value.contactsTab.threads.any { it.id == "thread-created-1" })
+        assertEquals("thread-created-1", viewModel.uiState.value.contactsTab.selectedThread?.id)
+        viewModel.clear()
+    }
+
+    @Test
+    fun `report submission failure keeps draft state and surfaces error`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            staff = listOf(
+                OperationStaff(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "tanaka",
+                    staffId = "tanaka",
+                    name = "田中",
+                    roles = listOf("Aゲート担当"),
+                )
+            ),
+            points = listOf(
+                OperationPoint(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "gate-a",
+                    pointId = "gate-a",
+                    name = "Gate A",
+                    description = "North entrance",
+                )
+            )
         )
-        assertTrue(viewModel.uiState.value.contactsTab.threads.any { it.id == "report-queue-gate-a" })
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            reportRepository = FakeReportRepository(submitErrorMessage = "submit failed"),
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onReportTypeSelected("queue")
+        viewModel.onReportCommentChanged("最後尾が歩道へ伸びています")
+        viewModel.onReportUrgencySelected("高")
+        viewModel.onReportContinueToPlaceSelection()
+        viewModel.onReportPlaceSelected("gate-a")
+        viewModel.onReportSubmitted()
+
+        assertEquals(AppTab.HOME, viewModel.uiState.value.selectedTab)
+        assertEquals(ReportFlowStep.PLACE_SELECTION, viewModel.uiState.value.reportsTab.step)
+        assertEquals("gate-a", viewModel.uiState.value.reportsTab.draft.selectedPlaceId)
+        assertEquals("submit failed", viewModel.uiState.value.reportsTab.reportsErrorMessage)
+        assertEquals(null, viewModel.uiState.value.contactsTab.selectedThread)
         viewModel.clear()
     }
 
@@ -467,14 +595,10 @@ class AppShellViewModelTest {
 
         assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
         assertEquals("本部 / 南口", viewModel.uiState.value.contactsTab.selectedThread?.title)
-        assertEquals(
-            ContactThreadBackDestination.REPORT_DETAIL,
-            viewModel.uiState.value.contactsTab.selectedThreadBackDestination
-        )
         assertEquals("report-1", viewModel.uiState.value.contactsTab.selectedThread?.messages?.singleOrNull()?.reportId)
         assertEquals("導線報告", viewModel.uiState.value.contactsTab.selectedThread?.messages?.singleOrNull()?.reportTitle)
         viewModel.onContactBackToList()
-        assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
+        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
         assertEquals(null, viewModel.uiState.value.contactsTab.selectedThread)
         assertEquals("導線報告", viewModel.uiState.value.reportsTab.selectedReport?.title)
         viewModel.onReportDetailClosed()
@@ -1149,10 +1273,25 @@ private class FakeContactChatService : ContactChatService {
 private class FakeReportRepository(
     private val reports: List<RelevantReport> = emptyList(),
     private val errorMessage: String? = null,
+    private val submittedReport: SubmittedReport = SubmittedReport(
+        reportId = "report-1",
+        threadId = "thread-1",
+    ),
+    private val submitErrorMessage: String? = null,
 ) : ReportRepository {
     override suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport> {
         errorMessage?.let { error(it) }
         return reports
+    }
+
+    override suspend fun submitReport(
+        currentStaffId: String,
+        title: String,
+        summary: String,
+        priorityLabel: String,
+    ): SubmittedReport {
+        submitErrorMessage?.let { error(it) }
+        return submittedReport
     }
 }
 
