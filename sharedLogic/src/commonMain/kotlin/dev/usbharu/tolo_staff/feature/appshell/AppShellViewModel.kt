@@ -403,7 +403,6 @@ class AppShellViewModel(
                             step = ReportFlowStep.TYPE_SELECTION,
                             draft = ReportDraftUiModel(),
                             selectedReport = null,
-                            openedFromContactThreadId = null,
                             isLoadingReports = false,
                             reportsErrorMessage = null,
                         ),
@@ -446,7 +445,6 @@ class AppShellViewModel(
                 selectedTab = AppTab.REPORTS,
                 reportsTab = state.reportsTab.copy(
                     selectedReport = report.toDetailUiModel(),
-                    openedFromContactThreadId = null,
                 )
             )
         }
@@ -454,13 +452,11 @@ class AppShellViewModel(
 
     fun onContactReportMessageSelected(reportId: String) {
         val report = currentState.reportsTab.relatedReports.firstOrNull { it.reportId == reportId } ?: return
-        val sourceThreadId = currentState.contactsTab.selectedThread?.id ?: return
         updateState { state ->
             state.copy(
                 selectedTab = AppTab.REPORTS,
                 reportsTab = state.reportsTab.copy(
                     selectedReport = report.toDetailUiModel(),
-                    openedFromContactThreadId = sourceThreadId,
                 )
             )
         }
@@ -489,31 +485,11 @@ class AppShellViewModel(
 
     fun onReportDetailClosed() {
         updateState { state ->
-            val sourceThreadId = state.reportsTab.openedFromContactThreadId
-            val sourceThread = sourceThreadId
-                ?.let { contactDetailsById[it] ?: localCreatedContactThreads[it] }
-                ?: state.contactsTab.selectedThread
-            if (sourceThreadId != null && sourceThread != null) {
-                state.copy(
-                    selectedTab = AppTab.CONTACTS,
-                    reportsTab = state.reportsTab.copy(
-                        selectedReport = null,
-                        openedFromContactThreadId = null,
-                    ),
-                    contactsTab = state.contactsTab.copy(
-                        selectedThread = sourceThread,
-                        isChoosingTargetType = false,
-                        selectedTargetType = null,
-                    )
+            state.copy(
+                reportsTab = state.reportsTab.copy(
+                    selectedReport = null,
                 )
-            } else {
-                state.copy(
-                    reportsTab = state.reportsTab.copy(
-                        selectedReport = null,
-                        openedFromContactThreadId = null,
-                    )
-                )
-            }
+            )
         }
     }
 

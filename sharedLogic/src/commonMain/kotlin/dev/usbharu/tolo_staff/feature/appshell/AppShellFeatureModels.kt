@@ -142,7 +142,6 @@ data class ReportsTabUiState(
     val step: ReportFlowStep = ReportFlowStep.TYPE_SELECTION,
     val relatedReports: List<RelatedReportUiModel> = emptyList(),
     val selectedReport: ReportDetailUiModel? = null,
-    val openedFromContactThreadId: String? = null,
     val isLoadingReports: Boolean = false,
     val reportsErrorMessage: String? = null,
 )

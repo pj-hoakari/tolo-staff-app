@@ -84,7 +84,7 @@ final class SampleScenarioTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["contact_thread_list"].waitForExistence(timeout: 3))
     }
 
-    func testReportMessageInContactThreadOpensReportDetailAndBackReturnsToThread() throws {
+    func testReportMessageInContactThreadOpensReportDetailAndBackReturnsToReportList() throws {
         let tabBarButtons = app.tabBars.buttons
         XCTAssertGreaterThanOrEqual(tabBarButtons.count, 4)
 
@@ -106,7 +106,7 @@ final class SampleScenarioTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["report_detail_screen"].waitForExistence(timeout: 3))
 
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["contact_thread_detail"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["report_type_queue"].waitForExistence(timeout: 3))
     }
 
     private func attachScreenshot(name: String) {

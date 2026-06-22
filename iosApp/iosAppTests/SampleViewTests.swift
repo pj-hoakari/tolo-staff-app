@@ -280,7 +280,6 @@ final class SampleViewTests: XCTestCase {
                 step: .typeSelection,
                 relatedReports: [],
                 selectedReport: selectedReport,
-                openedFromContactThreadId: nil,
                 isLoadingReports: false,
                 reportsErrorMessage: nil
             ),

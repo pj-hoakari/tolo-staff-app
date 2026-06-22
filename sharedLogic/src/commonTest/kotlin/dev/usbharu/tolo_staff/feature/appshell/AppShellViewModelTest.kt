@@ -687,7 +687,7 @@ class AppShellViewModelTest {
     }
 
     @Test
-    fun `contact report message opens report detail and closing detail returns to same thread`() = runTest {
+    fun `contact report message opens report detail and closing detail returns to report list`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val dataSource = FakeOperationsStreamDataSource(
             staff = listOf(
@@ -748,14 +748,11 @@ class AppShellViewModelTest {
 
         assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
         assertEquals("導線報告", viewModel.uiState.value.reportsTab.selectedReport?.title)
-        assertEquals("report-thread-1", viewModel.uiState.value.reportsTab.openedFromContactThreadId)
 
         viewModel.onReportDetailClosed()
 
-        assertEquals(AppTab.CONTACTS, viewModel.uiState.value.selectedTab)
-        assertEquals("report-thread-1", viewModel.uiState.value.contactsTab.selectedThread?.id)
+        assertEquals(AppTab.REPORTS, viewModel.uiState.value.selectedTab)
         assertEquals(null, viewModel.uiState.value.reportsTab.selectedReport)
-        assertEquals(null, viewModel.uiState.value.reportsTab.openedFromContactThreadId)
         viewModel.clear()
     }
 
