@@ -96,7 +96,7 @@ class ContactChatViewModelTest {
     }
 
     @Test
-    fun `send adds optimistic message then reconciles on success`() = runTest {
+    fun `send waits for server message ids on success`() = runTest {
         val service = FakeContactChatService(
             rooms = listOf(ChatRoom(id = "thread-1", title = "sato")),
             initialMessagesByRoom = mutableMapOf("thread-1" to emptyList())
@@ -121,7 +121,8 @@ class ContactChatViewModelTest {
         viewModel.onSendClicked()
 
         assertEquals("", viewModel.uiState.value.draftText)
-        assertTrue(viewModel.uiState.value.messages.any { it.body == "配置につきました" })
+        assertTrue(viewModel.uiState.value.messages.isEmpty())
+        assertTrue(viewModel.uiState.value.isSending)
 
         advanceUntilIdle()
 
@@ -133,7 +134,7 @@ class ContactChatViewModelTest {
     }
 
     @Test
-    fun `send rolls back optimistic message on failure`() = runTest {
+    fun `send preserves empty message list on failure without local ids`() = runTest {
         val service = FakeContactChatService(
             rooms = listOf(ChatRoom(id = "thread-1", title = "sato")),
             initialMessagesByRoom = mutableMapOf("thread-1" to emptyList()),
@@ -212,7 +213,7 @@ class ContactChatViewModelTest {
         advanceUntilIdle()
         viewModel.onDraftChanged("確認します")
         viewModel.onSendClicked()
-        assertEquals("佐藤", viewModel.uiState.value.messages.single().senderName)
+        assertTrue(viewModel.uiState.value.messages.isEmpty())
         advanceUntilIdle()
 
         assertEquals("sato", service.lastSentStaffId)

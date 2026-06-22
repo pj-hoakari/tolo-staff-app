@@ -94,7 +94,7 @@ class ContactChatMappingsTest {
     }
 
     @Test
-    fun `ui message identifies current user from sender name when sender id is unavailable`() {
+    fun `ui message does not identify current user from sender name when sender id is unavailable`() {
         val message = OperationMessage(
             updatedAt = "2026-06-19T09:00:00Z",
             reason = "test",
@@ -114,7 +114,7 @@ class ContactChatMappingsTest {
         )
 
         assertEquals("田中", message.senderName)
-        assertEquals(true, message.isFromCurrentUser)
+        assertEquals(false, message.isFromCurrentUser)
     }
 
 }

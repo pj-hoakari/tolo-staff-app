@@ -119,18 +119,8 @@ class ContactChatViewModel(
         }
         logger.info { "Sending chat draft: roomId=$roomId, staffId=${currentStaff.staffId}, textLength=${text.length}" }
 
-        val optimisticMessage = ChatMessage(
-            id = "local-${nextLocalMessageId++}",
-            roomId = roomId,
-            senderName = currentStaff.displayName,
-            body = text,
-            timeLabel = null,
-            isFromCurrentUser = true,
-        )
-
         updateState {
             it.copy(
-                messages = it.messages + optimisticMessage,
                 draftText = "",
                 isSending = true,
                 errorMessage = null,
@@ -153,7 +143,6 @@ class ContactChatViewModel(
                     state.copy(
                         isSending = false,
                         errorMessage = throwable.message ?: "メッセージ送信に失敗しました",
-                        messages = state.messages.filterNot { it.id == optimisticMessage.id },
                     )
                 }
             }
@@ -237,9 +226,5 @@ class ContactChatViewModel(
         roomsJob?.cancel()
         selectedRoomJob?.cancel()
         super.clear()
-    }
-
-    private companion object {
-        var nextLocalMessageId = 1L
     }
 }

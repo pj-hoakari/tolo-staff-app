@@ -354,6 +354,7 @@ class AppShellViewModelTest {
                     reason = "test",
                     entityId = "instruction-gate-a",
                     instructionId = "instruction-gate-a",
+                    threadId = "thread-gate-a",
                     title = "Shift update",
                     description = "Move barricades",
                     pointIds = listOf("gate-a"),
@@ -468,13 +469,92 @@ class AppShellViewModelTest {
         assertEquals(ReportFlowStep.TYPE_SELECTION, viewModel.uiState.value.reportsTab.step)
         assertEquals(null, viewModel.uiState.value.reportsTab.draft.selectedPlaceName)
         assertEquals("導線報告 / Gate A", viewModel.uiState.value.contactsTab.selectedThread?.title)
-        assertEquals(
-            "導線報告: 最後尾が歩道へ伸びています [高]",
-            viewModel.uiState.value.contactsTab.selectedThread?.messages?.lastOrNull()?.body
-        )
+        assertTrue(viewModel.uiState.value.contactsTab.selectedThread?.messages.orEmpty().isEmpty())
         assertEquals("report-created-1", viewModel.uiState.value.reportsTab.relatedReports.first().reportId)
         assertTrue(viewModel.uiState.value.contactsTab.threads.any { it.id == "thread-created-1" })
         assertEquals("thread-created-1", viewModel.uiState.value.contactsTab.selectedThread?.id)
+        viewModel.clear()
+    }
+
+    @Test
+    fun `submitted report thread switches from local placeholder to remote thread details when polling updates arrive`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dataSource = FakeOperationsStreamDataSource(
+            points = listOf(
+                OperationPoint(
+                    updatedAt = "",
+                    reason = "test",
+                    entityId = "gate-a",
+                    pointId = "gate-a",
+                    name = "Gate A",
+                    description = "North entrance",
+                )
+            )
+        )
+        val viewModel = AppShellViewModel(
+            overviewRepository = FakeOperationsOverviewRepository(),
+            dataSource = dataSource,
+            reportRepository = FakeReportRepository(
+                reports = listOf(
+                    RelevantReport(
+                        reportId = "report-created-1",
+                        threadId = "thread-created-1",
+                        authorStaffId = "tanaka",
+                        title = "導線報告",
+                        summary = "最後尾が歩道へ伸びています [高]",
+                        priorityLabel = "高",
+                        createdAtLabel = "2026-06-19T09:00:00Z",
+                    )
+                ),
+                submittedReport = SubmittedReport(
+                    reportId = "report-created-1",
+                    threadId = "thread-created-1",
+                )
+            ),
+            currentStaffSession = createSession(dispatcher),
+            coroutineContext = dispatcher
+        )
+
+        viewModel.onReportTypeSelected("queue")
+        viewModel.onReportCommentChanged("最後尾が歩道へ伸びています")
+        viewModel.onReportUrgencySelected("高")
+        viewModel.onReportContinueToPlaceSelection()
+        viewModel.onReportPlaceSelected("gate-a")
+        viewModel.onReportSubmitted()
+
+        assertTrue(viewModel.uiState.value.contactsTab.selectedThread?.messages.orEmpty().isEmpty())
+
+        dataSource.threadsFlow.value = listOf(
+            OperationThread(
+                updatedAt = "2026-06-19T09:00:00Z",
+                reason = "test",
+                entityId = "thread-created-1",
+                threadId = "thread-created-1",
+                members = listOf("tanaka", "hq"),
+                displayTitle = "本部 / Gate A",
+            )
+        )
+        dataSource.messagesFlow.value = listOf(
+            OperationMessage(
+                updatedAt = "2026-06-19T09:00:00Z",
+                reason = "test",
+                entityId = "message-created-1",
+                messageId = "message-created-1",
+                threadId = "thread-created-1",
+                staffId = "tanaka",
+                messageType = OperationMessageType.REPORT,
+                reportId = "report-created-1",
+            )
+        )
+
+        assertEquals("本部 / Gate A", viewModel.uiState.value.contactsTab.selectedThread?.title)
+        assertEquals("report-created-1", viewModel.uiState.value.contactsTab.selectedThread?.messages?.singleOrNull()?.reportId)
+        assertEquals("導線報告", viewModel.uiState.value.contactsTab.selectedThread?.messages?.singleOrNull()?.reportTitle)
+        assertEquals(
+            "報告が共有されました: report-created-1",
+            viewModel.uiState.value.contactsTab.threads.firstOrNull { it.id == "thread-created-1" }?.lastMessagePreview
+        )
+
         viewModel.clear()
     }
 
@@ -1076,7 +1156,7 @@ class AppShellViewModelTest {
     }
 
     @Test
-    fun `client message id restores sender when streamed sender is null literal`() = runTest {
+    fun `sender name alone does not restore current user when streamed sender id is null literal`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val dataSource = FakeOperationsStreamDataSource(
             staff = listOf(
@@ -1110,12 +1190,13 @@ class AppShellViewModelTest {
                 OperationMessage(
                     updatedAt = "2026-06-19T09:00:00Z",
                     reason = "message.created",
-                    entityId = "client-tanaka-12345",
-                    messageId = "client-tanaka-12345",
+                    entityId = "message-1",
+                    messageId = "message-1",
                     threadId = "thread-gate-a",
                     staffId = "null",
                     messageType = OperationMessageType.SIMPLE,
                     text = "こちら配置済みです",
+                    senderName = "田中",
                 )
             )
         )
@@ -1130,7 +1211,7 @@ class AppShellViewModelTest {
 
         val message = viewModel.uiState.value.contactsTab.selectedThread?.messages?.single()
         assertEquals("田中", message?.senderName)
-        assertEquals(true, message?.isCurrentUser)
+        assertEquals(false, message?.isCurrentUser)
 
         viewModel.clear()
     }
@@ -1318,7 +1399,7 @@ private class FakeOperationsStreamDataSource(
     private val staffFlow = MutableStateFlow(staff)
     private val assignmentsFlow = MutableStateFlow(assignments)
     private val instructionsFlow = MutableStateFlow(instructions)
-    private val threadsStateFlow = MutableStateFlow(threads)
+    val threadsFlow = MutableStateFlow(threads)
     val messagesFlow = MutableStateFlow(messages)
 
     override fun observePoints(): Flow<List<OperationPoint>> = pointsFlow
@@ -1329,7 +1410,7 @@ private class FakeOperationsStreamDataSource(
 
     override fun observeInstructions(): Flow<List<OperationInstruction>> = instructionsFlow
 
-    override fun observeThreads(): Flow<List<OperationThread>> = threadsStateFlow
+    override fun observeThreads(): Flow<List<OperationThread>> = threadsFlow
 
     override fun observeMessages(): Flow<List<OperationMessage>> = messagesFlow
 

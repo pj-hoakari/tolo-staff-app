@@ -129,6 +129,7 @@ internal fun Instruction.toOperationInstruction(): OperationInstruction = Operat
         is InstructionStatus.UNRECOGNIZED -> OperationInstructionStatus.ACTIVE
         InstructionStatus.INSTRUCTION_STATUS_UNSPECIFIED -> OperationInstructionStatus.ACTIVE
     },
+    threadId = threadId.ifBlank { null },
 )
 
 internal fun Thread.toOperationThread(): OperationThread = OperationThread(

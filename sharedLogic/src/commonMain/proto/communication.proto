@@ -48,6 +48,7 @@ message Instruction {
   string title = 4;
   string description = 5;
   InstructionStatus status = 6;
+  string thread_id = 7;
 }
 
 enum InstructionStatus {
@@ -85,6 +86,7 @@ message Message {
     SimpleMessagePayload simple = 8;
   }
   google.protobuf.Timestamp created_at = 9;
+  optional string staff_name = 10;
 }
 
 message AssignMessagePayload {}

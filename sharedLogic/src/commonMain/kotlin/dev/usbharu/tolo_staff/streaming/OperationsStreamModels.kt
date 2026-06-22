@@ -62,6 +62,7 @@ data class OperationInstruction(
     val title: String,
     val description: String,
     val status: OperationInstructionStatus,
+    val threadId: String? = null,
 ) : OperationsStreamEntity
 
 @Serializable

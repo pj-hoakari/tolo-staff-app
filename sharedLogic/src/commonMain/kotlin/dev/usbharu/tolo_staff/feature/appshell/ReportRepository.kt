@@ -9,7 +9,6 @@ import dev.usbharu.tolo.communication.grpc.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
 import dev.usbharu.tolo_staff.streaming.toIsoString
-import kotlin.random.Random
 
 interface ReportRepository {
     suspend fun listRelevantReports(currentStaffId: String): List<RelevantReport>
@@ -65,15 +64,12 @@ class GrpcReportRepository(
         },
         submitReportRequest = { currentStaffId, title, summary, priorityLabel ->
             grpcClient.reportService.CreateReport(
-                CreateReportRequest {
-                    report = Report {
-                        reportId = buildReportId(currentStaffId)
-                        staffId = currentStaffId
-                        this.title = title
-                        description = summary
-                        priority = priorityLabel.toReportPriority()
-                    }
-                }
+                buildCreateReportRequest(
+                    currentStaffId = currentStaffId,
+                    title = title,
+                    summary = summary,
+                    priorityLabel = priorityLabel,
+                )
             ).toSubmittedReport()
         }
     )
@@ -138,5 +134,16 @@ private fun String.toReportPriority(): ReportPriority =
 private fun String.requireNotBlank(fieldName: String): String =
     takeIf { it.isNotBlank() } ?: error("Report $fieldName is blank")
 
-private fun buildReportId(currentStaffId: String): String =
-    "client-report-$currentStaffId-${Random.nextLong().toString().replace('-', '0')}"
+internal fun buildCreateReportRequest(
+    currentStaffId: String,
+    title: String,
+    summary: String,
+    priorityLabel: String,
+): CreateReportRequest = CreateReportRequest {
+    report = Report {
+        staffId = currentStaffId
+        this.title = title
+        description = summary
+        priority = priorityLabel.toReportPriority()
+    }
+}

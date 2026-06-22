@@ -72,6 +72,7 @@ data class InstructionSummaryUiModel(
 
 data class InstructionDetailUiModel(
     val id: String,
+    val threadId: String? = null,
     val title: String,
     val body: String,
     val target: ContactTargetUiModel,

@@ -57,18 +57,10 @@ internal fun OperationMessage.toUiMessage(
         ?: effectiveSenderName
         ?: effectiveSenderStaffId
         ?: "不明"
-    val currentStaffName = staff.firstOrNull { it.staffId == currentStaffId }?.name
-        ?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
-    val isFromCurrentUser = effectiveSenderStaffId == currentStaffId ||
-        (
-            effectiveSenderStaffId == null &&
-                effectiveSenderName != null &&
-                currentStaffName != null &&
-                effectiveSenderName == currentStaffName
-            )
+    val isFromCurrentUser = effectiveSenderStaffId == currentStaffId
     if (resolvedSenderName == "不明") {
         logger.warn {
-            "Unable to resolve sender for chat message: messageId=$messageId, threadId=$threadId, currentStaffId=$currentStaffId, rawSenderStaffId=$staffId, normalizedSenderStaffId=$effectiveSenderStaffId, rawSenderName=$senderName, currentStaffName=$currentStaffName, messageType=$messageType"
+            "Unable to resolve sender for chat message: messageId=$messageId, threadId=$threadId, currentStaffId=$currentStaffId, rawSenderStaffId=$staffId, normalizedSenderStaffId=$effectiveSenderStaffId, rawSenderName=$senderName, messageType=$messageType"
         }
     }
     logger.debug {
@@ -89,14 +81,6 @@ internal fun OperationMessage.toUiMessage(
 internal fun OperationMessage.normalizedSenderStaffId(): String? =
     staffId
         .takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
-        ?: messageId.clientSenderStaffId()
-
-private fun String.clientSenderStaffId(): String? {
-    if (!startsWith("client-")) {
-        return null
-    }
-    return removePrefix("client-").substringBeforeLast("-").takeIf { it.isNotBlank() }
-}
 
 internal fun OperationMessage.toPreviewBody(): String = when (messageType) {
     OperationMessageType.SIMPLE -> text?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() } ?: "メッセージ"

@@ -60,7 +60,6 @@ class AppShellViewModel(
     private var observedStaffId: String? = null
     private var instructionDetailsById: Map<String, InstructionDetailUiModel> = emptyMap()
     private var contactDetailsById: Map<String, ContactThreadDetailUiModel> = emptyMap()
-    private var instructionThreadIdsByInstructionId: Map<String, String> = emptyMap()
     private var localCreatedReports: List<RelatedReportUiModel> = emptyList()
     private var localCreatedContactThreads: Map<String, ContactThreadDetailUiModel> = emptyMap()
     private var placementPhaseOverridesByAssignId: Map<String, PlacementPhase> = emptyMap()
@@ -182,8 +181,7 @@ class AppShellViewModel(
     }
 
     fun onInstructionThreadOpened() {
-        val selectedInstructionId = currentState.instructionsTab.selectedInstruction?.id ?: return
-        val threadId = instructionThreadIdsByInstructionId[selectedInstructionId] ?: return
+        val threadId = currentState.instructionsTab.selectedInstruction?.threadId ?: return
         val detail = contactDetailsById[threadId] ?: return
         updateState { state ->
             state.copy(
@@ -380,24 +378,6 @@ class AppShellViewModel(
                         type = ContactTargetType.PLACE,
                         displayName = selectedPlace.displayName,
                         subtitle = "本部"
-                    ),
-                    messages = listOf(
-                        ThreadMessageUiModel(
-                            id = "${submittedReport.reportId}-message",
-                            senderName = currentStaff.displayName,
-                            senderRoleLabel = currentStaff.roleLabel,
-                            body = submittedSummary,
-                            timeLabel = submittedReport.createdAtLabel,
-                            isCurrentUser = true,
-                            reportId = submittedReport.reportId,
-                            reportTitle = selectedType.title,
-                            reportSummary = submittedSummary,
-                            reportPriorityLabel = reportsTab.draft.urgencyLabel,
-                            reportAuthorName = currentStaff.displayName,
-                            reportTargetLabel = selectedPlace.displayName,
-                            reportTimeLabel = submittedReport.createdAtLabel,
-                            reportIsAuthoredByCurrentStaff = true,
-                        )
                     ),
                     canReply = true,
                 )
@@ -700,7 +680,10 @@ class AppShellViewModel(
                                 )
                             }
                         val mergedReports = mergeRelatedReports(remoteReports, localCreatedReports)
-                        val resolvedContactDetails = (contactDetailsById + localCreatedContactThreads)
+                        val resolvedContactDetails = mergeResolvedContactDetails(
+                            remoteDetails = contactDetailsById,
+                            localDetails = localCreatedContactThreads,
+                        )
                             .withResolvedReportMessages(mergedReports)
                         contactDetailsById = resolvedContactDetails
                         val selectedReport = state.reportsTab.selectedReport
@@ -784,7 +767,6 @@ class AppShellViewModel(
                     messages = messages,
                 )
                 instructionDetailsById = snapshot.instructionDetailsById
-                instructionThreadIdsByInstructionId = snapshot.instructionThreadIdsByInstructionId
 
                 updateState { state ->
                     val selectedInstruction = state.instructionsTab.selectedInstruction
@@ -797,7 +779,10 @@ class AppShellViewModel(
                             availableStaff = staff,
                         )
                     }
-                    val resolvedContactDetailsById = (snapshot.contactDetailsById + localCreatedContactThreads)
+                    val resolvedContactDetailsById = mergeResolvedContactDetails(
+                        remoteDetails = snapshot.contactDetailsById,
+                        localDetails = localCreatedContactThreads,
+                    )
                         .withResolvedReportMessages(resolvedReports)
                     contactDetailsById = resolvedContactDetailsById
                     val previousSelectedThread = state.contactsTab.selectedThread
@@ -884,7 +869,6 @@ class AppShellViewModel(
             staff = staff,
             assignments = assignments,
             instructions = relevantInstructions,
-            threads = threads,
             messages = messages,
         )
         val contactModels = buildContactModels(
@@ -922,7 +906,6 @@ class AppShellViewModel(
             },
             instructionDetailsById = instructionModels.detailsById,
             contactDetailsById = contactModels.detailsById,
-            instructionThreadIdsByInstructionId = instructionModels.threadIdByInstructionId,
         )
     }
 
@@ -1005,29 +988,17 @@ class AppShellViewModel(
         staff: List<OperationStaff>,
         assignments: List<OperationAssignment>,
         instructions: List<OperationInstruction>,
-        threads: List<OperationThread>,
         messages: List<OperationMessage>,
     ): BuiltInstructionModels {
         val pointsById = points.associateBy { it.pointId }
         val staffById = staff.associateBy { it.staffId }
         val messagesByThreadId = messages.groupBy { it.threadId }
-        val threadIdByInstructionId = messages
-            .filter { it.instructionId != null }
-            .groupBy { it.instructionId.orEmpty() }
-            .mapValues { (_, instructionMessages) ->
-                instructionMessages
-                    .sortedOperationMessages()
-                    .lastOrNull()
-                    ?.threadId
-                    .orEmpty()
-            }
-            .filterValues { it.isNotBlank() }
 
         val details = instructions
             .sortedBy { it.instructionId }
             .map { instruction ->
                 val target = instruction.toTarget(pointsById, staffById)
-                val instructionThreadId = threadIdByInstructionId[instruction.instructionId]
+                val instructionThreadId = instruction.threadId
                 val threadMessages = instructionThreadId
                     ?.let(messagesByThreadId::get)
                     .orEmpty()
@@ -1051,6 +1022,7 @@ class AppShellViewModel(
                     }
                 InstructionDetailUiModel(
                     id = instruction.instructionId,
+                    threadId = instructionThreadId,
                     title = instruction.title,
                     body = instruction.description,
                     target = target,
@@ -1090,7 +1062,6 @@ class AppShellViewModel(
                 isShowingThread = false,
             ),
             detailsById = detailsById,
-            threadIdByInstructionId = threadIdByInstructionId,
         )
     }
 
@@ -1246,20 +1217,30 @@ private fun mergeLocalContactThreads(
     val baseOrder = baseThreads.mapIndexed { index, summary -> summary.id to index }.toMap()
     val merged = baseThreads.associateBy { it.id }.toMutableMap()
     localThreads.values.forEach { detail ->
-        merged[detail.id] = ContactThreadSummaryUiModel(
-            id = detail.id,
-            title = detail.title,
-            target = detail.target,
-            lastMessagePreview = detail.messages.lastOrNull()?.body.orEmpty(),
-            unreadCount = 0,
-            isFormerAssignment = detail.isFormerAssignment,
-        )
+        if (detail.id !in merged) {
+            merged[detail.id] = ContactThreadSummaryUiModel(
+                id = detail.id,
+                title = detail.title,
+                target = detail.target,
+                lastMessagePreview = detail.messages.lastOrNull()?.body.orEmpty(),
+                unreadCount = 0,
+                isFormerAssignment = detail.isFormerAssignment,
+            )
+        }
     }
     return merged.values.sortedWith(
         compareBy<ContactThreadSummaryUiModel> { summary ->
             baseOrder[summary.id] ?: Int.MAX_VALUE
         }.thenBy { it.id }
     )
+}
+
+private fun mergeResolvedContactDetails(
+    remoteDetails: Map<String, ContactThreadDetailUiModel>,
+    localDetails: Map<String, ContactThreadDetailUiModel>,
+): Map<String, ContactThreadDetailUiModel> = buildMap {
+    putAll(localDetails)
+    putAll(remoteDetails)
 }
 
 private fun buildRelatedReportContactThread(report: RelatedReportUiModel): ContactThreadDetailUiModel {
@@ -1348,13 +1329,11 @@ private data class AppShellSnapshot(
     val reportPlaces: List<ContactTargetUiModel>,
     val instructionDetailsById: Map<String, InstructionDetailUiModel>,
     val contactDetailsById: Map<String, ContactThreadDetailUiModel>,
-    val instructionThreadIdsByInstructionId: Map<String, String>,
 )
 
 private data class BuiltInstructionModels(
     val instructionsTab: InstructionsTabUiState,
     val detailsById: Map<String, InstructionDetailUiModel>,
-    val threadIdByInstructionId: Map<String, String>,
 )
 
 private data class BuiltContactModels(
