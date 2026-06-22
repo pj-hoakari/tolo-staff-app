@@ -267,6 +267,7 @@ struct AppShellInstructionCard: View {
                     if let action {
                         Button(action: action) {
                             AppleInstructionHeroCard(instruction: instruction)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     } else {

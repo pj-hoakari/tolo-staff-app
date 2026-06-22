@@ -7,7 +7,6 @@ struct InstructionsTabRootView: View {
     var onInstructionSelected: (String) -> Void = { _ in }
     var onThreadOpened: () -> Void = {}
     var onDetailClosed: () -> Void = {}
-    var onStatusUpdated: (InstructionProgressStatus) -> Void = { _ in }
 
     var body: some View {
         NavigationStack {
@@ -36,8 +35,7 @@ struct InstructionsTabRootView: View {
                 if let selectedInstruction = state.selectedInstruction {
                     InstructionDetailView(
                         instruction: selectedInstruction,
-                        onOpenThread: onThreadOpened,
-                        onStatusUpdated: onStatusUpdated
+                        onOpenThread: onThreadOpened
                     )
                     .navigationTitle("指示詳細")
                     .navigationBarTitleDisplayMode(.inline)
@@ -123,8 +121,10 @@ private struct InstructionListView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44, alignment: .center)
             .padding(12)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("instruction_row_\(instruction.id)")
@@ -150,79 +150,166 @@ private extension InstructionSummaryUiModel {
 private struct InstructionDetailView: View {
     let instruction: InstructionDetailUiModel
     let onOpenThread: () -> Void
-    let onStatusUpdated: (InstructionProgressStatus) -> Void
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(instruction.title)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text(instruction.body)
-                    Text("対象: \(instruction.target.displayName)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("優先度: \(instruction.priorityLabel) / 現在状態: \(instruction.statusLabel)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if let locationLabel = instruction.locationLabel {
-                        Text("場所: \(locationLabel)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    if let attachmentSummary = instruction.attachmentSummary {
-                        Text(attachmentSummary)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 20) {
+                InstructionDetailHeroCard(instruction: instruction)
+                InstructionDetailBodyCard(instruction: instruction)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("担当者状態")
-                        .font(.headline)
-                    ForEach(instruction.participants, id: \.staffName) { participant in
-                        HStack {
-                            Text(participant.staffName)
-                            if participant.isFormerStaff {
-                                Text("旧担当")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(participant.statusLabel)
-                                .font(.caption)
-                                .foregroundStyle(participant.isCurrentStaff ? .blue : .secondary)
-                        }
-                    }
+                Button(action: onOpenThread) {
+                    Label("スレッドを見る", systemImage: "bubble.left.and.text.bubble.right.fill")
+                        .frame(maxWidth: .infinity)
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("状態を更新")
-                        .font(.headline)
-                    HStack {
-                        statusButton(title: "未確認", status: .unconfirmed)
-                        statusButton(title: "了解", status: .acknowledged)
-                    }
-                    HStack {
-                        statusButton(title: "対応中", status: .inProgress)
-                        statusButton(title: "完了", status: .completed)
-                    }
-                }
-
-                Button("スレッドを見る", action: onOpenThread)
-                    .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityIdentifier("instruction_detail_open_thread_button")
             }
-            .padding(16)
+            .padding(20)
         }
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.96, green: 0.98, blue: 1.0),
+                    Color(red: 0.99, green: 0.99, blue: 0.97)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .accessibilityIdentifier("instruction_detail")
     }
+}
 
-    private func statusButton(title: String, status: InstructionProgressStatus) -> some View {
-        Button(title) {
-            onStatusUpdated(status)
+private struct InstructionDetailHeroCard: View {
+    let instruction: InstructionDetailUiModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("優先対応")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text(instruction.title)
+                        .font(.title2)
+                        .bold()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                InstructionBadge(
+                    text: instruction.statusLabel,
+                    tint: statusTint(for: instruction.statusLabel)
+                )
+            }
+
+            HStack(spacing: 10) {
+                InstructionBadge(
+                    text: instruction.target.displayName,
+                    tint: .teal
+                )
+
+                if !instruction.priorityLabel.isEmpty {
+                    InstructionBadge(
+                        text: instruction.priorityLabel,
+                        tint: .orange
+                    )
+                }
+            }
         }
-        .buttonStyle(.bordered)
-        .frame(maxWidth: .infinity)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 28)
+                .fill(.thinMaterial)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 28)
+                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+        }
+    }
+}
+
+private struct InstructionDetailBodyCard: View {
+    let instruction: InstructionDetailUiModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("内容")
+                .font(.headline)
+
+            Text(instruction.body)
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 12) {
+                InstructionMetaRow(label: "対象", value: instruction.target.displayName)
+
+                if let locationLabel = instruction.locationLabel {
+                    InstructionMetaRow(label: "場所", value: locationLabel)
+                }
+
+                if let attachmentSummary = instruction.attachmentSummary {
+                    InstructionMetaRow(label: "共有物", value: attachmentSummary)
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(.background)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(.quaternary, lineWidth: 1)
+        }
+    }
+}
+
+private struct InstructionBadge: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        Text(text)
+            .font(.subheadline)
+            .bold()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(tint.opacity(0.15), in: Capsule())
+            .foregroundStyle(tint)
+    }
+}
+
+private struct InstructionMetaRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.body)
+        }
+    }
+}
+
+private func statusTint(for label: String) -> Color {
+    switch label {
+    case "対応中":
+        return .blue
+    case "完了":
+        return .green
+    case "了解":
+        return .teal
+    default:
+        return .orange
     }
 }

@@ -824,61 +824,6 @@ class AppShellViewModelTest {
     }
 
     @Test
-    fun `instruction status update is reflected in selected and featured instruction`() = runTest {
-        val dispatcher = UnconfinedTestDispatcher(testScheduler)
-        val dataSource = FakeOperationsStreamDataSource(
-            points = listOf(
-                OperationPoint(
-                    updatedAt = "",
-                    reason = "test",
-                    entityId = "gate-a",
-                    pointId = "gate-a",
-                    name = "Gate A",
-                    description = "North entrance",
-                )
-            ),
-            instructions = listOf(
-                OperationInstruction(
-                    updatedAt = "",
-                    reason = "test",
-                    entityId = "instruction-gate-a",
-                    instructionId = "instruction-gate-a",
-                    title = "Shift update",
-                    description = "Move barricades",
-                    pointIds = listOf("gate-a"),
-                    staffIds = listOf("tanaka"),
-                    status = dev.usbharu.tolo_staff.streaming.OperationInstructionStatus.ACTIVE,
-                )
-            )
-        )
-        val repository = FakeOperationsOverviewRepository(
-            projections = mapOf(
-                "tanaka" to AppShellOperationsProjection(
-                    homeOverview = AppShellHomeOverview(
-                        currentInstruction = "Move barricades",
-                        currentInstructionId = "instruction-gate-a",
-                    ),
-                    currentPlacementName = "Gate A"
-                )
-            )
-        )
-        val viewModel = AppShellViewModel(
-            overviewRepository = repository,
-            dataSource = dataSource,
-            currentStaffSession = createSession(dispatcher),
-            coroutineContext = dispatcher
-        )
-
-        viewModel.onInstructionSelected("instruction-gate-a")
-        viewModel.onInstructionStatusUpdated(InstructionProgressStatus.COMPLETED)
-
-        assertEquals("完了", viewModel.uiState.value.instructionsTab.selectedInstruction?.statusLabel)
-        assertEquals("完了", viewModel.uiState.value.instructionsTab.featuredInstruction?.statusLabel)
-        assertEquals("完了", viewModel.uiState.value.homeOverview.currentInstructionStatusLabel)
-        viewModel.clear()
-    }
-
-    @Test
     fun `contact flow does not create local draft thread without backend support`() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val viewModel = AppShellViewModel(

@@ -7,13 +7,6 @@ enum class ContactTargetType {
     USER
 }
 
-enum class InstructionProgressStatus {
-    UNCONFIRMED,
-    ACKNOWLEDGED,
-    IN_PROGRESS,
-    COMPLETED
-}
-
 enum class ReportFlowStep {
     TYPE_SELECTION,
     DRAFT_INPUT,
@@ -51,13 +44,6 @@ data class ThreadMessageUiModel(
     val reportIsAuthoredByCurrentStaff: Boolean = false,
 )
 
-data class InstructionParticipantStatusUiModel(
-    val staffName: String,
-    val statusLabel: String,
-    val isCurrentStaff: Boolean = false,
-    val isFormerStaff: Boolean = false,
-)
-
 data class InstructionSummaryUiModel(
     val id: String,
     val title: String,
@@ -80,7 +66,6 @@ data class InstructionDetailUiModel(
     val statusLabel: String,
     val locationLabel: String? = null,
     val attachmentSummary: String? = null,
-    val participants: List<InstructionParticipantStatusUiModel> = emptyList(),
     val thread: List<ThreadMessageUiModel> = emptyList(),
 )
 

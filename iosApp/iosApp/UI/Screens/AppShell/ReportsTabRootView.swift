@@ -99,18 +99,21 @@ struct ReportsTabRootView: View {
         List {
             Section("報告種別") {
                 ForEach(state.reportTypes, id: \.id) { type in
-                Button {
-                    onTypeSelected(type.id)
-                } label: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(type.title)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text(type.detailText)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 6)
+                    Button {
+                        onTypeSelected(type.id)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(type.title)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                            Text(type.detailText)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(minHeight: 44, alignment: .center)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("report_type_\(type.id)")
@@ -160,7 +163,10 @@ struct ReportsTabRootView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(minHeight: 44, alignment: .center)
                             .padding(.vertical, 6)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("related_report_\(report.reportId)")
@@ -237,6 +243,9 @@ struct ReportsTabRootView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 44, alignment: .center)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

@@ -50,10 +50,6 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onInstructionDetailClosed()
     }
 
-    func onInstructionStatusUpdated(_ status: InstructionProgressStatus) {
-        viewModel.onInstructionStatusUpdated(status: status)
-    }
-
     func onReportTypeSelected(_ typeId: String) {
         viewModel.onReportTypeSelected(typeId: typeId)
     }

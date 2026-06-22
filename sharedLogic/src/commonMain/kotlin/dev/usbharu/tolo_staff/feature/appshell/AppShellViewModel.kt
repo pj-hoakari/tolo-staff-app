@@ -215,45 +215,6 @@ class AppShellViewModel(
         }
     }
 
-    fun onInstructionStatusUpdated(status: InstructionProgressStatus) {
-        val selectedInstruction = currentState.instructionsTab.selectedInstruction ?: return
-        val nextStatusLabel = status.toLabel()
-        updateState { state ->
-            val updatedSelectedInstruction = selectedInstruction.copy(statusLabel = nextStatusLabel)
-            state.copy(
-                homeOverview = if (state.homeOverview.currentInstructionId == selectedInstruction.id) {
-                    state.homeOverview.copy(currentInstructionStatusLabel = nextStatusLabel)
-                } else {
-                    state.homeOverview
-                },
-                instructionsTab = state.instructionsTab.copy(
-                    selectedInstruction = updatedSelectedInstruction,
-                    instructions = state.instructionsTab.instructions.map { instruction ->
-                        if (instruction.id == selectedInstruction.id) {
-                            instruction.copy(statusLabel = nextStatusLabel)
-                        } else {
-                            instruction
-                        }
-                    },
-                    featuredInstruction = state.instructionsTab.featuredInstruction?.let { instruction ->
-                        if (instruction.id == selectedInstruction.id) {
-                            instruction.copy(statusLabel = nextStatusLabel)
-                        } else {
-                            instruction
-                        }
-                    },
-                    otherInstructions = state.instructionsTab.otherInstructions.map { instruction ->
-                        if (instruction.id == selectedInstruction.id) {
-                            instruction.copy(statusLabel = nextStatusLabel)
-                        } else {
-                            instruction
-                        }
-                    },
-                )
-            )
-        }
-    }
-
     fun onReportTypeSelected(typeId: String) {
         val reportType = currentState.reportsTab.reportTypes.firstOrNull { it.id == typeId } ?: return
         updateState {
@@ -840,7 +801,6 @@ class AppShellViewModel(
         )
         val instructionModels = buildInstructionModels(
             currentStaffId = currentStaffId,
-            currentStaff = currentStaff,
             points = points,
             staff = staff,
             assignments = assignments,
@@ -959,7 +919,6 @@ class AppShellViewModel(
 
     private fun buildInstructionModels(
         currentStaffId: String,
-        currentStaff: CurrentStaffUiModel,
         points: List<OperationPoint>,
         staff: List<OperationStaff>,
         assignments: List<OperationAssignment>,
@@ -980,22 +939,6 @@ class AppShellViewModel(
                     .orEmpty()
                     .sortedOperationMessages()
                     .map { message -> message.toThreadMessageUiModel(currentStaffId, staff) }
-                val participantStaffIds = buildSet {
-                    addAll(instruction.staffIds)
-                    assignments
-                        .filter { it.pointId in instruction.pointIds }
-                        .mapTo(this) { it.staffId }
-                }
-                val participants = participantStaffIds
-                    .sorted()
-                    .map { staffId ->
-                        val displayName = staffById[staffId]?.name ?: staffId
-                        InstructionParticipantStatusUiModel(
-                            staffName = displayName,
-                            statusLabel = instruction.status.toStatusLabel(),
-                            isCurrentStaff = staffId == currentStaff.staffId,
-                        )
-                    }
                 InstructionDetailUiModel(
                     id = instruction.instructionId,
                     threadId = instructionThreadId,
@@ -1010,7 +953,6 @@ class AppShellViewModel(
                         .joinToString(" / ")
                         .ifBlank { null },
                     attachmentSummary = null,
-                    participants = participants,
                     thread = threadMessages,
                 )
             }
@@ -1122,14 +1064,6 @@ class AppShellViewModel(
         fun OperationInstructionStatus.toStatusLabel(): String =
             when (this) {
                 OperationInstructionStatus.ACTIVE -> "対応中"
-            }
-
-        fun InstructionProgressStatus.toLabel(): String =
-            when (this) {
-                InstructionProgressStatus.UNCONFIRMED -> "未確認"
-                InstructionProgressStatus.ACKNOWLEDGED -> "了解"
-                InstructionProgressStatus.IN_PROGRESS -> "対応中"
-                InstructionProgressStatus.COMPLETED -> "完了"
             }
 
         fun defaultReportTypes(): List<ReportTypeUiModel> = listOf(

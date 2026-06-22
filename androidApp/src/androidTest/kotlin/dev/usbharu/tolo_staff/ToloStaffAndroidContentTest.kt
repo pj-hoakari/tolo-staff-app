@@ -301,7 +301,6 @@ class ToloStaffAndroidContentTest {
                         instructionsTab = state.instructionsTab.copy(selectedInstruction = null),
                     )
                 },
-                onInstructionStatusUpdated = {},
                 onReportTypeSelected = {
                     state = state.copy(
                         selectedTab = AppTab.REPORTS,

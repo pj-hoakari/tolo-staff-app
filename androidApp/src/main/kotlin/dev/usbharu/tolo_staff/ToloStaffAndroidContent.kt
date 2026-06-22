@@ -34,7 +34,6 @@ import androidx.navigation.compose.rememberNavController
 import dev.usbharu.tolo_staff.feature.appshell.AppShellUiState
 import dev.usbharu.tolo_staff.feature.appshell.AppTab
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetType
-import dev.usbharu.tolo_staff.feature.appshell.InstructionProgressStatus
 import dev.usbharu.tolo_staff.feature.appshell.displayedSelectedTab
 
 @Composable
@@ -45,7 +44,6 @@ fun ToloStaffAndroidContent(
     onInstructionSelected: (String) -> Unit = {},
     onInstructionThreadOpened: () -> Unit = {},
     onInstructionDetailClosed: () -> Unit = {},
-    onInstructionStatusUpdated: (InstructionProgressStatus) -> Unit = {},
     onReportTypeSelected: (String) -> Unit = {},
     onReportSelected: (String) -> Unit = {},
     onReportDetailClosed: () -> Unit = {},
@@ -225,7 +223,6 @@ fun ToloStaffAndroidContent(
                             InstructionDetailScreen(
                                 instruction = instruction,
                                 onThreadOpened = onInstructionThreadOpened,
-                                onStatusUpdated = onInstructionStatusUpdated,
                             )
                         }
                     }

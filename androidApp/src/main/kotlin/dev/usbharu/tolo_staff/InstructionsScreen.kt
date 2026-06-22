@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,9 +16,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -34,8 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.usbharu.tolo_staff.feature.appshell.InstructionDetailUiModel
-import dev.usbharu.tolo_staff.feature.appshell.InstructionParticipantStatusUiModel
-import dev.usbharu.tolo_staff.feature.appshell.InstructionProgressStatus
 import dev.usbharu.tolo_staff.feature.appshell.InstructionSummaryUiModel
 import dev.usbharu.tolo_staff.feature.appshell.InstructionsTabUiState
 
@@ -80,7 +80,6 @@ internal fun InstructionsListScreen(
 internal fun InstructionDetailScreen(
     instruction: InstructionDetailUiModel,
     onThreadOpened: () -> Unit,
-    onStatusUpdated: (InstructionProgressStatus) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -88,52 +87,17 @@ internal fun InstructionDetailScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            ScreenHeader("指示詳細", "内容確認、担当状況、進捗更新をこの画面で完結します。")
+            ScreenHeader("指示詳細", "概要を確認して、必要なら関連スレッドに移動できます。")
         }
         item {
-            InstructionDetailHero(instruction)
-        }
-        item {
-            SectionCard {
-                Text("担当者状態", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-                instruction.participants.forEach { participant ->
-                    ParticipantStatusRow(participant)
-                }
-            }
-        }
-        item {
-            SectionCard {
-                Text("状態を更新", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusActionButton(
-                        title = "未確認",
-                        selected = instruction.statusLabel == "未確認",
-                        modifier = Modifier.weight(1f)
-                    ) { onStatusUpdated(InstructionProgressStatus.UNCONFIRMED) }
-                    StatusActionButton(
-                        title = "了解",
-                        selected = instruction.statusLabel == "了解",
-                        modifier = Modifier.weight(1f)
-                    ) { onStatusUpdated(InstructionProgressStatus.ACKNOWLEDGED) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusActionButton(
-                        title = "対応中",
-                        selected = instruction.statusLabel == "対応中",
-                        modifier = Modifier.weight(1f)
-                    ) { onStatusUpdated(InstructionProgressStatus.IN_PROGRESS) }
-                    StatusActionButton(
-                        title = "完了",
-                        selected = instruction.statusLabel == "完了",
-                        modifier = Modifier.weight(1f)
-                    ) { onStatusUpdated(InstructionProgressStatus.COMPLETED) }
-                }
-            }
+            InstructionDetailHero(instruction = instruction)
         }
         item {
             Button(
                 onClick = onThreadOpened,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = "instruction_detail_open_thread_button" }
             ) {
                 Text("関連スレッドを開く")
             }
@@ -189,78 +153,60 @@ private fun InstructionListRow(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun InstructionDetailHero(instruction: InstructionDetailUiModel) {
     SectionCard {
-        Text(instruction.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(instruction.body, style = MaterialTheme.typography.bodyLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CompactInfoChip(instruction.target.displayName)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    "優先対応",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Text(
+                    instruction.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
             CompactInfoChip(
                 instruction.statusLabel,
                 emphasized = instruction.statusLabel == "対応中" || instruction.statusLabel == "完了"
             )
-            CompactInfoChip(instruction.priorityLabel.ifBlank { "通常" })
         }
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CompactInfoChip(instruction.target.displayName)
+            if (instruction.priorityLabel.isNotBlank()) {
+                CompactInfoChip(instruction.priorityLabel)
+            }
+            instruction.locationLabel?.let { locationLabel ->
+                CompactInfoChip(locationLabel)
+            }
+        }
+
+        Text(
+            instruction.body,
+            style = MaterialTheme.typography.bodyLarge
+        )
+
         instruction.locationLabel?.let {
             DetailInfoRow(icon = Icons.Default.Place, label = "場所", value = it)
         }
         instruction.attachmentSummary?.let {
-            DetailInfoRow(icon = Icons.Default.Groups, label = "添付", value = it)
+            DetailInfoRow(icon = Icons.Default.TaskAlt, label = "共有物", value = it)
         }
-    }
-}
-
-@Composable
-private fun ParticipantStatusRow(participant: InstructionParticipantStatusUiModel) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (participant.isCurrentStaff) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surface
-        }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(participant.staffName, fontWeight = FontWeight.SemiBold)
-                if (participant.isCurrentStaff) {
-                    Text("あなた", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            CompactInfoChip(participant.statusLabel, emphasized = participant.isCurrentStaff)
-        }
-    }
-}
-
-@Composable
-private fun StatusActionButton(
-    title: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.heightIn(min = 44.dp),
-        colors = if (selected) {
-            ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
-        } else {
-            ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
-    ) {
-        Text(title)
     }
 }
 

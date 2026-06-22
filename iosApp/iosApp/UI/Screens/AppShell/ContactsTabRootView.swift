@@ -124,6 +124,9 @@ private struct ContactThreadListView: View {
                         .background(.blue, in: Circle())
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44, alignment: .center)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("contact_thread_\(thread.id)")
@@ -165,6 +168,9 @@ private struct ContactTargetSelectionView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(minHeight: 44, alignment: .center)
+                            .contentShape(Rectangle())
                         }
                     }
                 }
@@ -325,6 +331,7 @@ struct ThreadMessageBubble: View {
                             RoundedRectangle(cornerRadius: 16)
                                 .stroke(Color.blue.opacity(0.18), lineWidth: 1)
                         )
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("contact_report_message_\(reportId)")
