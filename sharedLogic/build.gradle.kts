@@ -40,14 +40,15 @@ kotlin {
     
     sourceSets {
         androidMain.dependencies {
-            implementation(libs.firebase.android.common)
-            implementation(libs.firebase.android.firestore)
+            implementation(project.dependencies.platform(libs.firebase.android.bom.get()))
+            implementation(libs.gitlive.firebase.firestore)
+            implementation(libs.grpc.protobuf.lite)
         }
         commonMain.dependencies {
             implementation(libs.koin.core)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
-            implementation(libs.gitlive.firebase.firestore)
+            implementation(libs.kotlinx.datetime)
             api(libs.kotlinx.rpc.grpc.core)
             api(libs.kotlinx.rpc.protobuf.core)
             implementation(libs.kotlinx.rpc.grpc.client)
@@ -64,4 +65,19 @@ kotlin {
 
 rpc {
     protoc()
+}
+
+
+configurations.configureEach {
+    if (
+        name == "androidCompileClasspath" ||
+        name == "androidRuntimeClasspath" ||
+        name.endsWith("AndroidCompileClasspath") ||
+        name.endsWith("AndroidRuntimeClasspath")
+    ) {
+        exclude(
+            group = "com.google.api.grpc",
+            module = "proto-google-common-protos"
+        )
+    }
 }

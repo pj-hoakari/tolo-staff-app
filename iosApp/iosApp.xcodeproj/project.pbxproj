@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		111111111111111111111111 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 444444444444444444444444 /* FirebaseCore */; };
-		222222222222222222222222 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 555555555555555555555555 /* FirebaseFirestore */; };
 		4C752CF1AE70B2C9D87C4687 /* SampleViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB5D137909EDF0D079A67484 /* SampleViewTests.swift */; };
 		84F9017B8259DF8301B4E48F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0614992E441A8CF7600EE6A /* Foundation.framework */; };
 		8969D0F2B53D75C2F96B2A90 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 8B442AEB8E7A585EC572267D /* SnapshotTesting */; };
@@ -43,7 +41,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		6F84EE1693838BD4C083A656 /* Exceptions for "iosApp" folder in "iosApp" target */ = {
+		6F84EE1693838BD4C083A656 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -55,15 +53,13 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B1C6CAFC783088F75F05211E /* Configuration */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = Configuration;
 			sourceTree = "<group>";
 		};
 		F8BC5D5686B70F07BAD9123F /* iosApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				6F84EE1693838BD4C083A656 /* Exceptions for "iosApp" folder in "iosApp" target */,
+				6F84EE1693838BD4C083A656 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -92,8 +88,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				111111111111111111111111 /* FirebaseCore in Frameworks */,
-				222222222222222222222222 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -113,7 +107,6 @@
 			children = (
 				CB5D137909EDF0D079A67484 /* SampleViewTests.swift */,
 			);
-			name = iosAppTests;
 			path = iosAppTests;
 			sourceTree = "<group>";
 		};
@@ -152,7 +145,6 @@
 			children = (
 				51B008725EAF92AF2A9D7475 /* SampleScenarioTests.swift */,
 			);
-			name = iosAppUITests;
 			path = iosAppUITests;
 			sourceTree = "<group>";
 		};
@@ -198,8 +190,6 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
-				444444444444444444444444 /* FirebaseCore */,
-				555555555555555555555555 /* FirebaseFirestore */,
 			);
 			productName = iosApp;
 			productReference = 0073F0E8E76CA354F137CAF9 /* ToloStaff.app */;
@@ -248,7 +238,6 @@
 			mainGroup = 4484A11BBF4050C2621392AC;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				333333333333333333333333 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				167FA12C31B89F6BD8E0A58F /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -380,7 +369,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
@@ -652,14 +641,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		333333333333333333333333 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
-			requirement = {
-				kind = exactVersion;
-				version = 12.14.0;
-			};
-		};
 		167FA12C31B89F6BD8E0A58F /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing";
@@ -671,16 +652,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		444444444444444444444444 /* FirebaseCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 333333333333333333333333 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseCore;
-		};
-		555555555555555555555555 /* FirebaseFirestore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 333333333333333333333333 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseFirestore;
-		};
 		8B442AEB8E7A585EC572267D /* SnapshotTesting */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 167FA12C31B89F6BD8E0A58F /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;

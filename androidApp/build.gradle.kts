@@ -18,11 +18,18 @@ dependencies {
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.grpc.okhttp)
+    implementation(libs.koin.core)
 
     implementation(libs.compose.material3)
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.androidx.navigation.compose)
     implementation(compose.materialIconsExtended)
     debugImplementation(libs.compose.uiTooling)
+    debugImplementation(libs.compose.uiTestManifest)
+    implementation(libs.grpc.protobuf.lite)
+
+    androidTestImplementation(libs.androidx.testExt.junit)
+    androidTestImplementation(libs.compose.uiTestJunit4)
 }
 
 android {
@@ -35,6 +42,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     packaging {
         resources {
@@ -49,5 +57,23 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+configurations.configureEach {
+    if (
+        name == "debugRuntimeClasspath" ||
+        name == "releaseRuntimeClasspath" ||
+        name == "debugCompileClasspath" ||
+        name == "releaseCompileClasspath"
+    ) {
+        exclude(
+            group = "com.google.api.grpc",
+            module = "proto-google-common-protos"
+        )
+        exclude(
+            group = "com.google.protobuf",
+            module = "protobuf-java"
+        )
     }
 }

@@ -10,9 +10,9 @@ interface OperationsStreamEntity {
 
 @Serializable
 data class OperationPoint(
-    override val updatedAt: String,
-    override val reason: String,
-    override val entityId: String,
+    override val updatedAt: String = "",
+    override val reason: String = "",
+    override val entityId: String = "",
     val pointId: String,
     val name: String,
     val description: String,
@@ -20,9 +20,9 @@ data class OperationPoint(
 
 @Serializable
 data class OperationStaff(
-    override val updatedAt: String,
-    override val reason: String,
-    override val entityId: String,
+    override val updatedAt: String = "",
+    override val reason: String = "",
+    override val entityId: String = "",
     val staffId: String,
     val name: String,
     val roles: List<String> = emptyList(),
@@ -37,9 +37,9 @@ enum class OperationAssignmentStatus {
 
 @Serializable
 data class OperationAssignment(
-    override val updatedAt: String,
-    override val reason: String,
-    override val entityId: String,
+    override val updatedAt: String = "",
+    override val reason: String = "",
+    override val entityId: String = "",
     val assignId: String,
     val pointId: String,
     val staffId: String,
@@ -53,24 +53,26 @@ enum class OperationInstructionStatus {
 
 @Serializable
 data class OperationInstruction(
-    override val updatedAt: String,
-    override val reason: String,
-    override val entityId: String,
+    override val updatedAt: String = "",
+    override val reason: String = "",
+    override val entityId: String = "",
     val instructionId: String,
     val pointIds: List<String> = emptyList(),
     val staffIds: List<String> = emptyList(),
     val title: String,
     val description: String,
     val status: OperationInstructionStatus,
+    val threadId: String? = null,
 ) : OperationsStreamEntity
 
 @Serializable
 data class OperationThread(
-    override val updatedAt: String,
-    override val reason: String,
-    override val entityId: String,
+    override val updatedAt: String = "",
+    override val reason: String = "",
+    override val entityId: String = "",
     val threadId: String,
     val members: List<String> = emptyList(),
+    val displayTitle: String = "",
 ) : OperationsStreamEntity
 
 @Serializable
@@ -80,13 +82,16 @@ enum class OperationMessageType {
     INSTRUCTION,
     REPORT,
     SIMPLE,
+    ;
+
+    companion object
 }
 
 @Serializable
 data class OperationMessage(
-    override val updatedAt: String,
-    override val reason: String,
-    override val entityId: String,
+    override val updatedAt: String = "",
+    override val reason: String = "",
+    override val entityId: String = "",
     val messageId: String,
     val threadId: String,
     val staffId: String,
@@ -95,4 +100,5 @@ data class OperationMessage(
     val reportId: String? = null,
     val text: String? = null,
     val replyTo: String? = null,
+    val senderName: String? = null,
 ) : OperationsStreamEntity
