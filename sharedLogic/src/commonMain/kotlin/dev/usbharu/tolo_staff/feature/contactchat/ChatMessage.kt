@@ -5,6 +5,7 @@ data class ChatMessage(
     val roomId: String,
     val senderName: String,
     val body: String,
-    val timeLabel: String,
-    val isFromCurrentUser: Boolean = false
+    val timeLabel: String? = null,
+    val isFromCurrentUser: Boolean = false,
+    val isSystemEvent: Boolean = false
 )

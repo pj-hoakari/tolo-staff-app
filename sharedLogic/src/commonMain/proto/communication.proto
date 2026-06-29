@@ -1,0 +1,331 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.grpc";
+option java_outer_classname = "CommunicationProto";
+
+package communication;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+message Thread {
+  string thread_id = 1;
+  repeated string member_staff_ids = 2;
+  string display_title = 3;
+}
+
+message Point {
+  string point_id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message Staff {
+  string staff_id = 1;
+  string name = 2;
+  repeated string roles = 3;
+}
+
+message Assignment {
+  string assign_id = 1;
+  string point_id = 2;
+  string staff_id = 3;
+  AssignmentStatus status = 4;
+}
+
+enum AssignmentStatus {
+  ASSIGNMENT_STATUS_UNSPECIFIED = 0;
+  ASSIGNMENT_STATUS_ACTIVE = 1;
+  ASSIGNMENT_STATUS_EN_ROUTE = 2;
+  ASSIGNMENT_STATUS_PENDING = 3;
+}
+
+message Instruction {
+  string instruction_id = 1;
+  repeated string point_ids = 2;
+  repeated string staff_ids = 3;
+  string title = 4;
+  string description = 5;
+  InstructionStatus status = 6;
+  string thread_id = 7;
+}
+
+enum InstructionStatus {
+  INSTRUCTION_STATUS_UNSPECIFIED = 0;
+  INSTRUCTION_STATUS_ACTIVE = 1;
+}
+
+message Report {
+  string report_id = 1;
+  string staff_id = 2;
+  string title = 3;
+  string description = 4;
+  ReportPriority priority = 5;
+  string thread_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+enum ReportPriority {
+  REPORT_PRIORITY_UNSPECIFIED = 0;
+  REPORT_PRIORITY_LOW = 1;
+  REPORT_PRIORITY_MEDIUM = 2;
+  REPORT_PRIORITY_HIGH = 3;
+  REPORT_PRIORITY_CRITICAL = 4;
+}
+
+message Message {
+  string message_id = 1;
+  string thread_id = 2;
+  string staff_id = 3;
+  oneof payload {
+    AssignMessagePayload assign = 4;
+    UnassignMessagePayload unassign = 5;
+    InstructionMessagePayload instruction = 6;
+    ReportMessagePayload report = 7;
+    SimpleMessagePayload simple = 8;
+  }
+  google.protobuf.Timestamp created_at = 9;
+  optional string staff_name = 10;
+}
+
+message AssignMessagePayload {}
+
+message UnassignMessagePayload {}
+
+message InstructionMessagePayload {
+  string instruction_id = 1;
+}
+
+message ReportMessagePayload {
+  string report_id = 1;
+}
+
+message SimpleMessagePayload {
+  string text = 1;
+  optional string reply_to = 2;
+}
+
+message ThreadIdRequest {
+  string thread_id = 1;
+}
+
+message ThreadMessagesRequest {
+  string thread_id = 1;
+  PageRequest page = 2;
+}
+
+message StaffIdRequest {
+  string staff_id = 1;
+}
+
+message AssignmentIdRequest {
+  string assign_id = 1;
+}
+
+enum ChangeEntityType {
+  CHANGE_ENTITY_TYPE_UNSPECIFIED = 0;
+  CHANGE_ENTITY_TYPE_POINT = 1;
+  CHANGE_ENTITY_TYPE_STAFF = 2;
+  CHANGE_ENTITY_TYPE_ASSIGNMENT = 3;
+  CHANGE_ENTITY_TYPE_THREAD = 4;
+  CHANGE_ENTITY_TYPE_MESSAGE = 5;
+  CHANGE_ENTITY_TYPE_INSTRUCTION = 6;
+  CHANGE_ENTITY_TYPE_REPORT = 7;
+}
+
+enum ChangeOperation {
+  CHANGE_OPERATION_UNSPECIFIED = 0;
+  CHANGE_OPERATION_CREATED = 1;
+  CHANGE_OPERATION_UPDATED = 2;
+  CHANGE_OPERATION_DELETED = 3;
+}
+
+message ChangeHead {
+  int64 version = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  ChangeEntityType entity_type = 3;
+  string entity_id = 4;
+  string reason = 5;
+  string thread_id = 6;
+  ChangeOperation operation = 7;
+}
+
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListThreadsRequest {
+  PageRequest page = 1;
+}
+
+message ListAssignmentsRequest {
+  PageRequest page = 1;
+}
+
+message ListMessagesRequest {
+  PageRequest page = 1;
+}
+
+message ListRelevantInstructionsRequest {
+  string staff_id = 1;
+  PageRequest page = 2;
+}
+
+message ListRelevantReportsRequest {
+  string staff_id = 1;
+  PageRequest page = 2;
+}
+
+message ListPointsResponse {
+  repeated Point points = 1;
+}
+
+message ListStaffResponse {
+  repeated Staff staff = 1;
+}
+
+message ListAssignmentsResponse {
+  repeated Assignment assignments = 1;
+  string next_page_token = 2;
+}
+
+message UpdateAssignmentStatusRequest {
+  string assign_id = 1;
+  AssignmentStatus status = 2;
+}
+
+message ListThreadsResponse {
+  repeated Thread threads = 1;
+  string next_page_token = 2;
+}
+
+message CreateThreadRequest {
+  Thread thread = 1;
+}
+
+message UpdateThreadRequest {
+  Thread thread = 1;
+}
+
+message MessageIdRequest {
+  string message_id = 1;
+}
+
+message ListMessagesResponse {
+  repeated Message messages = 1;
+  string next_page_token = 2;
+}
+
+message CreateMessageRequest {
+  Message message = 1;
+}
+
+message UpdateMessageRequest {
+  Message message = 1;
+}
+
+message InstructionIdRequest {
+  string instruction_id = 1;
+}
+
+message ListInstructionsResponse {
+  repeated Instruction instructions = 1;
+  string next_page_token = 2;
+}
+
+message CreateInstructionRequest {
+  Instruction instruction = 1;
+}
+
+message UpdateInstructionRequest {
+  Instruction instruction = 1;
+}
+
+message ReportIdRequest {
+  string report_id = 1;
+}
+
+message ListReportsResponse {
+  repeated Report reports = 1;
+  string next_page_token = 2;
+}
+
+message CreateReportRequest {
+  Report report = 1;
+}
+
+message UpdateReportRequest {
+  Report report = 1;
+}
+
+service ThreadRpc {
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc GetThread(ThreadIdRequest) returns (Thread);
+  rpc ListThreadMessages(ThreadMessagesRequest) returns (ListMessagesResponse);
+  rpc CreateThread(CreateThreadRequest) returns (Thread);
+  rpc UpdateThread(UpdateThreadRequest) returns (Thread);
+  rpc DeleteThread(ThreadIdRequest) returns (google.protobuf.Empty);
+}
+
+service PointRpc {
+  rpc ListPoints(google.protobuf.Empty) returns (ListPointsResponse);
+}
+
+service StaffRpc {
+  rpc ListStaff(google.protobuf.Empty) returns (ListStaffResponse);
+}
+
+service AssignmentRpc {
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse);
+  rpc GetAssignment(AssignmentIdRequest) returns (Assignment);
+  rpc UpdateAssignmentStatus(UpdateAssignmentStatusRequest) returns (Assignment);
+}
+
+service MessageRpc {
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  rpc GetMessage(MessageIdRequest) returns (Message);
+  rpc CreateMessage(CreateMessageRequest) returns (Message);
+  rpc UpdateMessage(UpdateMessageRequest) returns (Message);
+  rpc DeleteMessage(MessageIdRequest) returns (google.protobuf.Empty);
+}
+
+service InstructionRpc {
+  rpc ListInstructions(google.protobuf.Empty) returns (ListInstructionsResponse);
+  rpc GetInstruction(InstructionIdRequest) returns (Instruction);
+  rpc ListRelevantInstructions(ListRelevantInstructionsRequest) returns (ListInstructionsResponse);
+  rpc CreateInstruction(CreateInstructionRequest) returns (Instruction);
+  rpc UpdateInstruction(UpdateInstructionRequest) returns (Instruction);
+  rpc DeleteInstruction(InstructionIdRequest) returns (google.protobuf.Empty);
+}
+
+service ReportRpc {
+  rpc ListReports(google.protobuf.Empty) returns (ListReportsResponse);
+  rpc GetReport(ReportIdRequest) returns (Report);
+  rpc ListRelevantReports(ListRelevantReportsRequest) returns (ListReportsResponse);
+  rpc CreateReport(CreateReportRequest) returns (Report);
+  rpc UpdateReport(UpdateReportRequest) returns (Report);
+  rpc DeleteReport(ReportIdRequest) returns (google.protobuf.Empty);
+}
+
+message Event {
+  string event_id = 1;
+  string name = 2;
+  string venue_name = 3;
+  double latitude = 4;
+  double longitude = 5;
+  double latitude_delta = 6;
+  double longitude_delta = 7;
+  google.protobuf.Timestamp start_time = 8;
+  google.protobuf.Timestamp end_time = 9;
+}
+
+service EventRpc {
+  rpc GetCurrentEvent(google.protobuf.Empty) returns (Event);
+}
+
+service ChangeHeadRpc {
+  rpc GetGlobalChangeHead(google.protobuf.Empty) returns (ChangeHead);
+  rpc GetStaffChangeHead(StaffIdRequest) returns (ChangeHead);
+}

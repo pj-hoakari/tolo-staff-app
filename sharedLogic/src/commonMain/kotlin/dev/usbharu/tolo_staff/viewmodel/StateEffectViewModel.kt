@@ -41,7 +41,7 @@ abstract class StateEffectViewModel<S, E>(
     fun observeEffect(onChange: (E) -> Unit): Job =
         effects.onEach(onChange).launchIn(viewModelScope)
 
-    fun clear() {
+    open fun clear() {
         viewModelScope.cancel()
     }
 }
