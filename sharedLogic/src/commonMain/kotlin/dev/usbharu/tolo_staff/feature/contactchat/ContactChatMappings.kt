@@ -1,44 +1,34 @@
 package dev.usbharu.tolo_staff.feature.contactchat
 
-import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.OperationMessage
-import dev.usbharu.tolo_staff.streaming.OperationMessageType
 import dev.usbharu.tolo_staff.streaming.OperationStaff
 import dev.usbharu.tolo_staff.streaming.OperationThread
 import dev.usbharu.tolo_staff.streaming.sortedOperationMessages
-
-private val logger = AppLogger.withTag("ContactChatMappings")
 
 internal fun OperationThread.deriveTitle(
     currentStaffId: String,
     staff: List<OperationStaff>,
 ): String {
-    displayTitle
-        .takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
-        ?.let { return it }
-
+    displayTitle.takeIf(String::isNotBlank)?.let { return it }
     val namesById = staff.associate { it.staffId to it.name }
-    val otherMembers = members
+    return members
         .filterNot { it == currentStaffId }
         .distinct()
-        .map { memberId -> namesById[memberId] ?: memberId }
-    return otherMembers.joinToString(", ").ifBlank { threadId }
+        .joinToString(", ") { namesById[it] ?: it }
+        .ifBlank { threadId }
 }
 
-internal fun List<OperationMessage>.latestMessageByThread(): Map<String, OperationMessage?> = groupBy { it.threadId }
-    .mapValues { (_, messages) -> messages.sortedOperationMessages().lastOrNull() }
+internal fun List<OperationMessage>.latestMessageByThread(): Map<String, OperationMessage?> =
+    groupBy { it.threadId }.mapValues { (_, messages) -> messages.sortedOperationMessages().lastOrNull() }
 
-internal fun List<OperationMessage>.toRoomPreviewByThread(): Map<String, String> = latestMessageByThread()
-    .mapValues { (_, message) -> message?.toPreviewBody().orEmpty() }
+internal fun List<OperationMessage>.toRoomPreviewByThread(): Map<String, String> =
+    latestMessageByThread().mapValues { (_, message) -> message?.toPreviewBody().orEmpty() }
 
 internal fun List<OperationThread>.sortedByLatestMessage(messages: List<OperationMessage>): List<OperationThread> {
-    val latestMessagesByThread = messages.latestMessageByThread()
+    val latestMessages = messages.latestMessageByThread()
     return sortedWith(
-        compareByDescending<OperationThread> { thread ->
-            latestMessagesByThread[thread.threadId]?.updatedAt?.takeUnless {
-                it.equals("null", ignoreCase = true) || it.isBlank()
-            }
-        }.thenBy { it.threadId }
+        compareByDescending<OperationThread> { latestMessages[it.threadId]?.updatedAt?.ifBlank { null } }
+            .thenBy { it.threadId }
     )
 }
 
@@ -46,46 +36,20 @@ internal fun OperationMessage.toUiMessage(
     currentStaffId: String,
     staff: List<OperationStaff>,
 ): ChatMessage {
-    logger.trace {
-        "toUiMessage started: messageId=$messageId, threadId=$threadId, currentStaffId=$currentStaffId, rawSenderStaffId=$staffId, rawSenderName=$senderName"
-    }
-    val effectiveSenderStaffId = normalizedSenderStaffId()
-    val effectiveSenderName = senderName
-        ?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
-    val resolvedSenderName = staff.firstOrNull { it.staffId == effectiveSenderStaffId }?.name
-        ?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
-        ?: effectiveSenderName
-        ?: effectiveSenderStaffId
-        ?: "不明"
-    val isFromCurrentUser = effectiveSenderStaffId == currentStaffId
-    if (resolvedSenderName == "不明") {
-        logger.warn {
-            "Unable to resolve sender for chat message: messageId=$messageId, threadId=$threadId, currentStaffId=$currentStaffId, rawSenderStaffId=$staffId, normalizedSenderStaffId=$effectiveSenderStaffId, rawSenderName=$senderName, messageType=$messageType"
-        }
-    }
-    logger.debug {
-        "Mapped chat message: messageId=$messageId, threadId=$threadId, senderStaffId=$staffId, effectiveSenderStaffId=$effectiveSenderStaffId, currentStaffId=$currentStaffId, senderName=$resolvedSenderName, isFromCurrentUser=$isFromCurrentUser"
-    }
-
+    val sender = staff.firstOrNull { it.staffId == staffId }?.name
+        ?: senderName?.takeIf(String::isNotBlank)
+        ?: staffId.ifBlank { "不明" }
     return ChatMessage(
         id = messageId,
         roomId = threadId,
-        senderName = resolvedSenderName,
+        senderName = sender,
         body = toPreviewBody(),
-        timeLabel = updatedAt.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() },
-        isFromCurrentUser = isFromCurrentUser,
-        isSystemEvent = messageType != OperationMessageType.SIMPLE,
+        timeLabel = updatedAt.ifBlank { null },
+        isFromCurrentUser = staffId == currentStaffId,
+        isSystemEvent = false,
     )
 }
 
-internal fun OperationMessage.normalizedSenderStaffId(): String? =
-    staffId
-        .takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
+internal fun OperationMessage.normalizedSenderStaffId(): String? = staffId.ifBlank { null }
 
-internal fun OperationMessage.toPreviewBody(): String = when (messageType) {
-    OperationMessageType.SIMPLE -> text?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() } ?: "メッセージ"
-    OperationMessageType.ASSIGN -> "配属が更新されました"
-    OperationMessageType.UNASSIGN -> "配属解除が共有されました"
-    OperationMessageType.INSTRUCTION -> "指示が共有されました: ${instructionId.orEmpty()}"
-    OperationMessageType.REPORT -> "報告が共有されました: ${reportId.orEmpty()}"
-}
+internal fun OperationMessage.toPreviewBody(): String = text.ifBlank { "メッセージ" }

@@ -1,12 +1,13 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
-import com.google.protobuf.kotlin.Empty
 import com.google.protobuf.kotlin.Timestamp
-import com.google.protobuf.kotlin.invoke
-import dev.usbharu.tolo.communication.grpc.Event
-import dev.usbharu.tolo.communication.grpc.invoke
+import dev.usbharu.tolo.communication.v1.Event
+import dev.usbharu.tolo.communication.v1.GetEventRequest
+import dev.usbharu.tolo.communication.v1.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
+import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
+import dev.usbharu.tolo_staff.streaming.toProtoScope
 import dev.usbharu.tolo_staff.streaming.toIsoString
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -34,12 +35,15 @@ class NoOpEventRepository : EventRepository {
 
 class GrpcEventRepository(
     private val grpcClient: GrpcCommunicationClient,
+    private val session: AppSessionContext,
 ) : EventRepository {
     private val logger = AppLogger.withTag("GrpcEventRepository")
 
     override fun observeCurrentEvent(): Flow<OperationEvent> = flow {
         val event = runCatching {
-            grpcClient.eventService.GetCurrentEvent(Empty {}).toOperationEvent()
+            grpcClient.referenceService.GetEvent(
+                GetEventRequest { scope = session.toProtoScope() }
+            ).toOperationEvent()
         }.getOrElse { error ->
             logger.warn(error) { "Failed to fetch current event via gRPC; falling back to default" }
             OperationEvent()
@@ -52,15 +56,10 @@ class GrpcEventRepository(
 }
 
 private fun Event.toOperationEvent(): OperationEvent = OperationEvent(
-    eventId = eventId,
+    eventId = scope.eventId.value,
     name = name,
-    venueName = venueName,
-    latitude = latitude,
-    longitude = longitude,
-    latitudeDelta = latitudeDelta,
-    longitudeDelta = longitudeDelta,
-    startTimeIso = startTime.toIsoIfSet(),
-    endTimeIso = endTime.toIsoIfSet(),
+    startTimeIso = startsAt.toIsoIfSet(),
+    endTimeIso = endsAt.toIsoIfSet(),
 )
 
 private fun Timestamp?.toIsoIfSet(): String? {

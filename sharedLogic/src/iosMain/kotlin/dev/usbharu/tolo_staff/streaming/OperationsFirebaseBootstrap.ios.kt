@@ -1,5 +1,5 @@
 package dev.usbharu.tolo_staff.streaming
 
 actual class OperationsFirebaseBootstrap {
-    actual fun initialize(context: Any?) = Unit
+    actual fun initialize(context: Any?, config: OperationsStreamingConfig) = Unit
 }

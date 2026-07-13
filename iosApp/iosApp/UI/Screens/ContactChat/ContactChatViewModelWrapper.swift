@@ -1,8 +1,11 @@
 import Foundation
+import Observation
 import SharedLogic
 
-final class ContactChatViewModelWrapper: ObservableObject {
-    @Published var state: ContactChatUiState
+@MainActor
+@Observable
+final class ContactChatViewModelWrapper {
+    var state: ContactChatUiState
 
     private let viewModel: ContactChatViewModel
     private var stateJob: Kotlinx_coroutines_coreJob?
@@ -23,7 +26,7 @@ final class ContactChatViewModelWrapper: ObservableObject {
 
         self.stateJob = viewModel.observeUiState { [weak self] state in
             guard let state else { return }
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 self?.state = state
             }
         }
@@ -45,7 +48,7 @@ final class ContactChatViewModelWrapper: ObservableObject {
         viewModel.onSendClicked()
     }
 
-    deinit {
+    func clear() {
         stateJob?.cancel(cause: nil)
         viewModel.clear()
     }

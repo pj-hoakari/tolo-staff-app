@@ -4,5 +4,25 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>ToloTenantId</key>
+	<string>$(TOLO_TENANT_ID)</string>
+	<key>ToloEventId</key>
+	<string>$(TOLO_EVENT_ID)</string>
+	<key>ToloStaffId</key>
+	<string>$(TOLO_STAFF_ID)</string>
+	<key>ToloGrpcHost</key>
+	<string>$(TOLO_GRPC_HOST)</string>
+	<key>ToloGrpcPort</key>
+	<string>$(TOLO_GRPC_PORT)</string>
+	<key>ToloFirestoreEnabled</key>
+	<string>$(TOLO_FIRESTORE_ENABLED)</string>
+	<key>ToloFirestoreHost</key>
+	<string>$(TOLO_FIRESTORE_HOST)</string>
+	<key>ToloFirestorePort</key>
+	<string>$(TOLO_FIRESTORE_PORT)</string>
+	<key>ToloFirestoreProjectId</key>
+	<string>$(TOLO_FIRESTORE_PROJECT_ID)</string>
+	<key>ToloFirestoreDatabaseId</key>
+	<string>$(TOLO_FIRESTORE_DATABASE_ID)</string>
 </dict>
 </plist>

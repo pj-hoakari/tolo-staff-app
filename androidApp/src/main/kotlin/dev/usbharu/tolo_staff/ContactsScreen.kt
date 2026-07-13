@@ -11,15 +11,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.usbharu.tolo_staff.feature.appshell.ContactTargetType
@@ -43,20 +50,9 @@ internal fun ContactThreadListScreen(
                 description = "現在のスレッドと新規連絡の開始",
             )
         }
-        if (state.threads.any { !it.isFormerAssignment }) {
-            item { Text("現在の連絡", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            items(state.threads.filter { !it.isFormerAssignment }, key = { it.id }) { thread ->
-                ContactThreadRow(thread, onThreadSelected)
-            }
-        }
-        if (state.threads.any { it.isFormerAssignment }) {
-            item { Text("旧担当", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            items(state.threads.filter { it.isFormerAssignment }, key = { it.id }) { thread ->
-                ContactThreadRow(thread, onThreadSelected)
-            }
-        }
-        items(state.formerAssignments, key = { it.id }) { assignment ->
-            Text(assignment.summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        item { Text("現在の連絡", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        items(state.threads, key = { it.id }) { thread ->
+            ContactThreadRow(thread, onThreadSelected)
         }
     }
 }
@@ -67,7 +63,12 @@ internal fun ContactTargetSelectionScreen(
     onTargetTypeSelected: (ContactTargetType) -> Unit,
     onTargetSelected: (String) -> Unit,
 ) {
-    val selectedTargets = state.availableTargets.filter { it.type == state.selectedTargetType }
+    val selectedTargetType = state.selectedTargetType ?: ContactTargetType.PLACE
+    val selectedTargets = state.availableTargets.filter { it.type == selectedTargetType }
+    val targetTypes = listOf(
+        ContactTargetType.PLACE to "担当場所",
+        ContactTargetType.USER to "個人",
+    )
 
     LazyColumn(
         modifier = Modifier
@@ -80,30 +81,46 @@ internal fun ContactTargetSelectionScreen(
             ScreenHeader("宛先を選択", "対象の種別を選んでから候補を選択します。")
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ContactTypeChip("担当場所", state.selectedTargetType == ContactTargetType.PLACE) {
-                        onTargetTypeSelected(ContactTargetType.PLACE)
-                    }
-                    ContactTypeChip("担当ロール", state.selectedTargetType == ContactTargetType.ROLE) {
-                        onTargetTypeSelected(ContactTargetType.ROLE)
+            SectionCard {
+                Text("宛先", style = MaterialTheme.typography.labelLarge)
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("contact_target_tabs")
+                ) {
+                    targetTypes.forEachIndexed { index, (type, label) ->
+                        SegmentedButton(
+                            selected = selectedTargetType == type,
+                            onClick = { onTargetTypeSelected(type) },
+                            shape = SegmentedButtonDefaults.itemShape(index, targetTypes.size),
+                            modifier = Modifier.testTag("contact_target_tab_${type.name.lowercase()}"),
+                            label = { Text(label) },
+                        )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ContactTypeChip("本部", state.selectedTargetType == ContactTargetType.HEADQUARTERS) {
-                        onTargetTypeSelected(ContactTargetType.HEADQUARTERS)
+
+                HorizontalDivider()
+                if (selectedTargets.isEmpty()) {
+                    Text(
+                        text = "選択できる宛先がありません",
+                        modifier = Modifier.testTag("contact_target_empty"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    selectedTargets.forEach { target ->
+                        TextButton(
+                            onClick = { onTargetSelected(target.id) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("contact_target_${target.id}"),
+                        ) {
+                            Text(
+                                text = target.displayName,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Start,
+                            )
+                        }
                     }
-                    ContactTypeChip("個人", state.selectedTargetType == ContactTargetType.USER) {
-                        onTargetTypeSelected(ContactTargetType.USER)
-                    }
-                }
-            }
-        }
-        items(selectedTargets, key = { it.id }) { target ->
-            SectionCard(onClick = { onTargetSelected(target.id) }) {
-                Text(target.displayName, fontWeight = FontWeight.SemiBold)
-                target.subtitle?.let {
-                    Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -113,7 +130,6 @@ internal fun ContactTargetSelectionScreen(
 @Composable
 internal fun ContactThreadDetailScreen(
     thread: ContactThreadDetailUiModel,
-    onReportSelected: (String) -> Unit,
     onDraftChanged: (String) -> Unit,
     onSendClicked: () -> Unit,
 ) {
@@ -131,16 +147,10 @@ internal fun ContactThreadDetailScreen(
                 SectionCard {
                     Text(thread.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                     Text(thread.target.displayName, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (thread.isFormerAssignment) {
-                        Text("旧担当", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
             }
             items(thread.messages, key = { it.id }) { message ->
-                ThreadMessageBubble(
-                    message = message,
-                    onReportSelected = onReportSelected,
-                )
+                ThreadMessageBubble(message = message)
             }
         }
 

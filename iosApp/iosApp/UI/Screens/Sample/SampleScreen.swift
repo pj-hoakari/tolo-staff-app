@@ -1,11 +1,16 @@
 import SwiftUI
 import SharedLogic
 
+@MainActor
 struct SampleScreen: View {
-    @StateObject private var wrapper: SampleViewModelWrapper
+    @State private var wrapper: SampleViewModelWrapper
 
-    init(wrapper: SampleViewModelWrapper = SampleViewModelWrapper()) {
-        _wrapper = StateObject(wrappedValue: wrapper)
+    init() {
+        _wrapper = State(initialValue: SampleViewModelWrapper())
+    }
+
+    init(wrapper: SampleViewModelWrapper) {
+        _wrapper = State(initialValue: wrapper)
     }
 
     var body: some View {
@@ -13,6 +18,7 @@ struct SampleScreen: View {
             state: wrapper.state,
             onPrimaryAction: { wrapper.onPrimaryActionClicked() }
         )
+        .onDisappear { wrapper.clear() }
         .navigationTitle(String(localized: "sample_title"))
     }
 }

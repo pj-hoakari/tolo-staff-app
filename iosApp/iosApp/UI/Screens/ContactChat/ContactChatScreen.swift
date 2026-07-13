@@ -1,11 +1,16 @@
 import SwiftUI
 import SharedLogic
 
+@MainActor
 struct ContactChatScreen: View {
-    @StateObject private var wrapper: ContactChatViewModelWrapper
+    @State private var wrapper: ContactChatViewModelWrapper
 
-    init(wrapper: ContactChatViewModelWrapper = ContactChatViewModelWrapper()) {
-        _wrapper = StateObject(wrappedValue: wrapper)
+    init() {
+        _wrapper = State(initialValue: ContactChatViewModelWrapper())
+    }
+
+    init(wrapper: ContactChatViewModelWrapper) {
+        _wrapper = State(initialValue: wrapper)
     }
 
     var body: some View {
@@ -27,6 +32,7 @@ struct ContactChatScreen: View {
                 }
             }
         }
+        .onDisappear { wrapper.clear() }
     }
 }
 
@@ -192,18 +198,14 @@ struct ContactChatContentView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .foregroundStyle(
-                        message.isSystemEvent
-                            ? AnyShapeStyle(.secondary)
-                            : message.isFromCurrentUser
+                        message.isFromCurrentUser
                             ? AnyShapeStyle(.white)
                             : AnyShapeStyle(.primary)
                     )
                     .background {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(
-                                message.isSystemEvent
-                                    ? AnyShapeStyle(Color.secondary.opacity(0.12))
-                                    : message.isFromCurrentUser
+                                message.isFromCurrentUser
                                     ? AnyShapeStyle(Color.accentColor)
                                     : AnyShapeStyle(Color.blue.opacity(0.12))
                             )

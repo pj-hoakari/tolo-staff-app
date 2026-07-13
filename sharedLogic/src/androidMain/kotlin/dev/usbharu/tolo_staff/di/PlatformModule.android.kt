@@ -12,26 +12,41 @@ import dev.usbharu.tolo_staff.streaming.FirestoreOperationsStreamDataSource
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
 import dev.usbharu.tolo_staff.streaming.OperationsChangeNotifier
 import dev.usbharu.tolo_staff.streaming.FirestoreOperationsChangeNotifier
-import dev.usbharu.tolo_staff.streaming.OperationsReadMode
 import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
-import dev.usbharu.tolo_staff.streaming.defaultOperationsReadMode
-import dev.usbharu.tolo_staff.streaming.defaultOperationsStreamingConfig
+import dev.usbharu.tolo_staff.runtime.AppRuntimeConfig
+import dev.usbharu.tolo_staff.runtime.AppSessionContext
+import dev.usbharu.tolo_staff.runtime.GrpcMetadataProvider
+import dev.usbharu.tolo_staff.streaming.OperationsStreamingConfig
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 actual fun platformModule(): Module = module {
-    single { defaultOperationsReadMode() }
-    single { GrpcCommunicationClient(host = dev.usbharu.tolo_staff.feature.contactchat.contactChatServerHost, port = 8080) }
-    single<OperationsChangeNotifier> { FirestoreOperationsChangeNotifier(defaultOperationsStreamingConfig()) }
-    single<ReportRepository> { GrpcReportRepository(grpcClient = get(), changeNotifier = get()) }
-    single<EventRepository> { GrpcEventRepository(grpcClient = get()) }
-    single<AssignmentStatusService> { GrpcAssignmentStatusService(grpcClient = get()) }
-    single<OperationsStreamDataSource> {
-        check(get<OperationsReadMode>() == OperationsReadMode.FIRESTORE)
-        FirestoreOperationsStreamDataSource(
-            config = defaultOperationsStreamingConfig(),
-            grpcClient = get(),
+    single {
+        val config = get<AppRuntimeConfig>()
+        OperationsStreamingConfig(
+            enabled = config.firestoreEnabled,
+            host = config.firestoreHost,
+            port = config.firestorePort,
+            projectId = config.firestoreProjectId,
+            databaseId = config.firestoreDatabaseId,
         )
     }
-    single<ContactChatService> { GrpcContactChatService(dataSource = get(), grpcClient = get()) }
+    single {
+        val config = get<AppRuntimeConfig>()
+        GrpcCommunicationClient(config.grpcHost, config.grpcPort, get<GrpcMetadataProvider>())
+    }
+    single<OperationsChangeNotifier> {
+        FirestoreOperationsChangeNotifier(get(), get<AppSessionContext>())
+    }
+    single<ReportRepository> { GrpcReportRepository(get(), get(), changeNotifier = get()) }
+    single<EventRepository> { GrpcEventRepository(get(), get()) }
+    single<AssignmentStatusService> { GrpcAssignmentStatusService(get(), get()) }
+    single<OperationsStreamDataSource> {
+        FirestoreOperationsStreamDataSource(
+            config = get(),
+            grpcClient = get(),
+            session = get(),
+        )
+    }
+    single<ContactChatService> { GrpcContactChatService(get(), get(), get()) }
 }

@@ -1,32 +1,33 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
-import com.google.protobuf.kotlin.invoke
-import dev.usbharu.tolo.communication.grpc.AssignmentStatus
-import dev.usbharu.tolo.communication.grpc.UpdateAssignmentStatusRequest
-import dev.usbharu.tolo.communication.grpc.invoke
+import dev.usbharu.tolo.communication.v1.ActivateAssignmentRequest
+import dev.usbharu.tolo.communication.v1.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
+import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
-import dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus
+import dev.usbharu.tolo_staff.streaming.toProtoAssignmentId
+import dev.usbharu.tolo_staff.streaming.toProtoScope
 
 class GrpcAssignmentStatusService(
     private val grpcClient: GrpcCommunicationClient,
+    private val session: AppSessionContext,
 ) : AssignmentStatusService {
     private val logger = AppLogger.withTag("GrpcAssignmentStatusService")
 
-    override suspend fun updateStatus(assignId: String, status: OperationAssignmentStatus) {
-        logger.trace { "updateStatus started: assignId=$assignId, status=$status" }
-        grpcClient.assignmentService.UpdateAssignmentStatus(
-            UpdateAssignmentStatusRequest {
-                this.assignId = assignId
-                this.status = status.toGrpcStatus()
-            }
+    override suspend fun activate(assignmentId: String, expectedVersion: Long) {
+        grpcClient.assignmentService.ActivateAssignment(
+            activateAssignmentRequest(session, assignmentId, expectedVersion)
         )
-        logger.info { "updateStatus completed: assignId=$assignId, status=$status" }
+        logger.info { "Activated assignment: assignmentId=$assignmentId, expectedVersion=$expectedVersion" }
     }
 }
 
-private fun OperationAssignmentStatus.toGrpcStatus(): AssignmentStatus = when (this) {
-    OperationAssignmentStatus.ACTIVE -> AssignmentStatus.ASSIGNMENT_STATUS_ACTIVE
-    OperationAssignmentStatus.EN_ROUTE -> AssignmentStatus.ASSIGNMENT_STATUS_EN_ROUTE
-    OperationAssignmentStatus.PENDING -> AssignmentStatus.ASSIGNMENT_STATUS_PENDING
+internal fun activateAssignmentRequest(
+    session: AppSessionContext,
+    assignmentId: String,
+    expectedVersion: Long,
+): ActivateAssignmentRequest = ActivateAssignmentRequest {
+    scope = session.toProtoScope()
+    this.assignmentId = assignmentId.toProtoAssignmentId()
+    this.expectedVersion = expectedVersion
 }

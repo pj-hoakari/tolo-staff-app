@@ -1,342 +1,135 @@
 import SwiftUI
 import XCTest
-import SnapshotTesting
 import SharedLogic
 @testable import ToloStaff
 
+@MainActor
 final class SampleViewTests: XCTestCase {
-    func testAppShellContentViewCanBeCreated() {
-        let state = makeAppShellState(selectedTab: AppTab.home)
-
-        let view = AppShellContentView(state: state)
-
-        XCTAssertNotNil(view)
+    func testAppShellKeepsFourTabs() {
+        for tab in [AppTab.home, .instructions, .reports, .contacts] {
+            let view = AppShellContentView(state: makeAppShellState(selectedTab: tab))
+            XCTAssertNotNil(view)
+        }
     }
 
-    func testInstructionsTabCanBeCreated() {
-        let featuredInstruction = InstructionSummaryUiModel(
-            id: "instruction-gate-a",
-            title: "Aゲート前の列を右側へ誘導",
-            targetName: "Aゲート担当",
-            priorityLabel: "高",
+    func testInstructionUsesBodyFirstLineAsTitleWithoutThreadState() {
+        let instruction = InstructionSummaryUiModel(
+            id: "instruction-1",
+            title: "南口の列整理",
+            targetName: "南口",
             statusLabel: "対応中",
-            preview: "来場者導線を確保し、右側へ寄せてください。",
-            locationLabel: nil,
-            attachmentSummary: nil,
-            unreadCount: 1
+            preview: "南口の列整理\n右側へ誘導してください"
         )
         let state = makeAppShellState(
-            selectedTab: AppTab.instructions,
-            homeOverview: AppShellHomeOverview(
-                eventName: "Tolo Staff Demo 2026",
-                eventTime: "Firestore Streaming Demo",
-                placementName: "Gate A",
-                placementDetail: "North entrance",
-                currentInstruction: featuredInstruction.preview,
-                currentInstructionTitle: featuredInstruction.title,
-                currentInstructionTargetName: featuredInstruction.targetName,
-                currentInstructionPriorityLabel: featuredInstruction.priorityLabel,
-                currentInstructionStatusLabel: featuredInstruction.statusLabel,
-                currentInstructionLocationLabel: nil,
-                currentInstructionAttachmentSummary: nil,
-                currentInstructionUnreadCount: Int32(featuredInstruction.unreadCount),
-                mapState: AppShellMapState(
-                    venueName: "Gate A",
-                    latitude: 35.0,
-                    longitude: 139.0,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01
-                ),
-                currentInstructionId: featuredInstruction.id,
-                unreadContactCount: 0,
-                pendingReportLabel: "",
-                placementStatus: makePlacementStatus(placementName: "Gate A", phase: .active)
-            ),
-            instructionsTab: InstructionsTabUiState(
-                instructions: [featuredInstruction],
-                featuredInstruction: featuredInstruction,
+            selectedTab: .instructions,
+            instructions: InstructionsTabUiState(
+                instructions: [instruction],
+                featuredInstruction: instruction,
                 otherInstructions: [],
-                selectedInstruction: nil,
-                isShowingThread: false
+                selectedInstruction: nil
             )
         )
 
-        let view = AppShellContentView(state: state)
-
-        XCTAssertNotNil(view)
-        XCTAssertEqual(state.instructionsTab.featuredInstruction?.id, "instruction-gate-a")
-        XCTAssertEqual(state.instructionsTab.otherInstructions.count, 0)
+        XCTAssertNotNil(AppShellContentView(state: state))
+        XCTAssertEqual(state.instructionsTab.featuredInstruction?.title, "南口の列整理")
     }
 
-    func testReportsTabCanBeCreated() {
-        let state = makeAppShellState(selectedTab: AppTab.reports)
-
-        let view = AppShellContentView(state: state)
-
-        XCTAssertNotNil(view)
-    }
-
-    func testReportsDetailCanBeCreated() {
+    func testReportDetailUsesNewContractFields() {
         let report = ReportDetailUiModel(
             reportId: "report-1",
-            threadId: "report-thread-1",
-            title: "導線報告",
-            summary: "南口の入場列は安定しています",
-            priorityLabel: "通常",
+            title: "混雑",
+            summary: "南口の列が伸びています",
+            severityLabel: "高",
             authorName: "田中",
             targetLabel: "南口",
-            timeLabel: "2026-06-19T09:00:00Z",
-            isAuthoredByCurrentStaff: true,
-            detailPlaceholderMessage: "詳細情報は今後の API 連携で表示予定です。現在は概要のみ確認できます。"
+            statusLabel: "未対応",
+            timeLabel: "2026-07-13T01:00:00Z",
+            isAuthoredByCurrentStaff: true
         )
-        let state = makeAppShellState(
-            selectedTab: AppTab.reports,
-            selectedReport: report
-        )
+        let state = makeAppShellState(selectedTab: .reports, selectedReport: report)
 
-        let view = AppShellContentView(state: state)
-
-        XCTAssertNotNil(view)
-        XCTAssertEqual(state.reportsTab.selectedReport?.reportId, "report-1")
-        XCTAssertEqual(state.reportsTab.selectedReport?.threadId, "report-thread-1")
+        XCTAssertNotNil(AppShellContentView(state: state))
+        XCTAssertEqual(state.reportsTab.selectedReport?.severityLabel, "高")
     }
 
-    func testContactsTabCanBeCreated() {
-        let state = makeAppShellState(selectedTab: AppTab.contacts)
-
-        let view = AppShellContentView(state: state)
-
-        XCTAssertNotNil(view)
-    }
-
-    func testPlacementBarCanBeCreatedForEachPhase() {
-        let pending = PlacementBar(
-            placementStatus: makePlacementStatus(placementName: "Gate A", phase: .pendingChange)
-        )
-        let enRoute = PlacementBar(
-            placementStatus: makePlacementStatus(placementName: "Gate B", phase: .enRoute)
-        )
-        let active = PlacementBar(
-            placementStatus: makePlacementStatus(placementName: "Gate C", phase: .active)
-        )
-
-        XCTAssertNotNil(pending)
-        XCTAssertNotNil(enRoute)
-        XCTAssertNotNil(active)
-    }
-
-    func testContactsThreadWithRichReportMessageCanBeCreated() {
-        let reportMessage = ThreadMessageUiModel(
-            id: "report-message-1",
-            senderName: "田中",
-            senderRoleLabel: "Aゲート担当",
-            body: "報告が共有されました: report-1",
-            timeLabel: "2026-06-20T09:00:00Z",
-            isCurrentUser: true,
-            isSystemEvent: true,
-            reportId: "report-1",
-            reportTitle: "導線報告",
-            reportSummary: "南口の入場列は安定しています",
-            reportPriorityLabel: "通常",
-            reportAuthorName: "田中",
-            reportTargetLabel: "南口",
-            reportTimeLabel: "2026-06-20T09:00:00Z",
-            reportIsAuthoredByCurrentStaff: true
-        )
-        let contactsTab = ContactsTabUiState(
-            threads: [],
-            selectedThread: ContactThreadDetailUiModel(
-                id: "report-thread-1",
-                title: "本部 / 南口",
-                target: ContactTargetUiModel(
-                    id: "report-thread-1",
-                    type: .headquarters,
-                    displayName: "本部 / 南口",
-                    subtitle: nil
-                ),
-                messages: [reportMessage],
-                draftMessage: "",
-                canReply: true,
-                isFormerAssignment: false
-            ),
-            availableTargets: [],
-            selectedTargetType: nil,
-            isChoosingTargetType: false,
-            formerAssignments: []
-        )
-        let state = makeAppShellState(
-            selectedTab: AppTab.contacts,
-            contactsTab: contactsTab
-        )
-
-        let view = AppShellContentView(state: state)
-
-        XCTAssertNotNil(view)
-        XCTAssertEqual(state.contactsTab.selectedThread?.messages.first?.reportId, "report-1")
-        XCTAssertEqual(state.contactsTab.selectedThread?.messages.first?.reportTitle, "導線報告")
-    }
-
-    func disabled_testAppShellContentSnapshotSmoke() {
-        let state = makeAppShellState(selectedTab: AppTab.home)
-
-        assertSnapshot(
-            of: AppShellContentView(state: state).frame(width: 390, height: 844),
-            as: .image(layout: .fixed(width: 390, height: 844)),
-            record: true
-        )
+    func testPlacementBarSupportsScheduledAndActiveOnly() {
+        XCTAssertNotNil(PlacementBar(placementStatus: makePlacementStatus(.scheduled)))
+        XCTAssertNotNil(PlacementBar(placementStatus: makePlacementStatus(.active)))
     }
 
     func testSampleContentViewCanBeCreated() {
-        let state = SampleUiState(
-            message: "KMP is ready",
-            tapCount: 2,
-            lastAction: "primary"
-        )
-
-        let view = SampleContentView(state: state)
-
-        XCTAssertNotNil(view)
-    }
-
-    func disabled_testSampleContentSnapshotSmoke() {
-        let state = SampleUiState(
-            message: "KMP is ready",
-            tapCount: 1,
-            lastAction: "primary"
-        )
-
-        assertSnapshot(
-            of: SampleContentView(state: state).frame(width: 390, height: 844),
-            as: .image(layout: .fixed(width: 390, height: 844)),
-            record: true
-        )
+        let state = SampleUiState(message: "KMP is ready", tapCount: 2, lastAction: "primary")
+        XCTAssertNotNil(SampleContentView(state: state))
     }
 
     private func makeAppShellState(
         selectedTab: AppTab,
-        homeOverview: AppShellHomeOverview? = nil,
-        instructionsTab: InstructionsTabUiState? = nil,
-        selectedReport: ReportDetailUiModel? = nil,
-        contactsTab: ContactsTabUiState? = nil
+        instructions: InstructionsTabUiState? = nil,
+        selectedReport: ReportDetailUiModel? = nil
     ) -> AppShellUiState {
-        let overview = homeOverview ?? AppShellHomeOverview(
+        let overview = AppShellHomeOverview(
             eventName: "Tolo Staff Demo 2026",
-            eventTime: "Firestore Streaming Demo",
-            placementName: "Gate A",
-            placementDetail: "North entrance",
-            currentInstruction: "Shift update: Move barricades",
-            currentInstructionTitle: "Shift update",
-            currentInstructionTargetName: "Gate A",
-            currentInstructionPriorityLabel: "高",
+            eventTime: "7/13 09:00 - 18:00",
+            placementName: "南口",
+            currentInstruction: "南口の列を整理してください",
+            currentInstructionTitle: "南口の列整理",
+            currentInstructionTargetName: "南口",
             currentInstructionStatusLabel: "対応中",
-            currentInstructionLocationLabel: nil,
-            currentInstructionAttachmentSummary: nil,
-            currentInstructionUnreadCount: 1,
-            mapState: AppShellMapState(
-                venueName: "Gate A",
-                latitude: 35.0,
-                longitude: 139.0,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01
-            ),
-            currentInstructionId: "instruction-gate-a",
+            currentInstructionId: "instruction-1",
             unreadContactCount: 0,
             pendingReportLabel: "",
-            placementStatus: makePlacementStatus(placementName: "Gate A", phase: .active)
+            placementStatus: makePlacementStatus(.active)
         )
-
-        let currentStaff = CurrentStaffUiModel(
-            staffId: "tanaka",
-            displayName: "田中",
-            roleLabel: "Aゲート担当"
+        let reportState = ReportsTabUiState(
+            reportTypes: [],
+            availablePlaces: [ContactTargetUiModel(id: "point-1", type: .place, displayName: "南口")],
+            draft: ReportDraftUiModel(
+                selectedTypeId: nil,
+                templateText: "",
+                comment: "",
+                selectedPlaceId: nil,
+                selectedPlaceName: nil,
+                urgencyLabel: "通常"
+            ),
+            step: .typeSelection,
+            relatedReports: [],
+            selectedReport: selectedReport,
+            isLoadingReports: false,
+            reportsErrorMessage: nil
         )
-
         return AppShellUiState(
             homeOverview: overview,
             currentPlacementName: overview.placementName,
-            currentStaff: currentStaff,
-            availableStaff: [currentStaff],
+            currentStaff: CurrentStaffUiModel(staffId: "staff-1", displayName: "田中"),
             selectedTab: selectedTab,
-            instructionsTab: instructionsTab ?? InstructionsTabUiState(
+            instructionsTab: instructions ?? InstructionsTabUiState(
                 instructions: [],
                 featuredInstruction: nil,
                 otherInstructions: [],
-                selectedInstruction: nil,
-                isShowingThread: false
+                selectedInstruction: nil
             ),
-            reportsTab: ReportsTabUiState(
-                reportTypes: [],
-                availablePlaces: [],
-                draft: ReportDraftUiModel(
-                    selectedTypeId: nil,
-                    templateText: "",
-                    comment: "",
-                    selectedPlaceId: nil,
-                    selectedPlaceName: nil,
-                    urgencyLabel: "",
-                    includesImage: false,
-                    includesLocation: false
-                ),
-                step: .typeSelection,
-                relatedReports: [],
-                selectedReport: selectedReport,
-                isLoadingReports: false,
-                reportsErrorMessage: nil
-            ),
-            contactsTab: contactsTab ?? ContactsTabUiState(
+            reportsTab: reportState,
+            contactsTab: ContactsTabUiState(
                 threads: [],
                 selectedThread: nil,
                 availableTargets: [],
                 selectedTargetType: nil,
-                isChoosingTargetType: false,
-                formerAssignments: []
+                isChoosingTargetType: false
             ),
             isLoading: false,
             errorMessage: nil
         )
     }
 
-    private func makePlacementStatus(
-        placementName: String,
-        phase: PlacementPhase
-    ) -> PlacementStatusUiModel {
-        switch phase {
-        case .pendingChange:
-            return PlacementStatusUiModel(
-                assignId: "assign-\(placementName)",
-                placementName: placementName,
-                phase: phase,
-                headline: "配置が変更されました",
-                buttonLabel: "確認しました",
-                showsActionButton: true
-            )
-        case .enRoute:
-            return PlacementStatusUiModel(
-                assignId: "assign-\(placementName)",
-                placementName: placementName,
-                phase: phase,
-                headline: "「\(placementName)」へ移動中",
-                buttonLabel: "到着",
-                showsActionButton: true
-            )
-        case .active:
-            return PlacementStatusUiModel(
-                assignId: "assign-\(placementName)",
-                placementName: placementName,
-                phase: phase,
-                headline: "現在の配置",
-                buttonLabel: nil,
-                showsActionButton: false
-            )
-        default:
-            return PlacementStatusUiModel(
-                assignId: "assign-\(placementName)",
-                placementName: placementName,
-                phase: .active,
-                headline: "現在の配置",
-                buttonLabel: nil,
-                showsActionButton: false
-            )
-        }
+    private func makePlacementStatus(_ phase: PlacementPhase) -> PlacementStatusUiModel {
+        PlacementStatusUiModel(
+            assignId: "assignment-1",
+            expectedVersion: 4,
+            placementName: "南口",
+            phase: phase,
+            headline: phase == .scheduled ? "配置が変更されました" : "現在の配置",
+            buttonLabel: phase == .scheduled ? "到着" : nil,
+            showsActionButton: phase == .scheduled
+        )
     }
 }

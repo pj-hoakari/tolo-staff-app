@@ -1,11 +1,11 @@
 package dev.usbharu.tolo_staff.streaming
 
 import dev.usbharu.tolo_staff.feature.appshell.AppShellHomeOverview
-import dev.usbharu.tolo_staff.feature.appshell.AppShellMapState
 import dev.usbharu.tolo_staff.feature.appshell.EventRepository
 import dev.usbharu.tolo_staff.feature.appshell.NoOpEventRepository
 import dev.usbharu.tolo_staff.feature.appshell.OperationEvent
-import dev.usbharu.tolo_staff.logging.AppLogger
+import dev.usbharu.tolo_staff.feature.appshell.PlacementPhase
+import dev.usbharu.tolo_staff.feature.appshell.placementStatusFor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -14,6 +14,7 @@ data class AppShellOperationsProjection(
     val currentPlacementName: String,
     val currentAssignmentId: String? = null,
     val currentAssignmentStatus: OperationAssignmentStatus? = null,
+    val currentAssignmentVersion: Long = 0,
 )
 
 interface OperationsOverviewRepository {
@@ -24,27 +25,15 @@ class OperationsOverviewRepositoryImpl(
     private val dataSource: OperationsStreamDataSource,
     private val eventRepository: EventRepository = NoOpEventRepository(),
 ) : OperationsOverviewRepository {
-    private val logger = AppLogger.withTag("OperationsOverviewRepository")
-
     override fun observeOverview(currentStaffId: String): Flow<AppShellOperationsProjection> {
-        logger.info { "observeOverview started: currentStaffId=$currentStaffId" }
         dataSource.start()
         return combine(
             dataSource.observePoints(),
             dataSource.observeAssignments(),
             dataSource.observeRelevantInstructions(currentStaffId),
             eventRepository.observeCurrentEvent(),
-        ) { points, assignments, instructions, currentEvent ->
-            logger.debug {
-                "Building overview projection: currentStaffId=$currentStaffId, points=${points.size}, assignments=${assignments.size}, instructions=${instructions.size}"
-            }
-            buildProjection(
-                currentStaffId = currentStaffId,
-                points = points,
-                assignments = assignments,
-                instructions = instructions,
-                currentEvent = currentEvent,
-            )
+        ) { points, assignments, instructions, event ->
+            buildProjection(currentStaffId, points, assignments, instructions, event)
         }
     }
 
@@ -53,107 +42,74 @@ class OperationsOverviewRepositoryImpl(
         points: List<OperationPoint>,
         assignments: List<OperationAssignment>,
         instructions: List<OperationInstruction>,
-        currentEvent: OperationEvent = OperationEvent(),
+        event: OperationEvent,
     ): AppShellOperationsProjection {
-        val relevantInstructions = instructions.relevantTo(
-            currentStaffId = currentStaffId,
-            assignments = assignments,
-        )
         val currentAssignment = assignments
-            .filter { it.staffId == currentStaffId }
-            .sortedBy { it.status.priority }
-            .firstOrNull()
-        val currentPoint = currentAssignment?.pointId?.let { pointId ->
-            points.firstOrNull { it.pointId == pointId }
+            .filter { it.staffId == currentStaffId && it.status in CURRENT_STATUSES }
+            .minByOrNull { if (it.status == OperationAssignmentStatus.ACTIVE) 0 else 1 }
+        val placementName = points.firstOrNull { it.pointId == currentAssignment?.pointId }?.name.orEmpty()
+        val currentInstruction = instructions
+            .filter { it.status == OperationInstructionStatus.ISSUED }
+            .maxWithOrNull(compareBy<OperationInstruction> { it.updatedAt }.thenBy { it.instructionId })
+        val targetName = currentInstruction?.targetLabel(points, currentStaffId)
+        val placementPhase = if (currentAssignment?.status == OperationAssignmentStatus.SCHEDULED) {
+            PlacementPhase.SCHEDULED
+        } else {
+            PlacementPhase.ACTIVE
         }
-        val activeInstruction = relevantInstructions
-            .filter { it.status == OperationInstructionStatus.ACTIVE }
-            .maxWithOrNull(
-                compareBy<OperationInstruction> { it.updatedAt }
-                    .thenBy { it.instructionId }
-            )
-
-        val placementName = currentPoint?.name.orEmpty()
-        val placementDetail = currentPoint?.description.orEmpty()
-        val instructionText = activeInstruction?.toDisplayText().orEmpty()
-        val instructionTargetName = activeInstruction
-            ?.pointIds
-            ?.mapNotNull { pointId -> points.firstOrNull { it.pointId == pointId }?.name }
-            ?.distinct()
-            ?.joinToString(" / ")
-            ?.ifBlank { null }
-        val instructionLocationLabel = activeInstruction
-            ?.pointIds
-            ?.mapNotNull { pointId ->
-                points.firstOrNull { it.pointId == pointId }
-                    ?.description
-                    ?.ifBlank { null }
-            }
-            ?.distinct()
-            ?.joinToString(" / ")
-            ?.ifBlank { null }
-
         return AppShellOperationsProjection(
             homeOverview = AppShellHomeOverview(
-                eventName = currentEvent.name,
-                eventTime = currentEvent.toEventTimeLabel(),
+                eventName = event.name,
+                eventTime = formatEventTimeLabel(event.startTimeIso, event.endTimeIso),
                 placementName = placementName,
-                placementDetail = placementDetail,
-                currentInstruction = instructionText,
-                currentInstructionTitle = activeInstruction?.title,
-                currentInstructionTargetName = instructionTargetName,
-                currentInstructionStatusLabel = activeInstruction?.status?.toStatusLabel(),
-                currentInstructionLocationLabel = instructionLocationLabel,
-                mapState = AppShellMapState(
-                    venueName = currentEvent.venueName,
-                    latitude = currentEvent.latitude,
-                    longitude = currentEvent.longitude,
-                    latitudeDelta = currentEvent.latitudeDelta,
-                    longitudeDelta = currentEvent.longitudeDelta,
+                currentInstruction = currentInstruction?.body.orEmpty(),
+                currentInstructionTitle = currentInstruction?.title,
+                currentInstructionTargetName = targetName,
+                currentInstructionStatusLabel = currentInstruction?.status?.toLabel(),
+                currentInstructionId = currentInstruction?.instructionId,
+                placementStatus = placementStatusFor(
+                    assignId = currentAssignment?.assignId,
+                    expectedVersion = currentAssignment?.version ?: 0,
+                    placementName = placementName,
+                    phase = placementPhase,
                 ),
-                currentInstructionId = activeInstruction?.instructionId,
             ),
             currentPlacementName = placementName,
             currentAssignmentId = currentAssignment?.assignId,
             currentAssignmentStatus = currentAssignment?.status,
+            currentAssignmentVersion = currentAssignment?.version ?: 0,
         )
     }
 
-    private fun OperationInstruction.toDisplayText(): String {
-        if (description.isBlank()) {
-            return title
-        }
-        return "$title: $description"
+    private companion object {
+        val CURRENT_STATUSES = setOf(OperationAssignmentStatus.ACTIVE, OperationAssignmentStatus.SCHEDULED)
     }
-
-    private fun OperationInstructionStatus.toStatusLabel(): String =
-        when (this) {
-            OperationInstructionStatus.ACTIVE -> "対応中"
-        }
-
-    private val OperationAssignmentStatus.priority: Int
-        get() = when (this) {
-            OperationAssignmentStatus.ACTIVE -> 0
-            OperationAssignmentStatus.EN_ROUTE -> 1
-            OperationAssignmentStatus.PENDING -> 2
-        }
 }
 
-private fun OperationEvent.toEventTimeLabel(): String =
-    formatEventTimeLabel(startTimeIso, endTimeIso)
+internal fun OperationInstruction.targetLabel(points: List<OperationPoint>, currentStaffId: String): String = when (targetType) {
+    OperationInstructionTargetType.ALL_EVENT_STAFF -> "イベント全体"
+    OperationInstructionTargetType.STAFF -> if (targetId == currentStaffId) "あなた" else targetId.orEmpty()
+    OperationInstructionTargetType.POINT -> points.firstOrNull { it.pointId == targetId }?.name ?: targetId.orEmpty()
+    OperationInstructionTargetType.UNKNOWN -> "対象不明"
+}
+
+internal fun OperationInstructionStatus.toLabel(): String = when (this) {
+    OperationInstructionStatus.ISSUED -> "対応中"
+    OperationInstructionStatus.COMPLETED -> "完了"
+    OperationInstructionStatus.CANCELLED -> "キャンセル"
+    OperationInstructionStatus.EXPIRED -> "期限切れ"
+}
 
 internal fun List<OperationInstruction>.relevantTo(
     currentStaffId: String,
     assignments: List<OperationAssignment>,
 ): List<OperationInstruction> {
-    val assignedPointIds = assignments
-        .asSequence()
-        .filter { it.staffId == currentStaffId }
-        .map { it.pointId }
-        .toSet()
-
-    return filter { instruction ->
-        currentStaffId in instruction.staffIds ||
-            instruction.pointIds.any(assignedPointIds::contains)
+    val pointIds = assignments
+        .filter { it.staffId == currentStaffId && it.status in setOf(OperationAssignmentStatus.ACTIVE, OperationAssignmentStatus.SCHEDULED) }
+        .mapTo(mutableSetOf()) { it.pointId }
+    return filter {
+        it.targetType == OperationInstructionTargetType.ALL_EVENT_STAFF ||
+            it.targetType == OperationInstructionTargetType.STAFF && it.targetId == currentStaffId ||
+            it.targetType == OperationInstructionTargetType.POINT && it.targetId in pointIds
     }
 }

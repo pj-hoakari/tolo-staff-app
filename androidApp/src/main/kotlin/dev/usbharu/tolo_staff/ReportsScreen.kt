@@ -88,8 +88,8 @@ internal fun ReportTypeSelectionScreen(
                                 Text("自分の報告", color = MaterialTheme.colorScheme.primary)
                             }
                         }
-                        if (report.priorityLabel.isNotBlank()) {
-                            Text(report.priorityLabel, color = MaterialTheme.colorScheme.primary)
+                        if (report.severityLabel.isNotBlank()) {
+                            Text(report.severityLabel, color = MaterialTheme.colorScheme.primary)
                         }
                         Text(report.summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${report.targetLabel} / ${report.authorName}", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -108,8 +108,6 @@ internal fun ReportDraftInputScreen(
     state: ReportsTabUiState,
     onCommentChanged: (String) -> Unit,
     onUrgencySelected: (String) -> Unit,
-    onImageToggleChanged: (Boolean) -> Unit,
-    onLocationToggleChanged: (Boolean) -> Unit,
     onContinueToPlaceSelection: () -> Unit,
 ) {
     LazyColumn(
@@ -143,12 +141,6 @@ internal fun ReportDraftInputScreen(
             }
         }
         item {
-            SectionCard {
-                ToggleRow("画像を添付", state.draft.includesImage, onImageToggleChanged)
-                ToggleRow("位置情報を添付", state.draft.includesLocation, onLocationToggleChanged)
-            }
-        }
-        item {
             Button(onClick = onContinueToPlaceSelection) {
                 Text("対象場所を選ぶ")
             }
@@ -175,9 +167,6 @@ internal fun ReportPlaceSelectionScreen(
                 onClick = { onPlaceSelected(place.id) }
             ) {
                 Text(place.displayName, fontWeight = FontWeight.SemiBold)
-                place.subtitle?.let {
-                    Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
                 if (state.draft.selectedPlaceId == place.id) {
                     Text("選択中", color = MaterialTheme.colorScheme.primary)
                 }
@@ -197,7 +186,6 @@ internal fun ReportPlaceSelectionScreen(
 @Composable
 internal fun ReportDetailScreen(
     report: ReportDetailUiModel,
-    onOpenThread: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -207,7 +195,7 @@ internal fun ReportDetailScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            ScreenHeader("報告詳細", "報告の概要と連絡スレッドへの導線を表示します。")
+            ScreenHeader("報告詳細", "報告の概要を表示します。")
         }
         item {
             SectionCard {
@@ -217,8 +205,8 @@ internal fun ReportDetailScreen(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.semantics { contentDescription = "report_detail_title" }
                     )
-                    if (report.priorityLabel.isNotBlank()) {
-                        Text(report.priorityLabel, color = MaterialTheme.colorScheme.primary)
+                    if (report.severityLabel.isNotBlank()) {
+                        Text(report.severityLabel, color = MaterialTheme.colorScheme.primary)
                     }
                     Text(
                         report.summary,
@@ -233,23 +221,6 @@ internal fun ReportDetailScreen(
                         Text(timeLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-        }
-        item {
-            SectionCard {
-                Text(
-                    report.detailPlaceholderMessage,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.semantics { contentDescription = "report_detail_placeholder" }
-                )
-            }
-        }
-        item {
-            Button(
-                onClick = onOpenThread,
-                modifier = Modifier.semantics { contentDescription = "report_detail_open_thread_button" }
-            ) {
-                Text("連絡スレッドを開く")
             }
         }
     }

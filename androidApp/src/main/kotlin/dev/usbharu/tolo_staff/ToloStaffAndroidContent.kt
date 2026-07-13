@@ -41,30 +41,25 @@ fun ToloStaffAndroidContent(
     state: AppShellUiState,
     onTabSelected: (AppTab) -> Unit = {},
     onHomeInstructionSelected: () -> Unit = {},
+    onPlacementArrivalConfirmed: () -> Unit = {},
     onInstructionSelected: (String) -> Unit = {},
-    onInstructionThreadOpened: () -> Unit = {},
     onInstructionDetailClosed: () -> Unit = {},
     onReportTypeSelected: (String) -> Unit = {},
     onReportSelected: (String) -> Unit = {},
     onReportDetailClosed: () -> Unit = {},
-    onReportThreadOpened: () -> Unit = {},
     onReportCommentChanged: (String) -> Unit = {},
     onReportUrgencySelected: (String) -> Unit = {},
-    onReportImageToggleChanged: (Boolean) -> Unit = {},
-    onReportLocationToggleChanged: (Boolean) -> Unit = {},
     onReportContinueToPlaceSelection: () -> Unit = {},
     onReportPlaceSelected: (String) -> Unit = {},
     onReportSubmitted: () -> Unit = {},
     onReportBack: () -> Unit = {},
     onContactThreadSelected: (String) -> Unit = {},
-    onContactReportMessageSelected: (String) -> Unit = {},
     onContactBackToList: () -> Unit = {},
     onContactNewThreadStarted: () -> Unit = {},
     onContactTargetTypeSelected: (ContactTargetType) -> Unit = {},
     onContactTargetSelected: (String) -> Unit = {},
     onContactDraftChanged: (String) -> Unit = {},
     onContactSendClicked: () -> Unit = {},
-    onCurrentStaffSelected: (String) -> Unit = {},
 ) {
     MaterialTheme {
         val navController = rememberNavController()
@@ -143,8 +138,6 @@ fun ToloStaffAndroidContent(
                         if (isRootRoute(currentRoute)) {
                             CurrentStaffHeaderIcon(
                                 currentStaff = state.currentStaff,
-                                availableStaff = state.availableStaff,
-                                onCurrentStaffSelected = onCurrentStaffSelected,
                                 modifier = Modifier.padding(start = 8.dp)
                             )
                         } else {
@@ -177,7 +170,10 @@ fun ToloStaffAndroidContent(
             bottomBar = {
                 Column {
                     if (displayedSelectedTab != AppTab.CONTACTS) {
-                        PlacementFooter(placementName = state.currentPlacementName)
+                        PlacementFooter(
+                            placementStatus = state.homeOverview.placementStatus,
+                            onArrivalConfirmed = onPlacementArrivalConfirmed,
+                        )
                     }
                     NavigationBar {
                         appShellTabs().forEach { item ->
@@ -222,7 +218,6 @@ fun ToloStaffAndroidContent(
                         state.instructionsTab.selectedInstruction?.let { instruction ->
                             InstructionDetailScreen(
                                 instruction = instruction,
-                                onThreadOpened = onInstructionThreadOpened,
                             )
                         }
                     }
@@ -237,7 +232,6 @@ fun ToloStaffAndroidContent(
                         state.reportsTab.selectedReport?.let { report ->
                             ReportDetailScreen(
                                 report = report,
-                                onOpenThread = onReportThreadOpened,
                             )
                         }
                     }
@@ -246,8 +240,6 @@ fun ToloStaffAndroidContent(
                             state = state.reportsTab,
                             onCommentChanged = onReportCommentChanged,
                             onUrgencySelected = onReportUrgencySelected,
-                            onImageToggleChanged = onReportImageToggleChanged,
-                            onLocationToggleChanged = onReportLocationToggleChanged,
                             onContinueToPlaceSelection = onReportContinueToPlaceSelection,
                         )
                     }
@@ -275,7 +267,6 @@ fun ToloStaffAndroidContent(
                         state.contactsTab.selectedThread?.let { thread ->
                             ContactThreadDetailScreen(
                                 thread = thread,
-                                onReportSelected = onContactReportMessageSelected,
                                 onDraftChanged = onContactDraftChanged,
                                 onSendClicked = onContactSendClicked,
                             )

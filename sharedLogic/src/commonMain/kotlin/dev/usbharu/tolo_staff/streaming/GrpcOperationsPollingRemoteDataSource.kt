@@ -1,30 +1,26 @@
 package dev.usbharu.tolo_staff.streaming
 
-import com.google.protobuf.kotlin.Empty
 import com.google.protobuf.kotlin.Timestamp
-import com.google.protobuf.kotlin.invoke
-import dev.usbharu.tolo.communication.grpc.Assignment
-import dev.usbharu.tolo.communication.grpc.AssignmentRpc
-import dev.usbharu.tolo.communication.grpc.AssignmentStatus
-import dev.usbharu.tolo.communication.grpc.Instruction
-import dev.usbharu.tolo.communication.grpc.InstructionRpc
-import dev.usbharu.tolo.communication.grpc.InstructionStatus
-import dev.usbharu.tolo.communication.grpc.ListAssignmentsRequest
-import dev.usbharu.tolo.communication.grpc.ListMessagesRequest
-import dev.usbharu.tolo.communication.grpc.ListRelevantInstructionsRequest
-import dev.usbharu.tolo.communication.grpc.ListThreadsRequest
-import dev.usbharu.tolo.communication.grpc.Message
-import dev.usbharu.tolo.communication.grpc.MessageRpc
-import dev.usbharu.tolo.communication.grpc.PageRequest
-import dev.usbharu.tolo.communication.grpc.Point
-import dev.usbharu.tolo.communication.grpc.PointRpc
-import dev.usbharu.tolo.communication.grpc.Staff
-import dev.usbharu.tolo.communication.grpc.StaffRpc
-import dev.usbharu.tolo.communication.grpc.Thread
-import dev.usbharu.tolo.communication.grpc.ThreadMessagesRequest
-import dev.usbharu.tolo.communication.grpc.ThreadRpc
-import dev.usbharu.tolo.communication.grpc.invoke
+import dev.usbharu.tolo.communication.v1.AssignmentStatus
+import dev.usbharu.tolo.communication.v1.ConversationThread
+import dev.usbharu.tolo.communication.v1.Instruction
+import dev.usbharu.tolo.communication.v1.InstructionStatus
+import dev.usbharu.tolo.communication.v1.InstructionTarget
+import dev.usbharu.tolo.communication.v1.ListAssignmentsRequest
+import dev.usbharu.tolo.communication.v1.ListInstructionsRequest
+import dev.usbharu.tolo.communication.v1.ListMessagesRequest
+import dev.usbharu.tolo.communication.v1.ListPointsRequest
+import dev.usbharu.tolo.communication.v1.ListStaffRequest
+import dev.usbharu.tolo.communication.v1.ListThreadsRequest
+import dev.usbharu.tolo.communication.v1.Message
+import dev.usbharu.tolo.communication.v1.Point
+import dev.usbharu.tolo.communication.v1.Staff
+import dev.usbharu.tolo.communication.v1.StaffAssignment
+import dev.usbharu.tolo.communication.v1.ThreadKind
+import dev.usbharu.tolo.communication.v1.ThreadStatus
+import dev.usbharu.tolo.communication.v1.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
+import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import kotlin.time.Instant
 
 data class PagedResult<T>(
@@ -34,288 +30,246 @@ data class PagedResult<T>(
 
 class GrpcOperationsPollingRemoteDataSource(
     private val grpcClient: GrpcCommunicationClient,
+    private val session: AppSessionContext,
 ) : OperationsPollingRemoteDataSource {
-    private val logger = AppLogger.withTag("GrpcOperationsPollingRemoteDataSource")
+    private val logger = AppLogger.withTag("GrpcOperationsRemoteDataSource")
 
-    override suspend fun listPoints(): List<OperationPoint> =
-        grpcClient.pointService.ListPoints(Empty {}).points
-            .map { it.toOperationPoint() }
-            .also { logger.debug { "Fetched points via gRPC: count=${it.size}" } }
-
-    override suspend fun listStaff(): List<OperationStaff> =
-        grpcClient.staffService.ListStaff(Empty {}).staff
-            .map { it.toOperationStaff() }
-            .also { logger.debug { "Fetched staff via gRPC: count=${it.size}" } }
-
-    override suspend fun listAssignments(): List<OperationAssignment> =
-        paginate { pageToken ->
-            listAssignmentsPage(pageToken = pageToken)
-        }
-            .also { logger.debug { "Fetched assignments via gRPC: count=${it.size}" } }
-
-    override suspend fun listInstructions(): List<OperationInstruction> =
-        grpcClient.instructionService.ListInstructions(Empty {}).instructions
-            .map { it.toOperationInstruction() }
-            .also { logger.debug { "Fetched instructions via gRPC: count=${it.size}" } }
-
-    override suspend fun listRelevantInstructions(staffId: String): List<OperationInstruction> =
-        paginate { pageToken ->
-            listRelevantInstructionsPage(staffId = staffId, pageToken = pageToken)
-        }
-            .also {
-                logger.debug {
-                    "Fetched relevant instructions via gRPC: staffId=$staffId, count=${it.size}"
-                }
+    override suspend fun listPoints(): List<OperationPoint> = paginate { token ->
+        val response = grpcClient.referenceService.ListPoints(
+            ListPointsRequest {
+                scope = session.toProtoScope()
+                page = pageRequest(DEFAULT_PAGE_SIZE, token)
             }
+        )
+        PagedResult(response.points.map(Point::toOperationPoint), response.page.nextPageToken.ifBlank { null })
+    }.also { logger.debug { "Fetched points via gRPC: count=${it.size}" } }
 
-    override suspend fun listThreads(): List<OperationThread> =
-        paginate { pageToken ->
-            listThreadsPage(pageToken = pageToken)
+    override suspend fun listStaff(): List<OperationStaff> = paginate { token ->
+        val response = grpcClient.referenceService.ListStaff(
+            ListStaffRequest {
+                scope = session.toProtoScope()
+                page = pageRequest(DEFAULT_PAGE_SIZE, token)
+            }
+        )
+        PagedResult(response.staff.map(Staff::toOperationStaff), response.page.nextPageToken.ifBlank { null })
+    }.also { logger.debug { "Fetched staff via gRPC: count=${it.size}" } }
+
+    override suspend fun listAssignments(): List<OperationAssignment> = paginate { token ->
+        listAssignmentsPage(pageToken = token)
+    }.also { logger.debug { "Fetched assignments via gRPC: count=${it.size}" } }
+
+    override suspend fun listInstructions(): List<OperationInstruction> = paginate { token ->
+        val response = grpcClient.instructionService.ListInstructions(
+            ListInstructionsRequest {
+                scope = session.toProtoScope()
+                page = pageRequest(DEFAULT_PAGE_SIZE, token)
+            }
+        )
+        PagedResult(
+            response.instructions.map(Instruction::toOperationInstruction),
+            response.page.nextPageToken.ifBlank { null },
+        )
+    }.also { logger.debug { "Fetched instructions via gRPC: count=${it.size}" } }
+
+    override suspend fun listRelevantInstructions(staffId: String): List<OperationInstruction> {
+        val assignments = listAssignments()
+        val assignedPointIds = assignments
+            .filter { it.staffId == staffId && it.status in CURRENT_ASSIGNMENT_STATUSES }
+            .mapTo(mutableSetOf()) { it.pointId }
+        return listInstructions().filter { instruction ->
+            instruction.targetType == OperationInstructionTargetType.ALL_EVENT_STAFF ||
+                instruction.targetType == OperationInstructionTargetType.STAFF && instruction.targetId == staffId ||
+                instruction.targetType == OperationInstructionTargetType.POINT && instruction.targetId in assignedPointIds
         }
-            .also { logger.debug { "Fetched threads via gRPC: count=${it.size}" } }
+    }
 
-    override suspend fun listMessages(): List<OperationMessage> =
-        paginate { pageToken ->
-            listMessagesPage(pageToken = pageToken)
-        }
-            .also { logger.debug { "Fetched messages via gRPC: count=${it.size}" } }
+    override suspend fun listThreads(): List<OperationThread> = paginate { token ->
+        listThreadsPage(pageToken = token)
+    }.also { logger.debug { "Fetched threads via gRPC: count=${it.size}" } }
 
-    override suspend fun listThreadMessages(threadId: String): List<OperationMessage> =
-        paginate { pageToken ->
-            listThreadMessagesPage(threadId = threadId, pageToken = pageToken)
-        }.also { logger.debug { "Fetched thread messages via gRPC: threadId=$threadId, count=${it.size}" } }
+    override suspend fun listMessages(): List<OperationMessage> = listThreads()
+        .flatMap { listThreadMessages(it.threadId) }
+        .sortedOperationMessages()
+
+    override suspend fun listThreadMessages(threadId: String): List<OperationMessage> = paginate { token ->
+        listThreadMessagesPage(threadId = threadId, pageToken = token)
+    }.also { logger.debug { "Fetched thread messages via gRPC: threadId=$threadId, count=${it.size}" } }
 
     suspend fun listAssignmentsPage(
         pageSize: Int = DEFAULT_PAGE_SIZE,
         pageToken: String = "",
-    ): PagedResult<OperationAssignment> =
-        grpcClient.assignmentService.ListAssignments(
+    ): PagedResult<OperationAssignment> {
+        val response = grpcClient.assignmentService.ListAssignments(
             ListAssignmentsRequest {
+                scope = session.toProtoScope()
                 page = pageRequest(pageSize, pageToken)
             }
-        ).let { response ->
-            PagedResult(
-                items = response.assignments.map { it.toOperationAssignment() },
-                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
-            )
-        }
+        )
+        return PagedResult(
+            response.assignments.map(StaffAssignment::toOperationAssignment),
+            response.page.nextPageToken.ifBlank { null },
+        )
+    }
 
     suspend fun listRelevantInstructionsPage(
         staffId: String,
         pageSize: Int = DEFAULT_PAGE_SIZE,
         pageToken: String = "",
-    ): PagedResult<OperationInstruction> =
-        grpcClient.instructionService.ListRelevantInstructions(
-            ListRelevantInstructionsRequest {
-                this.staffId = staffId
-                page = pageRequest(pageSize, pageToken)
-            }
-        ).let { response ->
-            PagedResult(
-                items = response.instructions.map { it.toOperationInstruction() },
-                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
-            )
-        }
+    ): PagedResult<OperationInstruction> {
+        if (pageToken.isNotBlank()) return PagedResult(emptyList())
+        return PagedResult(listRelevantInstructions(staffId).take(pageSize))
+    }
 
     suspend fun listThreadsPage(
         pageSize: Int = DEFAULT_PAGE_SIZE,
         pageToken: String = "",
-    ): PagedResult<OperationThread> =
-        grpcClient.threadService.ListThreads(
+    ): PagedResult<OperationThread> {
+        val response = grpcClient.threadService.ListThreads(
             ListThreadsRequest {
+                scope = session.toProtoScope()
+                participantStaffId = session.staffId.toProtoStaffId()
+                statuses += ThreadStatus.THREAD_STATUS_OPEN
+                statuses += ThreadStatus.THREAD_STATUS_CLOSED
                 page = pageRequest(pageSize, pageToken)
             }
-        ).let { response ->
-            PagedResult(
-                items = response.threads.map { it.toOperationThread() },
-                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
-            )
-        }
-
-    suspend fun listMessagesPage(
-        pageSize: Int = DEFAULT_PAGE_SIZE,
-        pageToken: String = "",
-    ): PagedResult<OperationMessage> =
-        grpcClient.messageService.ListMessages(
-            ListMessagesRequest {
-                page = pageRequest(pageSize, pageToken)
-            }
-        ).let { response ->
-            PagedResult(
-                items = response.messages.map { it.toOperationMessage() },
-                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
-            )
-        }
+        )
+        return PagedResult(
+            response.threads.map(ConversationThread::toOperationThread),
+            response.page.nextPageToken.ifBlank { null },
+        )
+    }
 
     suspend fun listThreadMessagesPage(
         threadId: String,
         pageSize: Int = DEFAULT_PAGE_SIZE,
         pageToken: String = "",
-    ): PagedResult<OperationMessage> =
-        grpcClient.threadService.ListThreadMessages(
-            ThreadMessagesRequest {
-                this.threadId = threadId
+    ): PagedResult<OperationMessage> {
+        val response = grpcClient.messageService.ListMessages(
+            ListMessagesRequest {
+                scope = session.toProtoScope()
+                this.threadId = threadId.toProtoThreadId()
                 page = pageRequest(pageSize, pageToken)
             }
-        ).let { response ->
-            PagedResult(
-                items = response.messages.map { it.toOperationMessage() },
-                nextPageToken = response.nextPageToken.takeIf(String::isNotBlank),
-            )
-        }
-
-    private suspend fun <T> paginate(
-        fetchPage: suspend (pageToken: String) -> PagedResult<T>,
-    ): List<T> {
-        val items = mutableListOf<T>()
-        var nextPageToken = ""
-        do {
-            val page = fetchPage(nextPageToken)
-            items += page.items
-            nextPageToken = page.nextPageToken.orEmpty()
-        } while (nextPageToken.isNotBlank())
-        return items
-    }
-
-    private fun pageRequest(pageSize: Int, pageToken: String): PageRequest = PageRequest {
-        this.pageSize = pageSize
-        this.pageToken = pageToken
+        )
+        return PagedResult(
+            response.messages.mapNotNull(Message::toOperationMessage),
+            response.page.nextPageToken.ifBlank { null },
+        )
     }
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 100
+        val CURRENT_ASSIGNMENT_STATUSES = setOf(
+            OperationAssignmentStatus.ACTIVE,
+            OperationAssignmentStatus.SCHEDULED,
+        )
     }
 }
 
 internal fun Point.toOperationPoint(): OperationPoint = OperationPoint(
     updatedAt = "",
     reason = "grpc.list",
-    entityId = pointId,
-    pointId = pointId,
-    name = name,
-    description = description,
+    entityId = id.value,
+    pointId = id.value,
+    name = displayName?.takeIf(String::isNotBlank) ?: id.value,
 )
 
 internal fun Staff.toOperationStaff(): OperationStaff = OperationStaff(
-    updatedAt = "",
+    updatedAt = syncedAt.toIsoStringOrEmpty(),
     reason = "grpc.list",
-    entityId = staffId,
-    staffId = staffId,
-    name = name,
-    roles = roles,
+    entityId = id.value,
+    staffId = id.value,
+    name = displayName.ifBlank { id.value },
 )
 
-internal fun Assignment.toOperationAssignment(): OperationAssignment = OperationAssignment(
-    updatedAt = "",
+internal fun StaffAssignment.toOperationAssignment(): OperationAssignment = OperationAssignment(
+    updatedAt = updatedAt.toIsoStringOrEmpty(),
     reason = "grpc.list",
-    entityId = assignId,
-    assignId = assignId,
-    pointId = pointId,
-    staffId = staffId,
+    entityId = id.value,
+    assignId = id.value,
+    pointId = pointId.value,
+    staffId = staffId.value,
     status = when (status) {
         AssignmentStatus.ASSIGNMENT_STATUS_ACTIVE -> OperationAssignmentStatus.ACTIVE
-        AssignmentStatus.ASSIGNMENT_STATUS_EN_ROUTE -> OperationAssignmentStatus.EN_ROUTE
-        AssignmentStatus.ASSIGNMENT_STATUS_PENDING -> OperationAssignmentStatus.PENDING
-        is AssignmentStatus.UNRECOGNIZED -> OperationAssignmentStatus.PENDING
-        AssignmentStatus.ASSIGNMENT_STATUS_UNSPECIFIED -> OperationAssignmentStatus.PENDING
+        AssignmentStatus.ASSIGNMENT_STATUS_ENDED -> OperationAssignmentStatus.ENDED
+        AssignmentStatus.ASSIGNMENT_STATUS_CANCELLED -> OperationAssignmentStatus.CANCELLED
+        AssignmentStatus.ASSIGNMENT_STATUS_SCHEDULED,
+        AssignmentStatus.ASSIGNMENT_STATUS_UNSPECIFIED,
+        is AssignmentStatus.UNRECOGNIZED,
+        -> OperationAssignmentStatus.SCHEDULED
     },
+    version = version,
 )
 
-internal fun Instruction.toOperationInstruction(): OperationInstruction = OperationInstruction(
-    updatedAt = "",
-    reason = "grpc.list",
-    entityId = instructionId,
-    instructionId = instructionId,
-    pointIds = pointIds,
-    staffIds = staffIds,
-    title = title,
-    description = description,
-    status = when (status) {
-        InstructionStatus.INSTRUCTION_STATUS_ACTIVE -> OperationInstructionStatus.ACTIVE
-        is InstructionStatus.UNRECOGNIZED -> OperationInstructionStatus.ACTIVE
-        InstructionStatus.INSTRUCTION_STATUS_UNSPECIFIED -> OperationInstructionStatus.ACTIVE
-    },
-    threadId = threadId.ifBlank { null },
-)
-
-internal fun Thread.toOperationThread(): OperationThread = OperationThread(
-    updatedAt = "",
-    reason = "grpc.list",
-    entityId = threadId,
-    threadId = threadId,
-    members = memberStaffIds,
-    displayTitle = displayTitle,
-)
-
-internal fun Message.toOperationMessage(): OperationMessage {
-    val payload = payload
-    return when (payload) {
-        is Message.Payload.Assign -> OperationMessage(
-            updatedAt = createdAt.toIsoString(),
-            reason = "grpc.list",
-            entityId = messageId,
-            messageId = messageId,
-            threadId = threadId,
-            staffId = staffId,
-            messageType = OperationMessageType.ASSIGN,
-        )
-
-        is Message.Payload.Unassign -> OperationMessage(
-            updatedAt = createdAt.toIsoString(),
-            reason = "grpc.list",
-            entityId = messageId,
-            messageId = messageId,
-            threadId = threadId,
-            staffId = staffId,
-            messageType = OperationMessageType.UNASSIGN,
-        )
-
-        is Message.Payload.Instruction -> OperationMessage(
-            updatedAt = createdAt.toIsoString(),
-            reason = "grpc.list",
-            entityId = messageId,
-            messageId = messageId,
-            threadId = threadId,
-            staffId = staffId,
-            messageType = OperationMessageType.INSTRUCTION,
-            instructionId = payload.value.instructionId,
-        )
-
-        is Message.Payload.Report -> OperationMessage(
-            updatedAt = createdAt.toIsoString(),
-            reason = "grpc.list",
-            entityId = messageId,
-            messageId = messageId,
-            threadId = threadId,
-            staffId = staffId,
-            messageType = OperationMessageType.REPORT,
-            reportId = payload.value.reportId,
-        )
-
-        is Message.Payload.Simple -> OperationMessage(
-            updatedAt = createdAt.toIsoString(),
-            reason = "grpc.list",
-            entityId = messageId,
-            messageId = messageId,
-            threadId = threadId,
-            staffId = staffId,
-            messageType = OperationMessageType.SIMPLE,
-            text = payload.value.text,
-            replyTo = payload.value.replyTo,
-        )
-
-        else -> OperationMessage(
-            updatedAt = createdAt.toIsoString(),
-            reason = "grpc.list",
-            entityId = messageId,
-            messageId = messageId,
-            threadId = threadId,
-            staffId = staffId,
-            messageType = OperationMessageType.SIMPLE,
-        )
+internal fun Instruction.toOperationInstruction(): OperationInstruction {
+    val (targetType, targetId) = when (val target = target.target) {
+        is InstructionTarget.Target.AllEventStaff -> OperationInstructionTargetType.ALL_EVENT_STAFF to null
+        is InstructionTarget.Target.StaffId -> OperationInstructionTargetType.STAFF to target.value.value
+        is InstructionTarget.Target.PointId -> OperationInstructionTargetType.POINT to target.value.value
+        null -> OperationInstructionTargetType.UNKNOWN to null
     }
+    return OperationInstruction(
+        updatedAt = updatedAt.toIsoStringOrEmpty(),
+        reason = "grpc.list",
+        entityId = id.value,
+        instructionId = id.value,
+        targetType = targetType,
+        targetId = targetId,
+        body = body,
+        status = when (status) {
+            InstructionStatus.INSTRUCTION_STATUS_COMPLETED -> OperationInstructionStatus.COMPLETED
+            InstructionStatus.INSTRUCTION_STATUS_CANCELLED -> OperationInstructionStatus.CANCELLED
+            InstructionStatus.INSTRUCTION_STATUS_EXPIRED -> OperationInstructionStatus.EXPIRED
+            InstructionStatus.INSTRUCTION_STATUS_ISSUED,
+            InstructionStatus.INSTRUCTION_STATUS_ACKNOWLEDGED,
+            InstructionStatus.INSTRUCTION_STATUS_UNSPECIFIED,
+            is InstructionStatus.UNRECOGNIZED,
+            -> OperationInstructionStatus.ISSUED
+        },
+        version = version,
+    )
 }
 
-internal fun Timestamp?.toIsoString(): String = this
-    ?.let { Instant.fromEpochSeconds(it.seconds, it.nanos).toString() }
-    .orEmpty()
+internal fun ConversationThread.toOperationThread(): OperationThread = OperationThread(
+    updatedAt = updatedAt.toIsoStringOrEmpty(),
+    reason = "grpc.list",
+    entityId = id.value,
+    threadId = id.value,
+    members = participantStaffIds.map { it.value },
+    displayTitle = title,
+    kind = when (kind) {
+        ThreadKind.THREAD_KIND_GENERAL -> OperationThreadKind.GENERAL
+        ThreadKind.THREAD_KIND_LOCATION -> OperationThreadKind.LOCATION
+        ThreadKind.THREAD_KIND_DIRECT -> OperationThreadKind.DIRECT
+        ThreadKind.THREAD_KIND_UNSPECIFIED,
+        is ThreadKind.UNRECOGNIZED,
+        -> OperationThreadKind.UNKNOWN
+    },
+    pointId = pointId.value.ifBlank { null },
+    status = when (status) {
+        ThreadStatus.THREAD_STATUS_CLOSED -> OperationThreadStatus.CLOSED
+        ThreadStatus.THREAD_STATUS_ARCHIVED -> OperationThreadStatus.ARCHIVED
+        ThreadStatus.THREAD_STATUS_OPEN,
+        ThreadStatus.THREAD_STATUS_UNSPECIFIED,
+        is ThreadStatus.UNRECOGNIZED,
+        -> OperationThreadStatus.OPEN
+    },
+    version = version,
+)
+
+internal fun Message.toOperationMessage(): OperationMessage? {
+    if (deletedAt.seconds != 0L || deletedAt.nanos != 0) return null
+    return OperationMessage(
+        updatedAt = createdAt.toIsoStringOrEmpty(),
+        reason = "grpc.list",
+        entityId = id.value,
+        messageId = id.value,
+        threadId = threadId.value,
+        staffId = senderStaffId.value,
+        text = body,
+    )
+}
+
+internal fun Timestamp?.toIsoString(): String = this?.let {
+    if (seconds == 0L && nanos == 0) "" else Instant.fromEpochSeconds(seconds, nanos).toString()
+}.orEmpty()

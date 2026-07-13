@@ -132,7 +132,7 @@ class ContactChatViewModel(
 
         viewModelScope.launch {
             runCatching {
-                service.sendSimpleMessage(roomId, currentStaff.staffId, text)
+                service.sendMessage(roomId, text)
                 logger.info { "Chat draft sent successfully: roomId=$roomId, staffId=${currentStaff.staffId}" }
                 updateState { it.copy(isSending = false, errorMessage = null) }
             }.onFailure { throwable ->

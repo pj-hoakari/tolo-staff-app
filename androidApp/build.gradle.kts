@@ -1,5 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+fun org.gradle.api.Project.stringProperty(name: String, default: String): String =
+    providers.gradleProperty(name).orElse(default).get()
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
@@ -43,6 +46,19 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "TOLO_TENANT_ID", "\"${project.stringProperty("tolo.tenantId", "tenant-dev")}\"")
+        buildConfigField("String", "TOLO_EVENT_ID", "\"${project.stringProperty("tolo.eventId", "event-dev")}\"")
+        buildConfigField("String", "TOLO_STAFF_ID", "\"${project.stringProperty("tolo.staffId", "tanaka")}\"")
+        buildConfigField("String", "TOLO_GRPC_HOST", "\"${project.stringProperty("tolo.grpcHost", "10.0.2.2")}\"")
+        buildConfigField("int", "TOLO_GRPC_PORT", project.stringProperty("tolo.grpcPort", "8080"))
+        buildConfigField("boolean", "TOLO_FIRESTORE_ENABLED", project.stringProperty("tolo.firestoreEnabled", "true"))
+        buildConfigField("String", "TOLO_FIRESTORE_HOST", "\"${project.stringProperty("tolo.firestoreHost", "10.0.2.2")}\"")
+        buildConfigField("int", "TOLO_FIRESTORE_PORT", project.stringProperty("tolo.firestorePort", "8081"))
+        buildConfigField("String", "TOLO_FIRESTORE_PROJECT_ID", "\"${project.stringProperty("tolo.firestoreProjectId", "tolo-communication-poc")}\"")
+        buildConfigField("String", "TOLO_FIRESTORE_DATABASE_ID", "\"${project.stringProperty("tolo.firestoreDatabaseId", "")}\"")
+    }
+    buildFeatures {
+        buildConfig = true
     }
     packaging {
         resources {

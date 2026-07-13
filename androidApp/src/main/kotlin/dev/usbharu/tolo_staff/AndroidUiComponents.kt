@@ -17,28 +17,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MarkEmailUnread
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,22 +41,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.usbharu.tolo_staff.feature.appshell.CurrentStaffUiModel
 import dev.usbharu.tolo_staff.feature.appshell.InstructionSummaryUiModel
+import dev.usbharu.tolo_staff.feature.appshell.PlacementStatusUiModel
 import dev.usbharu.tolo_staff.feature.appshell.ThreadMessageUiModel
 
 @Composable
 internal fun CurrentStaffHeaderIcon(
     currentStaff: CurrentStaffUiModel,
-    availableStaff: List<CurrentStaffUiModel>,
-    onCurrentStaffSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     Box(modifier = modifier) {
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(999.dp))
-                .clickable(enabled = availableStaff.isNotEmpty()) { expanded = true }
                 .padding(horizontal = 8.dp, vertical = 4.dp)
                 .semantics { contentDescription = "current_staff_${currentStaff.staffId}" },
             verticalAlignment = Alignment.CenterVertically,
@@ -78,55 +64,21 @@ internal fun CurrentStaffHeaderIcon(
                 modifier = Modifier.size(28.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = currentStaff.displayName,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                currentStaff.roleLabel?.takeIf { it.isNotBlank() }?.let { roleLabel ->
-                    Text(
-                        text = roleLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            availableStaff.forEach { staff ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(staff.displayName)
-                            staff.roleLabel?.takeIf { it.isNotBlank() }?.let { roleLabel ->
-                                Text(
-                                    text = roleLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    },
-                    onClick = {
-                        expanded = false
-                        onCurrentStaffSelected(staff.staffId)
-                    }
-                )
-            }
+            Text(
+                text = currentStaff.displayName,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 @Composable
-internal fun PlacementFooter(placementName: String) {
+internal fun PlacementFooter(
+    placementStatus: PlacementStatusUiModel,
+    onArrivalConfirmed: () -> Unit,
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 2.dp,
@@ -137,12 +89,19 @@ internal fun PlacementFooter(placementName: String) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("現在の配置", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                placementName,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.semantics { contentDescription = "app_shell_placement_name" }
-            )
+            Column {
+                Text(placementStatus.headline, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    placementStatus.placementName,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.semantics { contentDescription = "app_shell_placement_name" }
+                )
+            }
+            if (placementStatus.showsActionButton) {
+                Button(onClick = onArrivalConfirmed) {
+                    Text(placementStatus.buttonLabel ?: "到着")
+                }
+            }
         }
     }
 }
@@ -204,11 +163,7 @@ internal fun InstructionHeroCard(
     title: String?,
     body: String,
     targetName: String?,
-    priorityLabel: String?,
     statusLabel: String?,
-    locationLabel: String?,
-    attachmentSummary: String?,
-    unreadCount: Int,
     identifier: String,
     onClick: () -> Unit,
 ) {
@@ -227,9 +182,6 @@ internal fun InstructionHeroCard(
                 style = MaterialTheme.typography.labelLarge,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                priorityLabel?.takeIf { it.isNotBlank() }?.let {
-                    InstructionPill(it, instructionPriorityContainerColor(it), instructionPriorityContentColor(it))
-                }
                 statusLabel?.takeIf { it.isNotBlank() }?.let {
                     InstructionPill(it, instructionStatusContainerColor(it), instructionStatusContentColor(it))
                 }
@@ -249,12 +201,7 @@ internal fun InstructionHeroCard(
             style = MaterialTheme.typography.bodyLarge,
         )
 
-        InstructionMetaSummary(
-            targetName = targetName,
-            locationLabel = locationLabel,
-            attachmentSummary = attachmentSummary,
-            unreadCount = unreadCount,
-        )
+        InstructionMetaSummary(targetName = targetName)
     }
 }
 
@@ -269,11 +216,7 @@ internal fun FeaturedInstructionCard(
         title = instruction.title,
         body = instruction.preview,
         targetName = instruction.targetName,
-        priorityLabel = instruction.priorityLabel,
         statusLabel = instruction.statusLabel,
-        locationLabel = instruction.locationLabel,
-        attachmentSummary = instruction.attachmentSummary,
-        unreadCount = instruction.unreadCount,
         identifier = identifier,
         onClick = onClick,
     )
@@ -306,9 +249,6 @@ internal fun EmptyInstructionCard(
 @Composable
 private fun InstructionMetaSummary(
     targetName: String?,
-    locationLabel: String?,
-    attachmentSummary: String?,
-    unreadCount: Int,
 ) {
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -319,26 +259,6 @@ private fun InstructionMetaSummary(
             InstructionSecondaryPill(
                 text = it,
                 icon = Icons.Default.AccountCircle,
-            )
-        }
-        locationLabel?.takeIf { it.isNotBlank() }?.let {
-            InstructionSecondaryPill(
-                text = it,
-                icon = Icons.Default.LocationOn,
-            )
-        }
-        attachmentSummary?.takeIf { it.isNotBlank() }?.let {
-            InstructionSecondaryPill(
-                text = it,
-                icon = Icons.Default.AttachFile,
-            )
-        }
-        if (unreadCount > 0) {
-            InstructionSecondaryPill(
-                text = "$unreadCount 件",
-                icon = Icons.Default.MarkEmailUnread,
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
             )
         }
     }
@@ -395,20 +315,6 @@ private fun InstructionSecondaryPill(
 }
 
 @Composable
-private fun instructionPriorityContainerColor(priorityLabel: String): Color =
-    when (priorityLabel) {
-        "高" -> MaterialTheme.colorScheme.tertiaryContainer
-        else -> MaterialTheme.colorScheme.surface
-    }
-
-@Composable
-private fun instructionPriorityContentColor(priorityLabel: String): Color =
-    when (priorityLabel) {
-        "高" -> MaterialTheme.colorScheme.onTertiaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-@Composable
 private fun instructionStatusContainerColor(statusLabel: String): Color =
     when (statusLabel) {
         "対応中" -> MaterialTheme.colorScheme.primaryContainer
@@ -448,22 +354,6 @@ internal fun LabeledTextField(
 }
 
 @Composable
-internal fun ToggleRow(
-    label: String,
-    checked: Boolean,
-    onCheckedChanged: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label)
-        Switch(checked = checked, onCheckedChange = onCheckedChanged)
-    }
-}
-
-@Composable
 internal fun StatusButton(title: String, action: () -> Unit) {
     Button(
         onClick = action,
@@ -481,7 +371,6 @@ internal fun ContactTypeChip(title: String, selected: Boolean, action: () -> Uni
 @Composable
 internal fun ThreadMessageBubble(
     message: ThreadMessageUiModel,
-    onReportSelected: (String) -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -491,149 +380,38 @@ internal fun ThreadMessageBubble(
             Arrangement.Start
         }
     ) {
-        if (message.reportId != null && message.reportTitle != null && message.reportSummary != null) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (message.isCurrentUser) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.secondaryContainer
+            ),
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .semantics { contentDescription = "contact_chat_message_${message.id}" }
+        ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth(0.82f)
-                    .semantics { contentDescription = "contact_chat_message_${message.id}" },
+                modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = message.senderRoleLabel?.let { "${message.senderName} ($it)" } ?: message.senderName,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = message.senderName,
+                    color = if (message.isCurrentUser) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium
                 )
-                ContactReportMessageCard(
-                    message = message,
-                    onReportSelected = onReportSelected,
+                Text(
+                    text = message.body,
+                    color = if (message.isCurrentUser) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSecondaryContainer
                 )
-            }
-        } else {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = when {
-                        message.isSystemEvent -> MaterialTheme.colorScheme.surfaceVariant
-                        message.isCurrentUser -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.secondaryContainer
-                    }
-                ),
-                modifier = Modifier
-                    .fillMaxWidth(0.82f)
-                    .semantics { contentDescription = "contact_chat_message_${message.id}" }
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                message.timeLabel?.let {
                     Text(
-                        text = message.senderRoleLabel?.let { "${message.senderName} ($it)" } ?: message.senderName,
-                        color = if (message.isCurrentUser) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        style = MaterialTheme.typography.labelMedium
+                        text = it,
+                        color = if (message.isCurrentUser) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall
                     )
-                    Text(
-                        text = message.body,
-                        color = if (message.isCurrentUser) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        }
-                    )
-                    message.timeLabel?.let {
-                        Text(
-                            text = it,
-                            color = if (message.isCurrentUser) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ContactReportMessageCard(
-    message: ThreadMessageUiModel,
-    onReportSelected: (String) -> Unit,
-) {
-    val reportId = message.reportId ?: return
-    val reportTitle = message.reportTitle ?: return
-    val reportSummary = message.reportSummary ?: return
-    val reportAuthorName = message.reportAuthorName ?: return
-    val reportTargetLabel = message.reportTargetLabel ?: return
-
-    Surface(
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onReportSelected(reportId) }
-            .semantics { contentDescription = "contact_report_message_$reportId" },
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "報告",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = reportTitle,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            message.reportPriorityLabel?.takeIf { it.isNotBlank() }?.let { priorityLabel ->
-                Text(
-                    text = priorityLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Text(
-                text = reportSummary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "$reportTargetLabel / $reportAuthorName",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            message.reportTimeLabel?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }

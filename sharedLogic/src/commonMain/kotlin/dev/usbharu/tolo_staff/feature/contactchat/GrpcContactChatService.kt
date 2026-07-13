@@ -4,15 +4,17 @@ import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
 import dev.usbharu.tolo_staff.streaming.sortedOperationMessages
+import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
 class GrpcContactChatService(
     private val dataSource: OperationsStreamDataSource,
     grpcClient: GrpcCommunicationClient,
+    session: AppSessionContext,
 ) : ContactChatService {
     private val logger = AppLogger.withTag("GrpcContactChatService")
-    private val writer = GrpcContactChatWriter(grpcClient = grpcClient)
+    private val writer = GrpcContactChatWriter(grpcClient = grpcClient, session = session)
 
     override fun observeRooms(currentStaffId: String): Flow<List<ChatRoom>> {
         logger.info { "observeRooms started: currentStaffId=$currentStaffId" }
@@ -53,9 +55,11 @@ class GrpcContactChatService(
         }
     }
 
-    override suspend fun sendSimpleMessage(roomId: String, currentStaffId: String, text: String) {
-        logger.info { "Sending chat message via gRPC: roomId=$roomId, currentStaffId=$currentStaffId, textLength=${text.length}" }
-        writer.sendSimpleMessage(roomId, currentStaffId, text)
-        logger.info { "Sent chat message via gRPC: roomId=$roomId, currentStaffId=$currentStaffId" }
+    override suspend fun sendMessage(threadId: String, body: String) {
+        logger.info { "Sending chat message via gRPC: threadId=$threadId, textLength=${body.length}" }
+        writer.sendMessage(threadId, body)
+        logger.info { "Sent chat message via gRPC: threadId=$threadId" }
     }
+
+    override suspend fun createThread(target: ChatThreadTarget): ChatRoom = writer.createThread(target)
 }

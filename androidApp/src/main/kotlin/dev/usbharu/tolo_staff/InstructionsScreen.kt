@@ -79,7 +79,6 @@ internal fun InstructionsListScreen(
 @Composable
 internal fun InstructionDetailScreen(
     instruction: InstructionDetailUiModel,
-    onThreadOpened: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -87,20 +86,10 @@ internal fun InstructionDetailScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            ScreenHeader("指示詳細", "概要を確認して、必要なら関連スレッドに移動できます。")
+            ScreenHeader("指示詳細", "指示の概要を確認できます。")
         }
         item {
             InstructionDetailHero(instruction = instruction)
-        }
-        item {
-            Button(
-                onClick = onThreadOpened,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics { contentDescription = "instruction_detail_open_thread_button" }
-            ) {
-                Text("関連スレッドを開く")
-            }
         }
     }
 }
@@ -142,12 +131,6 @@ private fun InstructionListRow(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CompactInfoChip(instruction.targetName)
             CompactInfoChip(instruction.statusLabel)
-            if (instruction.priorityLabel.isNotBlank()) {
-                CompactInfoChip(instruction.priorityLabel)
-            }
-            if (instruction.unreadCount > 0) {
-                CompactInfoChip("未読 ${instruction.unreadCount}", emphasized = true)
-            }
         }
     }
 }
@@ -188,12 +171,6 @@ private fun InstructionDetailHero(instruction: InstructionDetailUiModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             CompactInfoChip(instruction.target.displayName)
-            if (instruction.priorityLabel.isNotBlank()) {
-                CompactInfoChip(instruction.priorityLabel)
-            }
-            instruction.locationLabel?.let { locationLabel ->
-                CompactInfoChip(locationLabel)
-            }
         }
 
         Text(
@@ -201,12 +178,6 @@ private fun InstructionDetailHero(instruction: InstructionDetailUiModel) {
             style = MaterialTheme.typography.bodyLarge
         )
 
-        instruction.locationLabel?.let {
-            DetailInfoRow(icon = Icons.Default.Place, label = "場所", value = it)
-        }
-        instruction.attachmentSummary?.let {
-            DetailInfoRow(icon = Icons.Default.TaskAlt, label = "共有物", value = it)
-        }
     }
 }
 

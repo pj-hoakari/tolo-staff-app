@@ -8,6 +8,7 @@ import dev.usbharu.tolo_staff.streaming.OperationMessage
 import dev.usbharu.tolo_staff.streaming.SharedPollingFlowFactory
 import dev.usbharu.tolo_staff.streaming.defaultOperationsPollingConfig
 import dev.usbharu.tolo_staff.streaming.sortedOperationMessages
+import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -18,9 +19,10 @@ class PollingContactChatService(
     private val remoteDataSource: OperationsPollingRemoteDataSource,
     private val config: OperationsPollingConfig = defaultOperationsPollingConfig(),
     grpcClient: GrpcCommunicationClient,
+    session: AppSessionContext,
 ) : ContactChatService {
     private val logger = AppLogger.withTag("PollingContactChatService")
-    private val writer = GrpcContactChatWriter(grpcClient = grpcClient)
+    private val writer = GrpcContactChatWriter(grpcClient = grpcClient, session = session)
     private val pollingFactory = SharedPollingFlowFactory(config.intervalMillis)
     private val staffFlow by lazy { pollingFactory.create { remoteDataSource.listStaff() } }
     private val threadsFlow by lazy { pollingFactory.create { remoteDataSource.listThreads() } }
@@ -65,15 +67,17 @@ class PollingContactChatService(
         }.flowOn(Dispatchers.Default)
     }
 
-    override suspend fun sendSimpleMessage(roomId: String, currentStaffId: String, text: String) {
+    override suspend fun sendMessage(threadId: String, body: String) {
         logger.info {
-            "Sending chat message from polling service: roomId=$roomId, currentStaffId=$currentStaffId, textLength=${text.length}"
+            "Sending chat message from polling service: threadId=$threadId, textLength=${body.length}"
         }
         withContext(Dispatchers.Default) {
-            writer.sendSimpleMessage(roomId, currentStaffId, text)
+            writer.sendMessage(threadId, body)
         }
-        logger.info { "Sent chat message from polling service: roomId=$roomId, currentStaffId=$currentStaffId" }
+        logger.info { "Sent chat message from polling service: threadId=$threadId" }
     }
+
+    override suspend fun createThread(target: ChatThreadTarget): ChatRoom = writer.createThread(target)
 
     private fun roomMessagesFlow(roomId: String): Flow<List<OperationMessage>> =
         roomMessagesFlows.getOrPut(roomId) {

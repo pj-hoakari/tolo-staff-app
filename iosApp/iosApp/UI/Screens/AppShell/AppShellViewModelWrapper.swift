@@ -1,8 +1,11 @@
 import Foundation
+import Observation
 import SharedLogic
 
-final class AppShellViewModelWrapper: ObservableObject {
-    @Published var state: AppShellUiState
+@MainActor
+@Observable
+final class AppShellViewModelWrapper {
+    var state: AppShellUiState
 
     private let viewModel: AppShellViewModel
     private var stateJob: Kotlinx_coroutines_coreJob?
@@ -16,7 +19,7 @@ final class AppShellViewModelWrapper: ObservableObject {
 
         self.stateJob = viewModel.observeUiState { [weak self] state in
             guard let state else { return }
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 self?.state = state
             }
         }
@@ -30,20 +33,12 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onHomeInstructionSelected()
     }
 
-    func onPlacementChangeConfirmed() {
-        viewModel.onPlacementChangeConfirmed()
-    }
-
     func onPlacementArrivalConfirmed() {
         viewModel.onPlacementArrivalConfirmed()
     }
 
     func onInstructionSelected(_ instructionId: String) {
         viewModel.onInstructionSelected(instructionId: instructionId)
-    }
-
-    func onInstructionThreadOpened() {
-        viewModel.onInstructionThreadOpened()
     }
 
     func onInstructionDetailClosed() {
@@ -62,24 +57,12 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onReportDetailClosed()
     }
 
-    func onReportThreadOpened() {
-        viewModel.onReportThreadOpened()
-    }
-
     func onReportCommentChanged(_ comment: String) {
         viewModel.onReportCommentChanged(comment: comment)
     }
 
     func onReportUrgencySelected(_ label: String) {
         viewModel.onReportUrgencySelected(label: label)
-    }
-
-    func onReportImageToggleChanged(_ isEnabled: Bool) {
-        viewModel.onReportImageToggleChanged(isEnabled: isEnabled)
-    }
-
-    func onReportLocationToggleChanged(_ isEnabled: Bool) {
-        viewModel.onReportLocationToggleChanged(isEnabled: isEnabled)
     }
 
     func onReportContinueToPlaceSelection() {
@@ -100,10 +83,6 @@ final class AppShellViewModelWrapper: ObservableObject {
 
     func onContactThreadSelected(_ threadId: String) {
         viewModel.onContactThreadSelected(threadId: threadId)
-    }
-
-    func onContactReportMessageSelected(_ reportId: String) {
-        viewModel.onContactReportMessageSelected(reportId: reportId)
     }
 
     func onContactBackToList() {
@@ -130,7 +109,7 @@ final class AppShellViewModelWrapper: ObservableObject {
         viewModel.onContactSendClicked()
     }
 
-    deinit {
+    func clear() {
         stateJob?.cancel(cause: nil)
         viewModel.clear()
     }

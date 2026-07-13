@@ -1,72 +1,42 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
-enum class ContactTargetType {
-    PLACE,
-    ROLE,
-    HEADQUARTERS,
-    USER
-}
+enum class ContactTargetType { PLACE, USER }
 
-enum class ReportFlowStep {
-    TYPE_SELECTION,
-    DRAFT_INPUT,
-    PLACE_SELECTION
-}
+enum class ReportFlowStep { TYPE_SELECTION, DRAFT_INPUT, PLACE_SELECTION }
 
 data class ContactTargetUiModel(
     val id: String,
     val type: ContactTargetType,
     val displayName: String,
-    val subtitle: String? = null,
 )
 
 data class CurrentStaffUiModel(
     val staffId: String,
     val displayName: String,
-    val roleLabel: String? = null,
 )
 
 data class ThreadMessageUiModel(
     val id: String,
     val senderName: String,
-    val senderRoleLabel: String? = null,
     val body: String,
     val timeLabel: String? = null,
     val isCurrentUser: Boolean = false,
-    val isSystemEvent: Boolean = false,
-    val reportId: String? = null,
-    val reportTitle: String? = null,
-    val reportSummary: String? = null,
-    val reportPriorityLabel: String? = null,
-    val reportAuthorName: String? = null,
-    val reportTargetLabel: String? = null,
-    val reportTimeLabel: String? = null,
-    val reportIsAuthoredByCurrentStaff: Boolean = false,
 )
 
 data class InstructionSummaryUiModel(
     val id: String,
     val title: String,
     val targetName: String,
-    val priorityLabel: String,
     val statusLabel: String,
     val preview: String,
-    val locationLabel: String? = null,
-    val attachmentSummary: String? = null,
-    val unreadCount: Int = 0,
 )
 
 data class InstructionDetailUiModel(
     val id: String,
-    val threadId: String? = null,
     val title: String,
     val body: String,
     val target: ContactTargetUiModel,
-    val priorityLabel: String,
     val statusLabel: String,
-    val locationLabel: String? = null,
-    val attachmentSummary: String? = null,
-    val thread: List<ThreadMessageUiModel> = emptyList(),
 )
 
 data class InstructionsTabUiState(
@@ -74,7 +44,6 @@ data class InstructionsTabUiState(
     val featuredInstruction: InstructionSummaryUiModel? = null,
     val otherInstructions: List<InstructionSummaryUiModel> = emptyList(),
     val selectedInstruction: InstructionDetailUiModel? = null,
-    val isShowingThread: Boolean = false,
 )
 
 data class ReportTypeUiModel(
@@ -89,39 +58,36 @@ data class ReportDraftUiModel(
     val comment: String = "",
     val selectedPlaceId: String? = null,
     val selectedPlaceName: String? = null,
-    val urgencyLabel: String = "",
-    val includesImage: Boolean = false,
-    val includesLocation: Boolean = false,
+    val urgencyLabel: String = "通常",
 )
 
 data class RelatedReportUiModel(
     val reportId: String,
-    val threadId: String,
     val title: String,
     val summary: String,
-    val priorityLabel: String,
+    val severityLabel: String,
     val authorStaffId: String,
     val authorName: String,
     val targetLabel: String,
+    val statusLabel: String,
     val timeLabel: String? = null,
     val isAuthoredByCurrentStaff: Boolean = false,
 )
 
 data class ReportDetailUiModel(
     val reportId: String,
-    val threadId: String,
     val title: String,
     val summary: String,
-    val priorityLabel: String,
+    val severityLabel: String,
     val authorName: String,
     val targetLabel: String,
+    val statusLabel: String,
     val timeLabel: String? = null,
     val isAuthoredByCurrentStaff: Boolean = false,
-    val detailPlaceholderMessage: String,
 )
 
 data class ReportsTabUiState(
-    val reportTypes: List<ReportTypeUiModel> = emptyList(),
+    val reportTypes: List<ReportTypeUiModel> = defaultReportTypes(),
     val availablePlaces: List<ContactTargetUiModel> = emptyList(),
     val draft: ReportDraftUiModel = ReportDraftUiModel(),
     val step: ReportFlowStep = ReportFlowStep.TYPE_SELECTION,
@@ -137,7 +103,6 @@ data class ContactThreadSummaryUiModel(
     val target: ContactTargetUiModel,
     val lastMessagePreview: String,
     val unreadCount: Int = 0,
-    val isFormerAssignment: Boolean = false,
 )
 
 data class ContactThreadDetailUiModel(
@@ -147,14 +112,6 @@ data class ContactThreadDetailUiModel(
     val messages: List<ThreadMessageUiModel> = emptyList(),
     val draftMessage: String = "",
     val canReply: Boolean = true,
-    val isFormerAssignment: Boolean = false,
-)
-
-data class FormerAssignmentUiModel(
-    val id: String,
-    val name: String,
-    val summary: String,
-    val canReply: Boolean = true,
 )
 
 data class ContactsTabUiState(
@@ -163,5 +120,12 @@ data class ContactsTabUiState(
     val availableTargets: List<ContactTargetUiModel> = emptyList(),
     val selectedTargetType: ContactTargetType? = null,
     val isChoosingTargetType: Boolean = false,
-    val formerAssignments: List<FormerAssignmentUiModel> = emptyList(),
+)
+
+fun defaultReportTypes(): List<ReportTypeUiModel> = listOf(
+    ReportTypeUiModel("congestion", "混雑", "入場列や人の流れ、混雑状況を共有します。"),
+    ReportTypeUiModel("safety_hazard", "安全上の危険", "事故や安全上の危険を共有します。"),
+    ReportTypeUiModel("equipment", "設備", "設備の故障や異常を共有します。"),
+    ReportTypeUiModel("gate", "ゲート", "入退場ゲートの状況を共有します。"),
+    ReportTypeUiModel("other", "その他", "その他の現場情報を共有します。"),
 )

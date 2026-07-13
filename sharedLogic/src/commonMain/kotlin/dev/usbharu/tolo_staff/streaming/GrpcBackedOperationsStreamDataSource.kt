@@ -1,6 +1,7 @@
 package dev.usbharu.tolo_staff.streaming
 
 import dev.usbharu.tolo_staff.logging.AppLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,17 +14,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
-data class OperationsPageConfig(
-    val threadPageSize: Int = 20,
-    val threadMessagePageSize: Int = 20,
-    val assignmentPageSize: Int = 50,
-    val instructionPageSize: Int = 50,
-)
-
 open class GrpcBackedOperationsStreamDataSource(
-    private val remoteDataSource: GrpcOperationsPollingRemoteDataSource,
+    private val remoteDataSource: OperationsPollingRemoteDataSource,
     private val changeNotifier: OperationsChangeNotifier = NoOpOperationsChangeNotifier(),
-    private val pageConfig: OperationsPageConfig = OperationsPageConfig(),
     coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : OperationsStreamDataSource {
     private val logger = AppLogger.withTag("GrpcBackedOperationsStreamDataSource")
@@ -117,6 +110,10 @@ open class GrpcBackedOperationsStreamDataSource(
                     OperationEntityType.POINT -> refreshPoints()
                     OperationEntityType.STAFF -> refreshStaff()
                     OperationEntityType.ASSIGNMENT -> refreshAssignments()
+                    OperationEntityType.UNKNOWN -> {
+                        refreshGlobalData()
+                        staffObserverJobs.keys.forEach(::refreshStaffScopedData)
+                    }
                     else -> Unit
                 }
             }
@@ -154,9 +151,11 @@ open class GrpcBackedOperationsStreamDataSource(
                         refreshThreadsForStaff(currentStaffId, refreshMessages = false)
                     }
                     OperationEntityType.INSTRUCTION -> refreshRelevantInstructions(currentStaffId)
-                    OperationEntityType.REPORT,
-                    OperationEntityType.UNKNOWN,
-                    -> Unit
+                    OperationEntityType.UNKNOWN -> {
+                        refreshGlobalData()
+                        refreshStaffScopedData(currentStaffId)
+                    }
+                    OperationEntityType.REPORT -> Unit
                 }
             }
         }
@@ -174,48 +173,65 @@ open class GrpcBackedOperationsStreamDataSource(
     }
 
     private suspend fun refreshPoints() {
-        pointsFlow.value = remoteDataSource.listPoints()
+        refreshSafely("points") {
+            pointsFlow.value = remoteDataSource.listPoints()
+        }
     }
 
     private suspend fun refreshStaff() {
-        staffFlow.value = remoteDataSource.listStaff()
+        refreshSafely("staff") {
+            staffFlow.value = remoteDataSource.listStaff()
+        }
     }
 
     private suspend fun refreshAssignments() {
-        assignmentsFlow.value = remoteDataSource
-            .listAssignmentsPage(pageSize = pageConfig.assignmentPageSize)
-            .items
+        refreshSafely("assignments") {
+            assignmentsFlow.value = remoteDataSource.listAssignments()
+        }
     }
 
     private suspend fun refreshRelevantInstructions(currentStaffId: String) {
-        relevantInstructionsFlow(currentStaffId).value = remoteDataSource
-            .listRelevantInstructionsPage(
-                staffId = currentStaffId,
-                pageSize = pageConfig.instructionPageSize,
-            )
-            .items
+        refreshSafely("instructions for staffId=$currentStaffId") {
+            relevantInstructionsFlow(currentStaffId).value = remoteDataSource.listRelevantInstructions(currentStaffId)
+        }
     }
 
     private suspend fun refreshThreadsForStaff(
         currentStaffId: String,
         refreshMessages: Boolean = true,
     ) {
-        val page = remoteDataSource.listThreadsPage(pageSize = pageConfig.threadPageSize)
-        threadsFlow.value = page.items
-        if (refreshMessages) {
-            page.items
-                .filter { currentStaffId in it.members }
-                .forEach { thread -> refreshThreadMessages(thread.threadId) }
+        refreshSafely("threads for staffId=$currentStaffId") {
+            val threads = remoteDataSource.listThreads()
+            threadsFlow.value = threads
+            if (refreshMessages) {
+                threads
+                    .filter { currentStaffId in it.members }
+                    .forEach { thread -> refreshThreadMessages(thread.threadId) }
+            }
         }
     }
 
     private fun refreshThreadMessages(threadId: String) {
         scope.launch {
-            val page = remoteDataSource.listThreadMessagesPage(
-                threadId = threadId,
-                pageSize = pageConfig.threadMessagePageSize,
-            )
-            messageCacheFlow.value = messageCacheFlow.value + (threadId to page.items)
+            refreshSafely("messages for threadId=$threadId") {
+                val messages = remoteDataSource.listThreadMessages(threadId)
+                messageCacheFlow.value = messageCacheFlow.value + (threadId to messages)
+            }
+        }
+    }
+
+    private suspend fun refreshSafely(
+        target: String,
+        refresh: suspend () -> Unit,
+    ) {
+        try {
+            refresh()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            logger.warn(throwable) {
+                "Failed to refresh $target; keeping the last available data"
+            }
         }
     }
 

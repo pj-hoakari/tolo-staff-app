@@ -6,7 +6,6 @@ data class AppShellUiState(
     val homeOverview: AppShellHomeOverview = AppShellHomeOverview(),
     val currentPlacementName: String = homeOverview.placementName,
     val currentStaff: CurrentStaffUiModel = unknownCurrentStaffMember().toUiModel(),
-    val availableStaff: List<CurrentStaffUiModel> = emptyList(),
     val selectedTab: AppTab = AppTab.HOME,
     val instructionsTab: InstructionsTabUiState = InstructionsTabUiState(),
     val reportsTab: ReportsTabUiState = ReportsTabUiState(),
@@ -22,5 +21,4 @@ private fun dev.usbharu.tolo_staff.streaming.CurrentStaffMember.toUiModel(): Cur
     CurrentStaffUiModel(
         staffId = staffId,
         displayName = displayName,
-        roleLabel = roleLabel,
     )

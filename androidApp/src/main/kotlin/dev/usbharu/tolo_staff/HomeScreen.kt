@@ -131,7 +131,7 @@ private fun HeroShiftCard(overview: AppShellHomeOverview) {
 
 @Composable
 private fun PlacementSummaryCard(overview: AppShellHomeOverview) {
-    SectionCard(contentDescription = "app_shell_home_placement_map_card") {
+    SectionCard(contentDescription = "app_shell_home_placement_card") {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -146,16 +146,6 @@ private fun PlacementSummaryCard(overview: AppShellHomeOverview) {
                 Text(overview.placementName, fontWeight = FontWeight.SemiBold)
             }
         }
-        Text(overview.placementDetail, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            text = overview.mapState.venueName,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text(
-            text = "緯度 ${overview.mapState.latitude}, 経度 ${overview.mapState.longitude}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -227,11 +217,7 @@ private fun AppShellHomeOverview.asFeaturedInstructionSummary(): InstructionSumm
         id = currentInstructionId ?: "home-current-instruction",
         title = currentInstructionTitle.orEmpty(),
         targetName = currentInstructionTargetName.orEmpty(),
-        priorityLabel = currentInstructionPriorityLabel.orEmpty(),
         statusLabel = currentInstructionStatusLabel.orEmpty(),
         preview = currentInstruction,
-        locationLabel = currentInstructionLocationLabel,
-        attachmentSummary = currentInstructionAttachmentSummary,
-        unreadCount = currentInstructionUnreadCount,
     )
 }

@@ -1,8 +1,11 @@
 import Foundation
+import Observation
 import SharedLogic
 
-final class SampleViewModelWrapper: ObservableObject {
-    @Published var state: SampleUiState
+@MainActor
+@Observable
+final class SampleViewModelWrapper {
+    var state: SampleUiState
 
     private let viewModel: SampleViewModel
     private var stateJob: Kotlinx_coroutines_coreJob?
@@ -18,7 +21,7 @@ final class SampleViewModelWrapper: ObservableObject {
 
         self.stateJob = viewModel.observeUiState { [weak self] state in
             guard let state else { return }
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 self?.state = state
             }
         }
@@ -32,7 +35,7 @@ final class SampleViewModelWrapper: ObservableObject {
         viewModel.onPrimaryActionClicked()
     }
 
-    deinit {
+    func clear() {
         stateJob?.cancel(cause: nil)
         effectJob?.cancel(cause: nil)
         viewModel.clear()

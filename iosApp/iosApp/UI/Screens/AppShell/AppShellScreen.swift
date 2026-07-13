@@ -1,11 +1,16 @@
 import SwiftUI
 import SharedLogic
 
+@MainActor
 struct AppShellScreen: View {
-    @StateObject private var wrapper: AppShellViewModelWrapper
+    @State private var wrapper: AppShellViewModelWrapper
 
-    init(wrapper: AppShellViewModelWrapper = AppShellViewModelWrapper()) {
-        _wrapper = StateObject(wrappedValue: wrapper)
+    init() {
+        _wrapper = State(initialValue: AppShellViewModelWrapper())
+    }
+
+    init(wrapper: AppShellViewModelWrapper) {
+        _wrapper = State(initialValue: wrapper)
     }
 
     var body: some View {
@@ -13,27 +18,21 @@ struct AppShellScreen: View {
             state: wrapper.state,
             onTabSelected: wrapper.onTabSelected,
             onHomeInstructionSelected: wrapper.onHomeInstructionSelected,
-            onPlacementChangeConfirmed: wrapper.onPlacementChangeConfirmed,
             onPlacementArrivalConfirmed: wrapper.onPlacementArrivalConfirmed,
             onOpenReportFromHome: { wrapper.onTabSelected(.reports) },
             onOpenContactsFromHome: { wrapper.onTabSelected(.contacts) },
             onInstructionSelected: wrapper.onInstructionSelected,
-            onInstructionThreadOpened: wrapper.onInstructionThreadOpened,
             onInstructionDetailClosed: wrapper.onInstructionDetailClosed,
             onReportTypeSelected: wrapper.onReportTypeSelected,
             onReportSelected: wrapper.onReportSelected,
             onReportDetailClosed: wrapper.onReportDetailClosed,
-            onReportThreadOpened: wrapper.onReportThreadOpened,
             onReportCommentChanged: wrapper.onReportCommentChanged,
             onReportUrgencySelected: wrapper.onReportUrgencySelected,
-            onReportImageToggleChanged: wrapper.onReportImageToggleChanged,
-            onReportLocationToggleChanged: wrapper.onReportLocationToggleChanged,
             onReportContinueToPlaceSelection: wrapper.onReportContinueToPlaceSelection,
             onReportPlaceSelected: wrapper.onReportPlaceSelected,
             onReportSubmitted: wrapper.onReportSubmitted,
             onReportBack: wrapper.onReportBack,
             onContactThreadSelected: wrapper.onContactThreadSelected,
-            onContactReportMessageSelected: wrapper.onContactReportMessageSelected,
             onContactBackToList: wrapper.onContactBackToList,
             onContactNewThreadStarted: wrapper.onContactNewThreadStarted,
             onContactTargetTypeSelected: wrapper.onContactTargetTypeSelected,
@@ -41,6 +40,7 @@ struct AppShellScreen: View {
             onContactDraftChanged: wrapper.onContactDraftChanged,
             onContactSendClicked: wrapper.onContactSendClicked
         )
+        .onDisappear { wrapper.clear() }
     }
 }
 
@@ -48,27 +48,21 @@ struct AppShellContentView: View {
     let state: AppShellUiState
     var onTabSelected: (AppTab) -> Void = { _ in }
     var onHomeInstructionSelected: () -> Void = {}
-    var onPlacementChangeConfirmed: () -> Void = {}
     var onPlacementArrivalConfirmed: () -> Void = {}
     var onOpenReportFromHome: () -> Void = {}
     var onOpenContactsFromHome: () -> Void = {}
     var onInstructionSelected: (String) -> Void = { _ in }
-    var onInstructionThreadOpened: () -> Void = {}
     var onInstructionDetailClosed: () -> Void = {}
     var onReportTypeSelected: (String) -> Void = { _ in }
     var onReportSelected: (String) -> Void = { _ in }
     var onReportDetailClosed: () -> Void = {}
-    var onReportThreadOpened: () -> Void = {}
     var onReportCommentChanged: (String) -> Void = { _ in }
     var onReportUrgencySelected: (String) -> Void = { _ in }
-    var onReportImageToggleChanged: (Bool) -> Void = { _ in }
-    var onReportLocationToggleChanged: (Bool) -> Void = { _ in }
     var onReportContinueToPlaceSelection: () -> Void = {}
     var onReportPlaceSelected: (String) -> Void = { _ in }
     var onReportSubmitted: () -> Void = {}
     var onReportBack: () -> Void = {}
     var onContactThreadSelected: (String) -> Void = { _ in }
-    var onContactReportMessageSelected: (String) -> Void = { _ in }
     var onContactBackToList: () -> Void = {}
     var onContactNewThreadStarted: () -> Void = {}
     var onContactTargetTypeSelected: (ContactTargetType) -> Void = { _ in }
@@ -89,7 +83,6 @@ struct AppShellContentView: View {
                 .tabViewBottomAccessory(isEnabled: displayedSelectedTab != AppTab.contacts) {
                     PlacementBar(
                         placementStatus: state.homeOverview.placementStatus,
-                        onPlacementChangeConfirmed: onPlacementChangeConfirmed,
                         onPlacementArrivalConfirmed: onPlacementArrivalConfirmed
                     )
                 }
@@ -99,13 +92,19 @@ struct AppShellContentView: View {
                     if displayedSelectedTab != AppTab.contacts {
                         PlacementBar(
                             placementStatus: state.homeOverview.placementStatus,
-                            onPlacementChangeConfirmed: onPlacementChangeConfirmed,
                             onPlacementArrivalConfirmed: onPlacementArrivalConfirmed
                         )
                     }
                 }
         } else {
-            tabs
+            tabs.safeAreaInset(edge: .bottom) {
+                if displayedSelectedTab != AppTab.contacts {
+                    PlacementBar(
+                        placementStatus: state.homeOverview.placementStatus,
+                        onPlacementArrivalConfirmed: onPlacementArrivalConfirmed
+                    )
+                }
+            }
         }
     }
 
@@ -140,7 +139,6 @@ struct AppShellContentView: View {
                     state: state.instructionsTab,
                     currentStaff: state.currentStaff,
                     onInstructionSelected: onInstructionSelected,
-                    onThreadOpened: onInstructionThreadOpened,
                     onDetailClosed: onInstructionDetailClosed
                 )
             }
@@ -152,11 +150,8 @@ struct AppShellContentView: View {
                     onTypeSelected: onReportTypeSelected,
                     onReportSelected: onReportSelected,
                     onReportDetailClosed: onReportDetailClosed,
-                    onReportThreadOpened: onReportThreadOpened,
                     onCommentChanged: onReportCommentChanged,
                     onUrgencySelected: onReportUrgencySelected,
-                    onImageToggleChanged: onReportImageToggleChanged,
-                    onLocationToggleChanged: onReportLocationToggleChanged,
                     onContinueToPlaceSelection: onReportContinueToPlaceSelection,
                     onPlaceSelected: onReportPlaceSelected,
                     onSubmitted: onReportSubmitted,
@@ -169,7 +164,6 @@ struct AppShellContentView: View {
                     state: state.contactsTab,
                     currentStaff: state.currentStaff,
                     onThreadSelected: onContactThreadSelected,
-                    onReportSelected: onContactReportMessageSelected,
                     onBackToList: onContactBackToList,
                     onNewThreadStarted: onContactNewThreadStarted,
                     onTargetTypeSelected: onContactTargetTypeSelected,
@@ -184,7 +178,6 @@ struct AppShellContentView: View {
 
 struct PlacementBar: View {
     let placementStatus: PlacementStatusUiModel
-    var onPlacementChangeConfirmed: () -> Void = {}
     var onPlacementArrivalConfirmed: () -> Void = {}
 
     var body: some View {
@@ -214,8 +207,8 @@ struct PlacementBar: View {
             Spacer(minLength: 12)
 
             if placementStatus.showsActionButton, let buttonLabel = placementStatus.buttonLabel {
-                Button(action: handleButtonTap) {
-                    Label(buttonLabel, systemImage: buttonSymbolName)
+                Button(action: onPlacementArrivalConfirmed) {
+                    Label(buttonLabel, systemImage: "flag.checkered.circle.fill")
                         .font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(PlacementActionButtonStyle(phase: placementStatus.phase))
@@ -249,36 +242,19 @@ struct PlacementBar: View {
 
     private var symbolName: String {
         switch placementStatus.phase {
-        case .pendingChange:
+        case .scheduled:
             return "bell.badge"
-        case .enRoute:
-            return "figure.walk.motion"
         case .active:
             return "mappin.circle.fill"
         default:
             return "mappin.circle.fill"
-        }
-    }
-
-    private var buttonSymbolName: String {
-        switch placementStatus.phase {
-        case .pendingChange:
-            return "checkmark.circle.fill"
-        case .enRoute:
-            return "flag.checkered.circle.fill"
-        case .active:
-            return "checkmark.circle.fill"
-        default:
-            return "checkmark.circle.fill"
         }
     }
 
     private var iconColor: Color {
         switch placementStatus.phase {
-        case .pendingChange:
+        case .scheduled:
             return Color.orange
-        case .enRoute:
-            return Color.accentColor
         case .active:
             return Color.accentColor
         default:
@@ -288,10 +264,8 @@ struct PlacementBar: View {
 
     private var backgroundStyle: AnyShapeStyle {
         switch placementStatus.phase {
-        case .pendingChange:
+        case .scheduled:
             return AnyShapeStyle(Color.orange.opacity(0.16))
-        case .enRoute:
-            return AnyShapeStyle(Color.accentColor.opacity(0.14))
         case .active:
             return AnyShapeStyle(Color.clear)
         default:
@@ -301,10 +275,8 @@ struct PlacementBar: View {
 
     private var borderColor: Color {
         switch placementStatus.phase {
-        case .pendingChange:
+        case .scheduled:
             return Color.orange.opacity(0.18)
-        case .enRoute:
-            return Color.accentColor.opacity(0.16)
         case .active:
             return Color.primary.opacity(0.08)
         default:
@@ -312,18 +284,6 @@ struct PlacementBar: View {
         }
     }
 
-    private func handleButtonTap() {
-        switch placementStatus.phase {
-        case .pendingChange:
-            onPlacementChangeConfirmed()
-        case .enRoute:
-            onPlacementArrivalConfirmed()
-        case .active:
-            break
-        default:
-            break
-        }
-    }
 }
 
 private struct PlacementActionButtonStyle: ButtonStyle {
@@ -341,10 +301,8 @@ private struct PlacementActionButtonStyle: ButtonStyle {
 
     private var buttonBackground: Color {
         switch phase {
-        case .pendingChange:
+        case .scheduled:
             return Color.orange
-        case .enRoute:
-            return Color.accentColor
         case .active:
             return Color.accentColor
         default:

@@ -8,7 +8,10 @@ class NoOpContactChatService : ContactChatService {
 
     override fun observeMessages(roomId: String, currentStaffId: String): Flow<List<ChatMessage>> = flowOf(emptyList())
 
-    override suspend fun sendSimpleMessage(roomId: String, currentStaffId: String, text: String) {
+    override suspend fun sendMessage(threadId: String, body: String) {
         error("Contact chat service is not available on this platform")
     }
+
+    override suspend fun createThread(target: ChatThreadTarget): ChatRoom =
+        error("Contact chat service is not available on this platform")
 }

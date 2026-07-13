@@ -15,7 +15,6 @@ data class OperationPoint(
     override val entityId: String = "",
     val pointId: String,
     val name: String,
-    val description: String,
 ) : OperationsStreamEntity
 
 @Serializable
@@ -25,14 +24,14 @@ data class OperationStaff(
     override val entityId: String = "",
     val staffId: String,
     val name: String,
-    val roles: List<String> = emptyList(),
 ) : OperationsStreamEntity
 
 @Serializable
 enum class OperationAssignmentStatus {
+    SCHEDULED,
     ACTIVE,
-    EN_ROUTE,
-    PENDING,
+    ENDED,
+    CANCELLED,
 }
 
 @Serializable
@@ -44,11 +43,23 @@ data class OperationAssignment(
     val pointId: String,
     val staffId: String,
     val status: OperationAssignmentStatus,
+    val version: Long = 0,
 ) : OperationsStreamEntity
 
 @Serializable
 enum class OperationInstructionStatus {
-    ACTIVE,
+    ISSUED,
+    COMPLETED,
+    CANCELLED,
+    EXPIRED,
+}
+
+@Serializable
+enum class OperationInstructionTargetType {
+    ALL_EVENT_STAFF,
+    STAFF,
+    POINT,
+    UNKNOWN,
 }
 
 @Serializable
@@ -57,13 +68,34 @@ data class OperationInstruction(
     override val reason: String = "",
     override val entityId: String = "",
     val instructionId: String,
-    val pointIds: List<String> = emptyList(),
-    val staffIds: List<String> = emptyList(),
-    val title: String,
-    val description: String,
+    val targetType: OperationInstructionTargetType,
+    val targetId: String? = null,
+    val body: String,
     val status: OperationInstructionStatus,
-    val threadId: String? = null,
-) : OperationsStreamEntity
+    val version: Long = 0,
+) : OperationsStreamEntity {
+    val title: String
+        get() = body.lineSequence().firstOrNull().orEmpty().take(MAX_TITLE_LENGTH)
+
+    private companion object {
+        const val MAX_TITLE_LENGTH = 40
+    }
+}
+
+@Serializable
+enum class OperationThreadKind {
+    GENERAL,
+    LOCATION,
+    DIRECT,
+    UNKNOWN,
+}
+
+@Serializable
+enum class OperationThreadStatus {
+    OPEN,
+    CLOSED,
+    ARCHIVED,
+}
 
 @Serializable
 data class OperationThread(
@@ -73,19 +105,11 @@ data class OperationThread(
     val threadId: String,
     val members: List<String> = emptyList(),
     val displayTitle: String = "",
+    val kind: OperationThreadKind = OperationThreadKind.UNKNOWN,
+    val pointId: String? = null,
+    val status: OperationThreadStatus = OperationThreadStatus.OPEN,
+    val version: Long = 0,
 ) : OperationsStreamEntity
-
-@Serializable
-enum class OperationMessageType {
-    ASSIGN,
-    UNASSIGN,
-    INSTRUCTION,
-    REPORT,
-    SIMPLE,
-    ;
-
-    companion object
-}
 
 @Serializable
 data class OperationMessage(
@@ -95,10 +119,6 @@ data class OperationMessage(
     val messageId: String,
     val threadId: String,
     val staffId: String,
-    val messageType: OperationMessageType,
-    val instructionId: String? = null,
-    val reportId: String? = null,
-    val text: String? = null,
-    val replyTo: String? = null,
+    val text: String,
     val senderName: String? = null,
 ) : OperationsStreamEntity
