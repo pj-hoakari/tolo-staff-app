@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package tolo.staff.v1;
+
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.v1";
+option java_outer_classname = "CommonProto";
+
+// Authentication credentials are supplied as transport metadata, not messages.
+message TenantId { string value = 1; }
+message EventId { string value = 1; }
+message StaffId { string value = 1; }
+message StaffDeviceId { string value = 1; }
+message NotificationEndpointId { string value = 1; }
+message ThreadId { string value = 1; }
+message MessageId { string value = 1; }
+message InstructionId { string value = 1; }
+message ReportId { string value = 1; }
+// Correlates a FieldReport with an operation requested from the guidance domain.
+message DangerFlagRequestId { string value = 1; }
+message AssignmentId { string value = 1; }
+message PointId { string value = 1; }
+message GraphRevisionId { string value = 1; }
+
+message EventScope {
+  TenantId tenant_id = 1;
+  EventId event_id = 2;
+}
+
+// page_token is opaque. page_size <= 0 uses the server default; the server caps it.
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message PageInfo { string next_page_token = 1; }

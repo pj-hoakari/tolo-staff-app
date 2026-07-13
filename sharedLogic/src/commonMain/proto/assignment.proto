@@ -1,0 +1,75 @@
+syntax = "proto3";
+package tolo.staff.v1;
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.v1";
+option java_outer_classname = "AssignmentProto";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+enum AssignmentStatus {
+  ASSIGNMENT_STATUS_UNSPECIFIED = 0;
+  ASSIGNMENT_STATUS_SCHEDULED = 1;
+  ASSIGNMENT_STATUS_ACTIVE = 2;
+  ASSIGNMENT_STATUS_ENDED = 3;
+  ASSIGNMENT_STATUS_CANCELLED = 4;
+}
+message StaffAssignment {
+  AssignmentId id = 1;
+  EventScope scope = 2;
+  reserved 3;
+  reserved "tenant_id", "event_id";
+  StaffId staff_id = 4;
+  // Every assignment destination is exposed to the staff app as a Point.
+  PointId point_id = 5;
+  google.protobuf.Timestamp starts_at = 6;
+  optional google.protobuf.Timestamp ends_at = 7; // Must be after starts_at.
+  AssignmentStatus status = 8;
+  StaffId assigned_by_staff_id = 9;
+  optional string note = 10; // Trimmed, at most 500 characters.
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  int64 version = 13; // Optimistic-lock version, not a polling cursor.
+}
+message ListAssignmentsRequest {
+  EventScope scope = 1;
+  optional StaffId staff_id = 2;
+  repeated AssignmentStatus statuses = 3;
+  optional PointId point_id = 4;
+  PageRequest page = 5;
+}
+message ListAssignmentsResponse { repeated StaffAssignment assignments = 1; PageInfo page = 2; }
+message GetAssignmentRequest { EventScope scope = 1; AssignmentId assignment_id = 2; }
+message CreateAssignmentRequest {
+  EventScope scope = 1;
+  string request_id = 2;
+  StaffId staff_id = 3;
+  PointId point_id = 4;
+  google.protobuf.Timestamp starts_at = 5;
+  optional google.protobuf.Timestamp ends_at = 6;
+  optional string note = 7;
+}
+message ReplaceAssignmentRequest {
+  EventScope scope = 1;
+  string request_id = 2;
+  AssignmentId previous_assignment_id = 3;
+  int64 expected_previous_version = 4;
+  PointId point_id = 5;
+  google.protobuf.Timestamp starts_at = 6;
+  optional google.protobuf.Timestamp ends_at = 7;
+  optional string note = 8;
+}
+message ReplaceAssignmentResponse { StaffAssignment ended_assignment = 1; StaffAssignment new_assignment = 2; }
+message ActivateAssignmentRequest { EventScope scope = 1; AssignmentId assignment_id = 2; int64 expected_version = 3; }
+message EndAssignmentRequest { EventScope scope = 1; AssignmentId assignment_id = 2; int64 expected_version = 3; }
+message CancelAssignmentRequest { EventScope scope = 1; AssignmentId assignment_id = 2; int64 expected_version = 3; }
+
+service AssignmentService {
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse);
+  rpc GetAssignment(GetAssignmentRequest) returns (StaffAssignment);
+  rpc CreateAssignment(CreateAssignmentRequest) returns (StaffAssignment);
+  rpc ReplaceAssignment(ReplaceAssignmentRequest) returns (ReplaceAssignmentResponse);
+  rpc ActivateAssignment(ActivateAssignmentRequest) returns (StaffAssignment);
+  rpc EndAssignment(EndAssignmentRequest) returns (StaffAssignment);
+  rpc CancelAssignment(CancelAssignmentRequest) returns (StaffAssignment);
+}

@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package tolo.staff.v1;
+
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.v1";
+option java_outer_classname = "ReferenceProto";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+enum TenantStatus {
+  TENANT_STATUS_UNSPECIFIED = 0;
+  TENANT_STATUS_ACTIVE = 1;
+  TENANT_STATUS_ARCHIVED = 2;
+}
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_SHORT_TERM = 1;
+  EVENT_TYPE_LONG_TERM = 2;
+}
+enum EventStatus {
+  EVENT_STATUS_UNSPECIFIED = 0;
+  EVENT_STATUS_DRAFT = 1;
+  EVENT_STATUS_OPEN = 2;
+  EVENT_STATUS_LOCKED = 3;
+  EVENT_STATUS_CLOSED = 4;
+  EVENT_STATUS_ARCHIVED = 5;
+}
+enum MembershipStatus {
+  MEMBERSHIP_STATUS_UNSPECIFIED = 0;
+  MEMBERSHIP_STATUS_ACTIVE = 1;
+  MEMBERSHIP_STATUS_REVOKED = 2;
+}
+enum PointType {
+  POINT_TYPE_UNSPECIFIED = 0;
+  POINT_TYPE_GOAL = 1;
+  POINT_TYPE_GOAL_TRANSIT_MIXED = 2;
+  POINT_TYPE_TRANSIT_ONLY = 3;
+  POINT_TYPE_GATE = 4;
+  POINT_TYPE_OBSERVATION = 5;
+  POINT_TYPE_ROVING_AREA = 6;
+}
+
+message Tenant {
+  TenantId id = 1;
+  string name = 2;
+  optional string icon_url = 3; // HTTPS only.
+  TenantStatus status = 4;
+  google.protobuf.Timestamp synced_at = 5;
+}
+message Event {
+  EventScope scope = 1;
+  reserved 2;
+  reserved "id", "tenant_id";
+  string name = 3;
+  EventType type = 4;
+  optional google.protobuf.Timestamp starts_at = 5;
+  optional google.protobuf.Timestamp ends_at = 6; // starts_at < ends_at.
+  EventStatus status = 7;
+  google.protobuf.Timestamp synced_at = 8;
+}
+message Staff {
+  StaffId id = 1;
+  TenantId tenant_id = 2;
+  string display_name = 3; // Trimmed, 1..120 characters.
+  optional string icon_url = 4; // HTTPS only.
+  MembershipStatus membership_status = 5;
+  google.protobuf.Timestamp synced_at = 6;
+}
+message Point {
+  PointId id = 1;
+  EventScope scope = 2;
+  reserved 3;
+  reserved "tenant_id", "event_id";
+  PointType point_type = 4;
+  optional string display_name = 5; // At most 120 characters.
+  optional GraphRevisionId graph_revision_id = 6;
+}
+
+message GetTenantRequest { TenantId tenant_id = 1; }
+message ListEventsRequest {
+  TenantId tenant_id = 1;
+  repeated EventStatus statuses = 2;
+  PageRequest page = 3;
+}
+message ListEventsResponse { repeated Event events = 1; PageInfo page = 2; }
+message GetEventRequest { EventScope scope = 1; }
+message ListStaffRequest {
+  EventScope scope = 1;
+  repeated MembershipStatus membership_statuses = 2;
+  PageRequest page = 3;
+}
+message ListStaffResponse { repeated Staff staff = 1; PageInfo page = 2; }
+message GetStaffRequest { EventScope scope = 1; StaffId staff_id = 2; }
+message ListPointsRequest {
+  EventScope scope = 1;
+  repeated PointType point_types = 2;
+  PageRequest page = 3;
+}
+message ListPointsResponse { repeated Point points = 1; PageInfo page = 2; }
+
+service ReferenceService {
+  rpc GetTenant(GetTenantRequest) returns (Tenant);
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse);
+  rpc GetEvent(GetEventRequest) returns (Event);
+  rpc ListStaff(ListStaffRequest) returns (ListStaffResponse);
+  rpc GetStaff(GetStaffRequest) returns (Staff);
+  rpc ListPoints(ListPointsRequest) returns (ListPointsResponse);
+}

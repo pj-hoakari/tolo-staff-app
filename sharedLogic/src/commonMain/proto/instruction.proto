@@ -1,0 +1,107 @@
+syntax = "proto3";
+package tolo.staff.v1;
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.v1";
+option java_outer_classname = "InstructionProto";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+enum InstructionStatus {
+  INSTRUCTION_STATUS_UNSPECIFIED = 0;
+  INSTRUCTION_STATUS_ISSUED = 1;
+  // Deprecated: acknowledgements are recorded per staff member in InstructionAcknowledgement.
+  INSTRUCTION_STATUS_ACKNOWLEDGED = 2 [deprecated = true];
+  INSTRUCTION_STATUS_COMPLETED = 3;
+  INSTRUCTION_STATUS_CANCELLED = 4;
+  INSTRUCTION_STATUS_EXPIRED = 5;
+}
+// Explicit marker for an instruction addressed to every staff member in the event.
+message AllEventStaffTarget {}
+message InstructionTarget {
+  // Exactly one target must be set. Absence is not interpreted as "all staff".
+  oneof target {
+    AllEventStaffTarget all_event_staff = 1;
+    StaffId staff_id = 2;
+    PointId point_id = 3;
+  }
+}
+message Instruction {
+  InstructionId id = 1;
+  EventScope scope = 2;
+  reserved 3;
+  reserved "tenant_id", "event_id";
+  InstructionTarget target = 4;
+  reserved 5;
+  reserved "target_staff_id", "target_point_id";
+  string body = 6; // Trimmed, 1..2000 characters.
+  google.protobuf.Timestamp issued_at = 7;
+  optional google.protobuf.Timestamp expires_at = 8;
+  StaffId issued_by_staff_id = 9;
+  InstructionStatus status = 10;
+  // Deprecated: acknowledgements are not aggregate-wide. Read InstructionAcknowledgement instead.
+  optional google.protobuf.Timestamp acknowledged_at = 11 [deprecated = true];
+  optional google.protobuf.Timestamp completed_at = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  int64 version = 15;
+}
+// Records one staff member's acknowledgement independently from the Instruction aggregate status.
+// The server derives staff_id from the authenticated subject; clients cannot acknowledge for others.
+message InstructionAcknowledgement {
+  EventScope scope = 1;
+  reserved 2;
+  reserved "tenant_id", "event_id";
+  InstructionId instruction_id = 3;
+  StaffId staff_id = 4;
+  google.protobuf.Timestamp acknowledged_at = 5;
+}
+message ListInstructionsRequest {
+  EventScope scope = 1;
+  // Filters by a single explicit target. When absent, instructions for all targets are returned.
+  optional StaffId target_staff_id = 2;
+  optional PointId target_point_id = 3;
+  repeated InstructionStatus statuses = 4;
+  PageRequest page = 5;
+}
+message ListInstructionsResponse { repeated Instruction instructions = 1; PageInfo page = 2; }
+message GetInstructionRequest { EventScope scope = 1; InstructionId instruction_id = 2; }
+message IssueInstructionRequest {
+  EventScope scope = 1;
+  string request_id = 2;
+  InstructionTarget target = 3;
+  reserved 4;
+  reserved "target_staff_id", "target_point_id";
+  string body = 5;
+  google.protobuf.Timestamp issued_at = 6;
+  optional google.protobuf.Timestamp expires_at = 7;
+}
+message AcknowledgeInstructionRequest {
+  EventScope scope = 1;
+  InstructionId instruction_id = 2;
+  // Idempotency key. The server verifies that the authenticated staff member is an eligible target;
+  // repeated acknowledgement by that staff member returns the existing record.
+  string request_id = 3;
+}
+message ListInstructionAcknowledgementsRequest {
+  EventScope scope = 1;
+  InstructionId instruction_id = 2;
+  optional StaffId staff_id = 3;
+  PageRequest page = 4;
+}
+message ListInstructionAcknowledgementsResponse {
+  repeated InstructionAcknowledgement acknowledgements = 1;
+  PageInfo page = 2;
+}
+message CompleteInstructionRequest { EventScope scope = 1; InstructionId instruction_id = 2; int64 expected_version = 3; }
+message CancelInstructionRequest { EventScope scope = 1; InstructionId instruction_id = 2; int64 expected_version = 3; }
+
+service InstructionService {
+  rpc ListInstructions(ListInstructionsRequest) returns (ListInstructionsResponse);
+  rpc GetInstruction(GetInstructionRequest) returns (Instruction);
+  rpc IssueInstruction(IssueInstructionRequest) returns (Instruction);
+  rpc AcknowledgeInstruction(AcknowledgeInstructionRequest) returns (InstructionAcknowledgement);
+  rpc ListInstructionAcknowledgements(ListInstructionAcknowledgementsRequest) returns (ListInstructionAcknowledgementsResponse);
+  rpc CompleteInstruction(CompleteInstructionRequest) returns (Instruction);
+  rpc CancelInstruction(CancelInstructionRequest) returns (Instruction);
+}

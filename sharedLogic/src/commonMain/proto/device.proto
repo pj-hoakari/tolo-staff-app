@@ -1,0 +1,80 @@
+syntax = "proto3";
+package tolo.staff.v1;
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.v1";
+option java_outer_classname = "DeviceProto";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_IOS = 1;
+  PLATFORM_ANDROID = 2;
+  PLATFORM_WEB = 3;
+}
+enum DeviceStatus {
+  DEVICE_STATUS_UNSPECIFIED = 0;
+  DEVICE_STATUS_ACTIVE = 1;
+  DEVICE_STATUS_STALE = 2;
+  DEVICE_STATUS_REVOKED = 3;
+}
+enum PushProvider {
+  PUSH_PROVIDER_UNSPECIFIED = 0;
+  PUSH_PROVIDER_APNS = 1;
+  PUSH_PROVIDER_FCM = 2;
+  PUSH_PROVIDER_WEB_PUSH = 3;
+}
+message StaffDevice {
+  StaffDeviceId id = 1;
+  TenantId tenant_id = 2;
+  StaffId staff_id = 3;
+  string installation_id = 4; // 1..128 characters.
+  Platform platform = 5;
+  optional NotificationEndpointId notification_endpoint_id = 6;
+  optional string device_public_key_id = 7;
+  bool notifications_enabled = 8;
+  DeviceStatus status = 9;
+  google.protobuf.Timestamp registered_at = 10;
+  optional google.protobuf.Timestamp last_seen_at = 11;
+  optional google.protobuf.Timestamp revoked_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  int64 version = 14;
+}
+message RegisterDeviceRequest {
+  TenantId tenant_id = 1;
+  string request_id = 2;
+  string installation_id = 3;
+  Platform platform = 4;
+  optional string device_public_key_id = 5;
+  bool notifications_enabled = 6;
+}
+message GetDeviceRequest { TenantId tenant_id = 1; StaffDeviceId device_id = 2; }
+message UpdateNotificationSettingsRequest {
+  TenantId tenant_id = 1;
+  StaffDeviceId device_id = 2;
+  int64 expected_version = 3;
+  bool notifications_enabled = 4;
+}
+message RegisterNotificationEndpointRequest {
+  TenantId tenant_id = 1;
+  StaffDeviceId device_id = 2;
+  int64 expected_version = 3;
+  string request_id = 4;
+  PushProvider provider = 5;
+  string push_token = 6; // Transient secret; never returned or stored by Realtime Service.
+}
+message UnlinkNotificationEndpointRequest { TenantId tenant_id = 1; StaffDeviceId device_id = 2; int64 expected_version = 3; }
+message MarkDeviceSeenRequest { TenantId tenant_id = 1; StaffDeviceId device_id = 2; }
+message RevokeDeviceRequest { TenantId tenant_id = 1; StaffDeviceId device_id = 2; int64 expected_version = 3; }
+
+service DeviceService {
+  rpc RegisterDevice(RegisterDeviceRequest) returns (StaffDevice);
+  rpc GetDevice(GetDeviceRequest) returns (StaffDevice);
+  rpc UpdateNotificationSettings(UpdateNotificationSettingsRequest) returns (StaffDevice);
+  rpc RegisterNotificationEndpoint(RegisterNotificationEndpointRequest) returns (StaffDevice);
+  rpc UnlinkNotificationEndpoint(UnlinkNotificationEndpointRequest) returns (StaffDevice);
+  rpc MarkDeviceSeen(MarkDeviceSeenRequest) returns (StaffDevice);
+  rpc RevokeDevice(RevokeDeviceRequest) returns (StaffDevice);
+}
+

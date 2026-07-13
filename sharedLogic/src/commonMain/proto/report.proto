@@ -1,0 +1,99 @@
+syntax = "proto3";
+package tolo.staff.v1;
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.v1";
+option java_outer_classname = "ReportProto";
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+enum ReportCategory {
+  REPORT_CATEGORY_UNSPECIFIED = 0;
+  REPORT_CATEGORY_CONGESTION = 1;
+  REPORT_CATEGORY_SAFETY_HAZARD = 2;
+  REPORT_CATEGORY_EQUIPMENT = 3;
+  REPORT_CATEGORY_GATE = 4;
+  REPORT_CATEGORY_OTHER = 5;
+}
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_INFO = 1;
+  SEVERITY_ATTENTION = 2;
+  SEVERITY_URGENT = 3;
+}
+enum ReportStatus {
+  REPORT_STATUS_UNSPECIFIED = 0;
+  REPORT_STATUS_OPEN = 1;
+  REPORT_STATUS_ACKNOWLEDGED = 2;
+  REPORT_STATUS_RESOLVED = 3;
+  REPORT_STATUS_DISMISSED = 4;
+}
+message FieldReport {
+  ReportId id = 1;
+  EventScope scope = 2;
+  reserved 3;
+  reserved "tenant_id", "event_id";
+  StaffId reporter_staff_id = 4;
+  ReportCategory category = 5;
+  Severity severity = 6;
+  optional PointId point_id = 7; // Required for congestion and safety hazards.
+  string description = 8; // Trimmed, 1..2000 characters.
+  google.protobuf.Timestamp observed_at = 9;
+  ReportStatus status = 10;
+  optional StaffId acknowledged_by_staff_id = 11;
+  optional google.protobuf.Timestamp acknowledged_at = 12;
+  optional StaffId resolved_by_staff_id = 13;
+  optional google.protobuf.Timestamp resolved_at = 14;
+  optional string resolution_note = 15; // Trimmed, 1..1000 characters when set.
+  // Set after a danger-flag operation has been accepted by the guidance domain.
+  optional DangerFlagRequestId danger_flag_request_id = 16;
+  google.protobuf.Timestamp created_at = 17;
+  google.protobuf.Timestamp updated_at = 18;
+  int64 version = 19;
+}
+message ListReportsRequest {
+  EventScope scope = 1;
+  optional StaffId reporter_staff_id = 2;
+  optional PointId point_id = 3;
+  repeated ReportCategory categories = 4;
+  repeated Severity severities = 5;
+  repeated ReportStatus statuses = 6;
+  PageRequest page = 7;
+}
+message ListReportsResponse { repeated FieldReport reports = 1; PageInfo page = 2; }
+message GetReportRequest { EventScope scope = 1; ReportId report_id = 2; }
+message SubmitReportRequest {
+  EventScope scope = 1;
+  string request_id = 2;
+  ReportCategory category = 3;
+  Severity severity = 4;
+  optional PointId point_id = 5;
+  string description = 6;
+  google.protobuf.Timestamp observed_at = 7;
+}
+message AcknowledgeReportRequest { EventScope scope = 1; ReportId report_id = 2; int64 expected_version = 3; }
+message ResolveReportRequest {
+  EventScope scope = 1;
+  ReportId report_id = 2;
+  int64 expected_version = 3;
+  string resolution_note = 4;
+}
+message DismissReportRequest { EventScope scope = 1; ReportId report_id = 2; int64 expected_version = 3; }
+message RequestDangerFlagOperationRequest {
+  EventScope scope = 1;
+  ReportId report_id = 2;
+  int64 expected_version = 3;
+  // Idempotency key for this API call. The resulting domain correlation ID is returned on FieldReport.
+  string request_id = 4;
+}
+
+service ReportService {
+  rpc ListReports(ListReportsRequest) returns (ListReportsResponse);
+  rpc GetReport(GetReportRequest) returns (FieldReport);
+  rpc SubmitReport(SubmitReportRequest) returns (FieldReport);
+  rpc AcknowledgeReport(AcknowledgeReportRequest) returns (FieldReport);
+  rpc ResolveReport(ResolveReportRequest) returns (FieldReport);
+  rpc DismissReport(DismissReportRequest) returns (FieldReport);
+  // Requests an authorized operation; severity alone never confirms a danger flag.
+  rpc RequestDangerFlagOperation(RequestDangerFlagOperationRequest) returns (FieldReport);
+}
