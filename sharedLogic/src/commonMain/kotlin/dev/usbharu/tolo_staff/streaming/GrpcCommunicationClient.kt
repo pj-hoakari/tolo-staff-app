@@ -7,6 +7,8 @@ import dev.usbharu.tolo.communication.v1.ReferenceService
 import dev.usbharu.tolo.communication.v1.ReportService
 import dev.usbharu.tolo.communication.v1.ThreadService
 import dev.usbharu.tolo_staff.logging.AppLogger
+import dev.usbharu.tolo_staff.feature.auth.AuthGrpcClientInterceptor
+import dev.usbharu.tolo_staff.feature.auth.AuthRepository
 import dev.usbharu.tolo_staff.runtime.GrpcMetadataProvider
 import dev.usbharu.tolo_staff.runtime.NoOpGrpcMetadataProvider
 import kotlinx.rpc.grpc.GrpcMetadata
@@ -20,10 +22,12 @@ class GrpcCommunicationClient(
     host: String,
     port: Int,
     val metadataProvider: GrpcMetadataProvider = NoOpGrpcMetadataProvider,
+    authRepository: AuthRepository? = null,
 ) {
     private val logger = AppLogger.withTag("GrpcCommunicationClient")
     private val client = GrpcClient(host, port) {
         credentials = plaintext() + MetadataCallCredentials(metadataProvider)
+        if (authRepository != null) intercept(AuthGrpcClientInterceptor(authRepository))
     }
 
     init {

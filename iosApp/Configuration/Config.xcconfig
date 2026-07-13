@@ -16,5 +16,11 @@ TOLO_FIRESTORE_HOST=127.0.0.1
 TOLO_FIRESTORE_PORT=8081
 TOLO_FIRESTORE_PROJECT_ID=tolo-communication-poc
 TOLO_FIRESTORE_DATABASE_ID=
+TOLO_OIDC_ISSUER=http:/$()/localhost:8080
+TOLO_OIDC_CLIENT_ID=tolo-staff-mobile
+TOLO_OIDC_REDIRECT_URI=dev.usbharu.tolostaff:/$()oauth2redirect
+TOLO_OIDC_SCOPES=openid profile offline_access tenant.read tenant.write events.read events.write
+TOLO_OIDC_AUDIENCE=backend-api
+TOLO_OIDC_RESOURCE_BASE_URL=https:/$()/api.example.com
 
 #include? "Config.local.xcconfig"

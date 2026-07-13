@@ -4,13 +4,16 @@ import SharedLogic
 @MainActor
 struct AppShellScreen: View {
     @State private var wrapper: AppShellViewModelWrapper
+    private let onLogout: () -> Void
 
-    init() {
+    init(onLogout: @escaping () -> Void = {}) {
         _wrapper = State(initialValue: AppShellViewModelWrapper())
+        self.onLogout = onLogout
     }
 
-    init(wrapper: AppShellViewModelWrapper) {
+    init(wrapper: AppShellViewModelWrapper, onLogout: @escaping () -> Void = {}) {
         _wrapper = State(initialValue: wrapper)
+        self.onLogout = onLogout
     }
 
     var body: some View {
@@ -38,7 +41,8 @@ struct AppShellScreen: View {
             onContactTargetTypeSelected: wrapper.onContactTargetTypeSelected,
             onContactTargetSelected: wrapper.onContactTargetSelected,
             onContactDraftChanged: wrapper.onContactDraftChanged,
-            onContactSendClicked: wrapper.onContactSendClicked
+            onContactSendClicked: wrapper.onContactSendClicked,
+            onLogout: onLogout
         )
         .onDisappear { wrapper.clear() }
     }
@@ -69,6 +73,7 @@ struct AppShellContentView: View {
     var onContactTargetSelected: (String) -> Void = { _ in }
     var onContactDraftChanged: (String) -> Void = { _ in }
     var onContactSendClicked: () -> Void = {}
+    var onLogout: () -> Void = {}
 
     var body: some View {
         tabContainer
@@ -129,6 +134,10 @@ struct AppShellContentView: View {
                     .toolbar {
                         ToolbarItem(id: "current-staff-header", placement: .topBarLeading) {
                             CurrentStaffHeaderIconView(currentStaff: state.currentStaff)
+                        }
+                        ToolbarItem(id: "logout", placement: .topBarTrailing) {
+                            Button("auth_logout", systemImage: "rectangle.portrait.and.arrow.right", action: onLogout)
+                                .accessibilityIdentifier("auth_logout_button")
                         }
                     }
                 }

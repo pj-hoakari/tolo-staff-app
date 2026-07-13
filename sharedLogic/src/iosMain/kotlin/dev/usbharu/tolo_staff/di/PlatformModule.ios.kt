@@ -16,6 +16,7 @@ import dev.usbharu.tolo_staff.streaming.PollingOperationsStreamDataSource
 import dev.usbharu.tolo_staff.streaming.defaultOperationsPollingConfig
 import dev.usbharu.tolo_staff.runtime.AppRuntimeConfig
 import dev.usbharu.tolo_staff.runtime.GrpcMetadataProvider
+import dev.usbharu.tolo_staff.feature.auth.AuthRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -23,7 +24,7 @@ actual fun platformModule(): Module = module {
     single { defaultOperationsPollingConfig() }
     single {
         val config = get<AppRuntimeConfig>()
-        GrpcCommunicationClient(config.grpcHost, config.grpcPort, get<GrpcMetadataProvider>())
+        GrpcCommunicationClient(config.grpcHost, config.grpcPort, get<GrpcMetadataProvider>(), get<AuthRepository>())
     }
     single<ReportRepository> { GrpcReportRepository(get(), get(), pollingIntervalMillis = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>().intervalMillis) }
     single<EventRepository> { GrpcEventRepository(get(), get()) }

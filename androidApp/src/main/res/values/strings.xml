@@ -18,4 +18,9 @@
     <string name="reports_description">作業報告を確認・作成します。</string>
     <string name="contacts_description">連絡事項とメッセージを確認します。</string>
     <string name="contact_chat_message_placeholder">メッセージを入力</string>
+    <string name="auth_title">Tolo Staff</string>
+    <string name="auth_description">組織のログイン画面をブラウザで開いて認証します。</string>
+    <string name="auth_login">ログイン</string>
+    <string name="auth_retry">もう一度試す</string>
+    <string name="auth_error">ログインを完了できませんでした。</string>
 </resources>

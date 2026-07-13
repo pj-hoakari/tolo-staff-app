@@ -24,5 +24,26 @@
 	<string>$(TOLO_FIRESTORE_PROJECT_ID)</string>
 	<key>ToloFirestoreDatabaseId</key>
 	<string>$(TOLO_FIRESTORE_DATABASE_ID)</string>
+	<key>ToloOidcIssuer</key>
+	<string>$(TOLO_OIDC_ISSUER)</string>
+	<key>ToloOidcClientId</key>
+	<string>$(TOLO_OIDC_CLIENT_ID)</string>
+	<key>ToloOidcRedirectUri</key>
+	<string>$(TOLO_OIDC_REDIRECT_URI)</string>
+	<key>ToloOidcScopes</key>
+	<string>$(TOLO_OIDC_SCOPES)</string>
+	<key>ToloOidcAudience</key>
+	<string>$(TOLO_OIDC_AUDIENCE)</string>
+	<key>ToloOidcResourceBaseUrl</key>
+	<string>$(TOLO_OIDC_RESOURCE_BASE_URL)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>dev.usbharu.tolostaff.oidc</string>
+			<key>CFBundleURLSchemes</key>
+			<array><string>dev.usbharu.tolostaff</string></array>
+		</dict>
+	</array>
 </dict>
 </plist>

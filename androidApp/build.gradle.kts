@@ -26,6 +26,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.uiToolingPreview)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.appauth.android)
     implementation(compose.materialIconsExtended)
     debugImplementation(libs.compose.uiTooling)
     debugImplementation(libs.compose.uiTestManifest)
@@ -56,6 +57,13 @@ android {
         buildConfigField("int", "TOLO_FIRESTORE_PORT", project.stringProperty("tolo.firestorePort", "8081"))
         buildConfigField("String", "TOLO_FIRESTORE_PROJECT_ID", "\"${project.stringProperty("tolo.firestoreProjectId", "tolo-communication-poc")}\"")
         buildConfigField("String", "TOLO_FIRESTORE_DATABASE_ID", "\"${project.stringProperty("tolo.firestoreDatabaseId", "")}\"")
+        buildConfigField("String", "TOLO_OIDC_ISSUER", "\"${project.stringProperty("tolo.oidc.issuer", "http://10.0.2.2:8080")}\"")
+        buildConfigField("String", "TOLO_OIDC_CLIENT_ID", "\"${project.stringProperty("tolo.oidc.clientId", "tolo-staff-mobile")}\"")
+        buildConfigField("String", "TOLO_OIDC_REDIRECT_URI", "\"${project.stringProperty("tolo.oidc.redirectUri", "dev.usbharu.tolostaff:/oauth2redirect")}\"")
+        buildConfigField("String", "TOLO_OIDC_SCOPES", "\"${project.stringProperty("tolo.oidc.scopes", "openid profile offline_access tenant.read tenant.write events.read events.write")}\"")
+        buildConfigField("String", "TOLO_OIDC_AUDIENCE", "\"${project.stringProperty("tolo.oidc.audience", "backend-api")}\"")
+        buildConfigField("String", "TOLO_OIDC_RESOURCE_BASE_URL", "\"${project.stringProperty("tolo.oidc.resourceBaseUrl", "https://api.example.com")}\"")
+        manifestPlaceholders["appAuthRedirectScheme"] = project.stringProperty("tolo.oidc.redirectScheme", "dev.usbharu.tolostaff")
     }
     buildFeatures {
         buildConfig = true
@@ -66,8 +74,16 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            buildConfigField(
+                "String",
+                "TOLO_OIDC_DEBUG_ORIGIN_OVERRIDE",
+                "\"${project.stringProperty("tolo.oidc.debugOriginOverride", "http://10.0.2.2:8080")}\"",
+            )
+        }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("String", "TOLO_OIDC_DEBUG_ORIGIN_OVERRIDE", "\"\"")
         }
     }
     compileOptions {

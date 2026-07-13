@@ -17,6 +17,7 @@ import dev.usbharu.tolo_staff.runtime.AppRuntimeConfig
 import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import dev.usbharu.tolo_staff.runtime.GrpcMetadataProvider
 import dev.usbharu.tolo_staff.streaming.OperationsStreamingConfig
+import dev.usbharu.tolo_staff.feature.auth.AuthRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -33,7 +34,7 @@ actual fun platformModule(): Module = module {
     }
     single {
         val config = get<AppRuntimeConfig>()
-        GrpcCommunicationClient(config.grpcHost, config.grpcPort, get<GrpcMetadataProvider>())
+        GrpcCommunicationClient(config.grpcHost, config.grpcPort, get<GrpcMetadataProvider>(), get<AuthRepository>())
     }
     single<OperationsChangeNotifier> {
         FirestoreOperationsChangeNotifier(get(), get<AppSessionContext>())

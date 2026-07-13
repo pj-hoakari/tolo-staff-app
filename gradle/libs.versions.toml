@@ -20,6 +20,7 @@ kotlinx-serialization = "1.9.0"
 kotlinx-datetime = "0.8.0"
 material3 = "1.11.0-alpha07"
 navigationCompose = "2.9.0"
+appauthAndroid = "0.11.1"
 skie = "0.10.12"
 kotlinx-rpc = "0.11.0-grpc-187"
 grpc = "1.79.0"
@@ -48,6 +49,7 @@ compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-previ
 compose-uiTestJunit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "androidxComposeUiTest" }
 compose-uiTestManifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "androidxComposeUiTest" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+appauth-android = { module = "net.openid:appauth", version.ref = "appauthAndroid" }
 kotlinx-rpc-grpc-core = { module = "org.jetbrains.kotlinx:kotlinx-rpc-grpc-core", version.ref = "kotlinx-rpc" }
 kotlinx-rpc-grpc-client = { module = "org.jetbrains.kotlinx:kotlinx-rpc-grpc-client", version.ref = "kotlinx-rpc" }
 kotlinx-rpc-protobuf-core = { module = "org.jetbrains.kotlinx:kotlinx-rpc-protobuf-core", version.ref = "kotlinx-rpc" }

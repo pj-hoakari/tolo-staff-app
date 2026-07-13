@@ -10,7 +10,8 @@ import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
 
 @Composable
 fun ToloStaffAndroidApp(
-    viewModel: AppShellViewModel = remember { KoinHelper().getAppShellViewModel() }
+    viewModel: AppShellViewModel = remember { KoinHelper().getAppShellViewModel() },
+    onLogout: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -41,5 +42,6 @@ fun ToloStaffAndroidApp(
         onContactDraftChanged = viewModel::onContactDraftChanged,
         onContactSendClicked = viewModel::onContactSendClicked,
         onPlacementArrivalConfirmed = viewModel::onPlacementArrivalConfirmed,
+        onLogout = onLogout,
     )
 }

@@ -23,6 +23,21 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 - Android app: `./gradlew :androidApp:assembleDebug`
 - iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
 
+### OIDC configuration
+
+ToloStaff uses Authorization Code + PKCE in the system authentication UI. Android values can be supplied as Gradle properties:
+
+- `tolo.oidc.issuer`
+- `tolo.oidc.clientId`
+- `tolo.oidc.redirectUri` and `tolo.oidc.redirectScheme`
+- `tolo.oidc.scopes`
+- `tolo.oidc.audience`
+- `tolo.oidc.resourceBaseUrl`
+
+For Android Debug builds, `tolo.oidc.debugOriginOverride` controls the origin used to reach a locally running IdP. It defaults to `http://10.0.2.2:8080` for the Android emulator. For example, use `-Ptolo.oidc.debugOriginOverride=http://192.168.1.20:8080` on a physical device. The override is applied to discovery retrieval and loopback endpoints returned by discovery; Release builds ignore it.
+
+For iOS, override the matching `TOLO_OIDC_*` values in `iosApp/Configuration/Config.local.xcconfig`. The redirect URI and registered custom scheme must exactly match the public-client registration at the IdP. The client must allow PKCE S256, token endpoint authentication method `none`, and public-client token exchange from the tenant resource to the event resource. No client secret belongs in either app.
+
 ### Running tests
 
 Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:

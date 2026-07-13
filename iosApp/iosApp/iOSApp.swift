@@ -23,14 +23,22 @@ struct iOSApp: App {
         return AppRuntimeConfig(
             tenantId: info["ToloTenantId"] as? String ?? "tenant-dev",
             eventId: info["ToloEventId"] as? String ?? "event-dev",
-            staffId: info["ToloStaffId"] as? String ?? "tanaka",
+            staffId: ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--uitesting") })
+                ? (info["ToloStaffId"] as? String ?? "tanaka")
+                : "unauthenticated",
             grpcHost: info["ToloGrpcHost"] as? String ?? "127.0.0.1",
             grpcPort: port,
             firestoreEnabled: firestoreEnabled,
             firestoreHost: info["ToloFirestoreHost"] as? String ?? "127.0.0.1",
             firestorePort: firestorePort,
             firestoreProjectId: info["ToloFirestoreProjectId"] as? String ?? "tolo-communication-poc",
-            firestoreDatabaseId: firestoreDatabaseId
+            firestoreDatabaseId: firestoreDatabaseId,
+            oidcIssuer: info["ToloOidcIssuer"] as? String ?? "http://localhost:8080",
+            oidcClientId: info["ToloOidcClientId"] as? String ?? "tolo-staff-mobile",
+            oidcRedirectUri: info["ToloOidcRedirectUri"] as? String ?? "dev.usbharu.tolostaff:/oauth2redirect",
+            oidcScopes: info["ToloOidcScopes"] as? String ?? "openid profile offline_access tenant.read tenant.write events.read events.write",
+            oidcAudience: info["ToloOidcAudience"] as? String ?? "backend-api",
+            oidcResourceBaseUrl: info["ToloOidcResourceBaseUrl"] as? String ?? "https://api.example.com"
         )
     }
 }

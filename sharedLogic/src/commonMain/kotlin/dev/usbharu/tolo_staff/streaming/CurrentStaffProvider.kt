@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlin.coroutines.CoroutineContext
@@ -54,6 +55,36 @@ class FixedCurrentStaffSession(
                 _isReady.value = true
             }
             .launchIn(scope)
+    }
+}
+
+class AuthenticatedCurrentStaffSession(
+    sessionContext: dev.usbharu.tolo_staff.runtime.AppSessionContext,
+    dataSource: OperationsStreamDataSource,
+    coroutineContext: CoroutineContext = Dispatchers.Default,
+) : CurrentStaffSession {
+    private val logger = AppLogger.withTag("AuthenticatedCurrentStaffSession")
+    private val scope = CoroutineScope(SupervisorJob() + coroutineContext)
+    private val _currentStaff = MutableStateFlow(CurrentStaffMember(sessionContext.staffId, sessionContext.staffId))
+    private val _isReady = MutableStateFlow(false)
+
+    override val currentStaff: StateFlow<CurrentStaffMember> = _currentStaff.asStateFlow()
+    override val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
+
+    init {
+        dataSource.start()
+        combine(sessionContext.staffIdFlow, dataSource.observeStaff()) { staffId, staff ->
+            CurrentStaffMember(
+                staffId = staffId,
+                displayName = staff.firstOrNull { it.staffId == staffId }?.name?.takeIf(String::isNotBlank) ?: staffId,
+            )
+        }.onEach { current ->
+            _currentStaff.value = current
+            _isReady.value = true
+        }.catch { throwable ->
+            logger.warn(throwable) { "Failed to resolve authenticated staff" }
+            _isReady.value = true
+        }.launchIn(scope)
     }
 }
 

@@ -16,7 +16,7 @@ class MainActivity : ComponentActivity() {
         val runtimeConfig = AppRuntimeConfig(
             tenantId = BuildConfig.TOLO_TENANT_ID,
             eventId = BuildConfig.TOLO_EVENT_ID,
-            staffId = BuildConfig.TOLO_STAFF_ID,
+            staffId = "unauthenticated",
             grpcHost = BuildConfig.TOLO_GRPC_HOST,
             grpcPort = BuildConfig.TOLO_GRPC_PORT,
             firestoreEnabled = BuildConfig.TOLO_FIRESTORE_ENABLED,
@@ -24,6 +24,12 @@ class MainActivity : ComponentActivity() {
             firestorePort = BuildConfig.TOLO_FIRESTORE_PORT,
             firestoreProjectId = BuildConfig.TOLO_FIRESTORE_PROJECT_ID,
             firestoreDatabaseId = BuildConfig.TOLO_FIRESTORE_DATABASE_ID.ifBlank { null },
+            oidcIssuer = BuildConfig.TOLO_OIDC_ISSUER,
+            oidcClientId = BuildConfig.TOLO_OIDC_CLIENT_ID,
+            oidcRedirectUri = BuildConfig.TOLO_OIDC_REDIRECT_URI,
+            oidcScopes = BuildConfig.TOLO_OIDC_SCOPES,
+            oidcAudience = BuildConfig.TOLO_OIDC_AUDIENCE,
+            oidcResourceBaseUrl = BuildConfig.TOLO_OIDC_RESOURCE_BASE_URL,
         )
         OperationsFirebaseBootstrap().initialize(
             applicationContext,
@@ -36,9 +42,11 @@ class MainActivity : ComponentActivity() {
             )
         )
         KoinInitializer.start(runtimeConfig)
+        val koinHelper = dev.usbharu.tolo_staff.di.KoinHelper()
+        val oidcCoordinator = AndroidOidcCoordinator(this, runtimeConfig, koinHelper.getAuthRepository())
 
         setContent {
-            ToloStaffAndroidApp()
+            AndroidAuthRoot(oidcCoordinator)
         }
     }
 }
