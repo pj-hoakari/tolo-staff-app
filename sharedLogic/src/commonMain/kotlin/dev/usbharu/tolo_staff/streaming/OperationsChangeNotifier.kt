@@ -41,6 +41,8 @@ interface OperationsChangeNotifier {
     fun observeGlobal(): Flow<OperationsChangeHead> = emptyFlow()
 
     fun observeStaff(staffId: String): Flow<OperationsChangeHead> = emptyFlow()
+
+    fun observeResyncRequests(): Flow<Unit> = emptyFlow()
 }
 
 class NoOpOperationsChangeNotifier : OperationsChangeNotifier

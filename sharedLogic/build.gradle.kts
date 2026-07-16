@@ -41,6 +41,7 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(project.dependencies.platform(libs.firebase.android.bom.get()))
+            implementation(libs.gitlive.firebase.auth)
             implementation(libs.gitlive.firebase.firestore)
             implementation(libs.grpc.protobuf.lite)
         }

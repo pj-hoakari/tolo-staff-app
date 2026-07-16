@@ -20,6 +20,7 @@ dependencies {
     }
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.grpc.okhttp)
     implementation(libs.koin.core)
 
@@ -57,6 +58,11 @@ android {
         buildConfigField("int", "TOLO_FIRESTORE_PORT", project.stringProperty("tolo.firestorePort", "8081"))
         buildConfigField("String", "TOLO_FIRESTORE_PROJECT_ID", "\"${project.stringProperty("tolo.firestoreProjectId", "tolo-communication-poc")}\"")
         buildConfigField("String", "TOLO_FIRESTORE_DATABASE_ID", "\"${project.stringProperty("tolo.firestoreDatabaseId", "")}\"")
+        buildConfigField("String", "TOLO_FIREBASE_APPLICATION_ID", "\"${project.stringProperty("tolo.firebaseApplicationId", "1:1234567890:android:tolostaff")}\"")
+        buildConfigField("String", "TOLO_FIREBASE_API_KEY", "\"${project.stringProperty("tolo.firebaseApiKey", "fake-api-key")}\"")
+        buildConfigField("String", "TOLO_FIREBASE_GCM_SENDER_ID", "\"${project.stringProperty("tolo.firebaseGcmSenderId", "1234567890")}\"")
+        buildConfigField("String", "TOLO_FIREBASE_AUTH_HOST", "\"${project.stringProperty("tolo.firebaseAuthHost", "10.0.2.2")}\"")
+        buildConfigField("int", "TOLO_FIREBASE_AUTH_PORT", project.stringProperty("tolo.firebaseAuthPort", "9099"))
         buildConfigField("boolean", "TOLO_OIDC_ENABLED", project.stringProperty("tolo.oidc.enabled", "false"))
         buildConfigField("String", "TOLO_OIDC_ISSUER", "\"${project.stringProperty("tolo.oidc.issuer", "http://10.0.2.2:8080")}\"")
         buildConfigField("String", "TOLO_OIDC_CLIENT_ID", "\"${project.stringProperty("tolo.oidc.clientId", "tolo-staff-mobile")}\"")
@@ -76,6 +82,8 @@ android {
     }
     buildTypes {
         getByName("debug") {
+            buildConfigField("boolean", "TOLO_FIRESTORE_EMULATOR_ENABLED", project.stringProperty("tolo.firestoreEmulatorEnabled", "true"))
+            buildConfigField("boolean", "TOLO_FIREBASE_AUTH_EMULATOR_ENABLED", project.stringProperty("tolo.firebaseAuthEmulatorEnabled", "true"))
             buildConfigField(
                 "String",
                 "TOLO_OIDC_DEBUG_ORIGIN_OVERRIDE",
@@ -84,6 +92,8 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("boolean", "TOLO_FIRESTORE_EMULATOR_ENABLED", "false")
+            buildConfigField("boolean", "TOLO_FIREBASE_AUTH_EMULATOR_ENABLED", "false")
             buildConfigField("String", "TOLO_OIDC_DEBUG_ORIGIN_OVERRIDE", "\"\"")
         }
     }

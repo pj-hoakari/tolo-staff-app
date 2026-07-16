@@ -67,6 +67,37 @@ class AppRuntimeConfigTest {
     }
 
     @Test
+    fun `anonymous firestore access is restricted to debug emulator builds`() {
+        assertFailsWith<IllegalArgumentException> {
+            AppRuntimeConfig(
+                tenantId = "tenant",
+                eventId = "event",
+                staffId = "staff",
+                grpcHost = "localhost",
+                firestoreEnabled = true,
+                firestoreAccessMode = FirestoreAccessMode.DEBUG_EMULATOR_ANONYMOUS,
+                firestoreEmulatorEnabled = true,
+                isDebugBuild = false,
+            ).requireValid()
+        }
+    }
+
+    @Test
+    fun `authenticated firestore requires oidc and firebase configuration`() {
+        assertFailsWith<IllegalArgumentException> {
+            AppRuntimeConfig(
+                tenantId = "tenant",
+                eventId = "event",
+                staffId = "staff",
+                grpcHost = "localhost",
+                firestoreEnabled = true,
+                firestoreAccessMode = FirestoreAccessMode.AUTHENTICATED,
+                oidcLoginEnabled = false,
+            ).requireValid()
+        }
+    }
+
+    @Test
     fun `request ids are non blank and distinct`() {
         val first = DefaultRequestIdGenerator.nextId()
         val second = DefaultRequestIdGenerator.nextId()

@@ -20,6 +20,12 @@ enum class AuthFailure {
     SESSION_EXPIRED,
 }
 
+enum class AuthRefreshReason {
+    FIREBASE_GRANT_EXPIRING,
+    FIRESTORE_PERMISSION_DENIED,
+    FOREGROUND_RESUME,
+}
+
 @Serializable
 data class AuthTokens(
     val tenantAccessToken: String,

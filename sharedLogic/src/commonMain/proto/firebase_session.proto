@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package tolo.staff.v1;
+
+option java_multiple_files = true;
+option java_package = "dev.usbharu.tolo.communication.v1";
+option java_outer_classname = "FirebaseSessionProto";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+message ExchangeFirebaseCustomTokenRequest {
+  EventScope scope = 1;
+  string installation_id = 2;
+}
+
+message ExchangeFirebaseCustomTokenResponse {
+  string custom_token = 1;
+  string firebase_uid = 2;
+  string firebase_project_id = 3;
+  string firestore_database_id = 4;
+  int64 grant_version = 5;
+  google.protobuf.Timestamp grant_expires_at = 6;
+  google.protobuf.Timestamp custom_token_expires_at = 7;
+}
+
+message RevokeFirebaseSessionRequest {
+  EventScope scope = 1;
+  string installation_id = 2;
+}
+
+service FirebaseSessionService {
+  rpc ExchangeFirebaseCustomToken(ExchangeFirebaseCustomTokenRequest)
+      returns (ExchangeFirebaseCustomTokenResponse);
+  rpc RevokeFirebaseSession(RevokeFirebaseSessionRequest)
+      returns (google.protobuf.Empty);
+}

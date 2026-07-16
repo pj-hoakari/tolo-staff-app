@@ -1,5 +1,11 @@
 package dev.usbharu.tolo_staff.runtime
 
+enum class FirestoreAccessMode {
+    DISABLED,
+    AUTHENTICATED,
+    DEBUG_EMULATOR_ANONYMOUS,
+}
+
 data class AppRuntimeConfig(
     val tenantId: String,
     val eventId: String,
@@ -11,6 +17,15 @@ data class AppRuntimeConfig(
     val firestorePort: Int = 8081,
     val firestoreProjectId: String = "tolo-communication-poc",
     val firestoreDatabaseId: String? = null,
+    val firestoreAccessMode: FirestoreAccessMode = FirestoreAccessMode.DISABLED,
+    val firestoreEmulatorEnabled: Boolean = false,
+    val firebaseAuthEmulatorEnabled: Boolean = false,
+    val firebaseAuthHost: String = "127.0.0.1",
+    val firebaseAuthPort: Int = 9099,
+    val firebaseApplicationId: String = "",
+    val firebaseApiKey: String = "",
+    val firebaseGcmSenderId: String = "",
+    val isDebugBuild: Boolean = false,
     val oidcLoginEnabled: Boolean = false,
     val oidcIssuer: String = "http://localhost:8080",
     val oidcClientId: String = "tolo-staff-mobile",
@@ -25,6 +40,33 @@ data class AppRuntimeConfig(
         require(staffId.isNotBlank()) { "staffId must not be blank" }
         require(grpcHost.isNotBlank()) { "grpcHost must not be blank" }
         require(grpcPort in 1..65535) { "grpcPort must be between 1 and 65535" }
+        require(firestorePort in 1..65535) { "firestorePort must be between 1 and 65535" }
+        require(firebaseAuthPort in 1..65535) { "firebaseAuthPort must be between 1 and 65535" }
+        if (firestoreEmulatorEnabled || firebaseAuthEmulatorEnabled) {
+            require(isDebugBuild) { "Firebase emulators are only allowed in debug builds" }
+        }
+        when (firestoreAccessMode) {
+            FirestoreAccessMode.DISABLED -> Unit
+            FirestoreAccessMode.DEBUG_EMULATOR_ANONYMOUS -> {
+                require(isDebugBuild && firestoreEmulatorEnabled) {
+                    "Anonymous Firestore access is only allowed with the Firestore emulator in debug builds"
+                }
+            }
+            FirestoreAccessMode.AUTHENTICATED -> {
+                require(oidcLoginEnabled) { "Authenticated Firestore access requires OIDC login" }
+                require(firebaseApplicationId.isNotBlank()) { "firebaseApplicationId must not be blank" }
+                require(firebaseApiKey.isNotBlank()) { "firebaseApiKey must not be blank" }
+                require(firebaseGcmSenderId.isNotBlank()) { "firebaseGcmSenderId must not be blank" }
+                if (!firebaseAuthEmulatorEnabled) {
+                    require(firebaseApiKey != "fake-api-key") {
+                        "Authenticated production Firebase access requires a non-placeholder API key"
+                    }
+                    require(firebaseApplicationId != "1:1234567890:android:tolostaff") {
+                        "Authenticated production Firebase access requires a non-placeholder application ID"
+                    }
+                }
+            }
+        }
         if (oidcLoginEnabled) {
             require(oidcIssuer.startsWith("https://") || oidcIssuer.startsWith("http://localhost") || oidcIssuer.startsWith("http://10.0.2.2")) {
                 "oidcIssuer must use HTTPS outside local development"

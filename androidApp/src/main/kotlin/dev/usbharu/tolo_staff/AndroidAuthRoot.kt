@@ -36,7 +36,17 @@ internal fun AndroidAuthRoot(
     }
     val logoutLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {}
     LaunchedEffect(Unit) { coordinator.restore() }
-    DisposableEffect(viewModel) { onDispose { viewModel.clear() } }
+    LaunchedEffect(coordinator) {
+        coordinator.refreshRequests.collect {
+            coordinator.refreshForFirebase()
+        }
+    }
+    DisposableEffect(viewModel, coordinator) {
+        onDispose {
+            viewModel.clear()
+            coordinator.close()
+        }
+    }
 
     MaterialTheme {
         if (state.phase == AuthPhase.AUTHENTICATED) {

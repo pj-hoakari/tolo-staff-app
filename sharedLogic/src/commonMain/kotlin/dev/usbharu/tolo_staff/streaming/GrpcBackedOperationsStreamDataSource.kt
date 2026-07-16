@@ -30,6 +30,7 @@ open class GrpcBackedOperationsStreamDataSource(
     private val relevantInstructionsFlows = mutableMapOf<String, MutableStateFlow<List<OperationInstruction>>>()
     private val staffObserverJobs = mutableMapOf<String, Job>()
     private var globalObserverJob: Job? = null
+    private var resyncObserverJob: Job? = null
     private var started = false
 
     override fun observePoints(): Flow<List<OperationPoint>> {
@@ -118,12 +119,21 @@ open class GrpcBackedOperationsStreamDataSource(
                 }
             }
         }
+        resyncObserverJob = scope.launch {
+            changeNotifier.observeResyncRequests().collect {
+                logger.info { "Refreshing gRPC snapshots after Firestore listener session change" }
+                refreshGlobalData()
+                staffObserverJobs.keys.forEach(::refreshStaffScopedData)
+            }
+        }
     }
 
     override fun stop() {
         logger.info { "Stopping gRPC-backed operations stream" }
         globalObserverJob?.cancel()
         globalObserverJob = null
+        resyncObserverJob?.cancel()
+        resyncObserverJob = null
         staffObserverJobs.values.forEach(Job::cancel)
         staffObserverJobs.clear()
         started = false

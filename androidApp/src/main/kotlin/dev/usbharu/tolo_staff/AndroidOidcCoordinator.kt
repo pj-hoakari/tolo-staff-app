@@ -6,8 +6,16 @@ import android.net.Uri
 import android.util.Base64
 import dev.usbharu.tolo_staff.feature.auth.AuthFailure
 import dev.usbharu.tolo_staff.feature.auth.AuthRepository
+import dev.usbharu.tolo_staff.feature.auth.AuthRefreshReason
 import dev.usbharu.tolo_staff.feature.auth.AuthTokens
 import dev.usbharu.tolo_staff.runtime.AppRuntimeConfig
+import dev.usbharu.tolo_staff.streaming.FirebaseSessionController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AppAuthConfiguration
 import net.openid.appauth.AuthorizationRequest
@@ -21,7 +29,12 @@ import net.openid.appauth.connectivity.ConnectionBuilder
 import net.openid.appauth.connectivity.DefaultConnectionBuilder
 import org.json.JSONObject
 
-internal class AndroidOidcCoordinator(context: Context, private val config: AppRuntimeConfig, private val repository: AuthRepository) {
+internal class AndroidOidcCoordinator(
+    context: Context,
+    private val config: AppRuntimeConfig,
+    private val repository: AuthRepository,
+    private val firebaseSessionController: FirebaseSessionController,
+) {
     private val issuer = Uri.parse(config.oidcIssuer)
     private val debugOriginOverride = BuildConfig.TOLO_OIDC_DEBUG_ORIGIN_OVERRIDE
         .takeIf { BuildConfig.DEBUG && it.isNotBlank() }
@@ -44,7 +57,11 @@ internal class AndroidOidcCoordinator(context: Context, private val config: AppR
         .build()
     private val service = AuthorizationService(context, appAuthConfiguration)
     private val vault = AndroidAuthVault(context)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var serviceConfiguration: AuthorizationServiceConfiguration? = null
+    private var refreshInFlight = false
+
+    val refreshRequests: Flow<AuthRefreshReason> = repository.refreshRequests
 
     fun restore() {
         val restored = vault.load()
@@ -116,19 +133,35 @@ internal class AndroidOidcCoordinator(context: Context, private val config: AppR
     }
 
     fun logout(launch: (Intent) -> Unit) {
-        val idToken = repository.currentTokens()?.idToken
-        vault.clear()
-        repository.logout()
-        val knownConfiguration = serviceConfiguration
-        if (knownConfiguration != null) {
-            launchEndSession(knownConfiguration, idToken, launch)
+        scope.launch {
+            val idToken = repository.currentTokens()?.idToken
+            firebaseSessionController.logout()
+            vault.clear()
+            repository.logout()
+            val knownConfiguration = serviceConfiguration
+            if (knownConfiguration != null) {
+                launchEndSession(knownConfiguration, idToken, launch)
+                return@launch
+            }
+            AuthorizationServiceConfiguration.fetchFromIssuer(networkIssuer, { discovered, _ ->
+                if (discovered != null) {
+                    launchEndSession(normalizeLocalOidcEndpointsForDebug(discovered, debugOriginOverride), idToken, launch)
+                }
+            }, connectionBuilder)
+        }
+    }
+
+    fun refreshForFirebase() {
+        val previous = repository.currentTokens() ?: run {
+            repository.fail(AuthFailure.SESSION_EXPIRED)
             return
         }
-        AuthorizationServiceConfiguration.fetchFromIssuer(networkIssuer, { discovered, _ ->
-            if (discovered != null) {
-                launchEndSession(normalizeLocalOidcEndpointsForDebug(discovered, debugOriginOverride), idToken, launch)
-            }
-        }, connectionBuilder)
+        refresh(previous)
+    }
+
+    fun close() {
+        scope.cancel()
+        service.dispose()
     }
 
     private fun launchEndSession(configuration: AuthorizationServiceConfiguration, idToken: String?, launch: (Intent) -> Unit) {
@@ -140,13 +173,17 @@ internal class AndroidOidcCoordinator(context: Context, private val config: AppR
     }
 
     private fun refresh(previous: AuthTokens) {
+        if (refreshInFlight) return
+        refreshInFlight = true
         val refreshToken = previous.refreshToken ?: run {
+            refreshInFlight = false
             vault.clear()
             repository.fail(AuthFailure.SESSION_EXPIRED)
             return
         }
         AuthorizationServiceConfiguration.fetchFromIssuer(networkIssuer, { discovered, error ->
             if (discovered == null || error != null) {
+                refreshInFlight = false
                 repository.fail(AuthFailure.NETWORK)
                 return@fetchFromIssuer
             }
@@ -158,12 +195,14 @@ internal class AndroidOidcCoordinator(context: Context, private val config: AppR
                 .build()
             service.performTokenRequest(request) { tenantResponse, tokenError ->
                 if (tenantResponse?.accessToken == null || tokenError != null) {
+                    refreshInFlight = false
                     vault.clear()
                     repository.fail(AuthFailure.SESSION_EXPIRED)
                     return@performTokenRequest
                 }
                 exchangeEventToken(tenantResponse.accessToken.orEmpty()) { eventResponse, eventError ->
                     if (eventResponse?.accessToken == null || eventError != null) {
+                        refreshInFlight = false
                         repository.fail(AuthFailure.TOKEN_EXCHANGE)
                         return@exchangeEventToken
                     }
@@ -179,6 +218,7 @@ internal class AndroidOidcCoordinator(context: Context, private val config: AppR
                     )
                     vault.save(refreshed)
                     repository.authenticate(refreshed)
+                    refreshInFlight = false
                 }
             }
         }, connectionBuilder)

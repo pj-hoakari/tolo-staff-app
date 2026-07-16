@@ -4,8 +4,11 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,6 +49,27 @@ class ConnectionFailureResilienceTest {
         assertEquals(2, attempts)
     }
 
+    @Test
+    fun `firestore session resync request refreshes grpc snapshots`() = runTest {
+        val remote = CountingOperationsRemoteDataSource()
+        val notifier = ResyncOperationsChangeNotifier()
+        val dataSource = GrpcBackedOperationsStreamDataSource(
+            remoteDataSource = remote,
+            changeNotifier = notifier,
+            coroutineContext = StandardTestDispatcher(testScheduler),
+        )
+
+        dataSource.observePoints()
+        runCurrent()
+        assertEquals(1, remote.pointsRequests)
+
+        notifier.resync.emit(Unit)
+        runCurrent()
+
+        assertEquals(2, remote.pointsRequests)
+        dataSource.stop()
+    }
+
     private class FailingOperationsRemoteDataSource : OperationsPollingRemoteDataSource {
         override suspend fun listPoints(): List<OperationPoint> = connectionRefused()
         override suspend fun listStaff(): List<OperationStaff> = connectionRefused()
@@ -57,5 +81,27 @@ class ConnectionFailureResilienceTest {
         override suspend fun listThreadMessages(threadId: String): List<OperationMessage> = connectionRefused()
 
         private fun connectionRefused(): Nothing = error("connection refused")
+    }
+
+    private class ResyncOperationsChangeNotifier : OperationsChangeNotifier {
+        val resync = MutableSharedFlow<Unit>()
+        override fun observeResyncRequests(): Flow<Unit> = resync
+    }
+
+    private class CountingOperationsRemoteDataSource : OperationsPollingRemoteDataSource {
+        var pointsRequests = 0
+
+        override suspend fun listPoints(): List<OperationPoint> {
+            pointsRequests += 1
+            return emptyList()
+        }
+
+        override suspend fun listStaff(): List<OperationStaff> = emptyList()
+        override suspend fun listAssignments(): List<OperationAssignment> = emptyList()
+        override suspend fun listInstructions(): List<OperationInstruction> = emptyList()
+        override suspend fun listRelevantInstructions(staffId: String): List<OperationInstruction> = emptyList()
+        override suspend fun listThreads(): List<OperationThread> = emptyList()
+        override suspend fun listMessages(): List<OperationMessage> = emptyList()
+        override suspend fun listThreadMessages(threadId: String): List<OperationMessage> = emptyList()
     }
 }

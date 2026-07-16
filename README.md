@@ -40,6 +40,17 @@ For Android Debug builds, `tolo.oidc.debugOriginOverride` controls the origin us
 
 For iOS, override the matching `TOLO_OIDC_*` values in `iosApp/Configuration/Config.local.xcconfig`. The redirect URI and registered custom scheme must exactly match the public-client registration at the IdP. The client must allow PKCE S256, token endpoint authentication method `none`, and public-client token exchange from the tenant resource to the event resource. No client secret belongs in either app.
 
+### Android Firestore configuration
+
+Android uses Firestore change heads only as invalidation notifications; current data is always fetched again through gRPC.
+
+- With `tolo.oidc.enabled=true`, the app exchanges the event access token through `FirebaseSessionService`, signs in with the returned Firebase Custom Token, and starts listeners only while the Firebase session is ready.
+- Debug builds with OIDC disabled use anonymous Firestore Emulator access. This requires development-only Firestore Rules that allow reads of the two change-head paths. Release builds reject anonymous and emulator configurations.
+- `tolo.firestoreEmulatorEnabled` and `tolo.firebaseAuthEmulatorEnabled` default to `true` only for debug builds. Their default Android emulator endpoints are `10.0.2.2:8081` and `10.0.2.2:9099`.
+- Authenticated non-emulator builds must provide `tolo.firebaseApplicationId`, `tolo.firebaseApiKey`, and `tolo.firebaseGcmSenderId`. Placeholder values are rejected at runtime.
+
+Firebase Custom Tokens and Firebase ID/refresh tokens are never stored by application code. The installation ID is a non-secret UUID stored separately and remains stable across logout.
+
 ### Running tests
 
 Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:

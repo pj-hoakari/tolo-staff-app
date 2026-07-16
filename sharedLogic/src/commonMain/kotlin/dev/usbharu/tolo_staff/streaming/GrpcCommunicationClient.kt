@@ -5,6 +5,7 @@ import dev.usbharu.tolo.communication.v1.InstructionService
 import dev.usbharu.tolo.communication.v1.MessageService
 import dev.usbharu.tolo.communication.v1.ReferenceService
 import dev.usbharu.tolo.communication.v1.ReportService
+import dev.usbharu.tolo.communication.v1.FirebaseSessionService
 import dev.usbharu.tolo.communication.v1.ThreadService
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.feature.auth.AuthGrpcClientInterceptor
@@ -40,6 +41,7 @@ class GrpcCommunicationClient(
     val threadService: ThreadService by lazy { client.withService<ThreadService>() }
     val messageService: MessageService by lazy { client.withService<MessageService>() }
     val reportService: ReportService by lazy { client.withService<ReportService>() }
+    val firebaseSessionService: FirebaseSessionService by lazy { client.withService<FirebaseSessionService>() }
 }
 
 private class MetadataCallCredentials(
