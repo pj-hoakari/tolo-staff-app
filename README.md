@@ -34,6 +34,8 @@ ToloStaff uses Authorization Code + PKCE in the system authentication UI. Androi
 - `tolo.oidc.audience`
 - `tolo.oidc.resourceBaseUrl`
 
+OIDC login is disabled by default while the IdP contract is under development. Set `tolo.oidc.enabled=true` for Android or `TOLO_OIDC_ENABLED=true` in the iOS XCConfig to enable it. When disabled, the app opens directly with `TOLO_STAFF_ID`, sends no Bearer token, and hides logout.
+
 For Android Debug builds, `tolo.oidc.debugOriginOverride` controls the origin used to reach a locally running IdP. It defaults to `http://10.0.2.2:8080` for the Android emulator. For example, use `-Ptolo.oidc.debugOriginOverride=http://192.168.1.20:8080` on a physical device. The override is applied to discovery retrieval and loopback endpoints returned by discovery; Release builds ignore it.
 
 For iOS, override the matching `TOLO_OIDC_*` values in `iosApp/Configuration/Config.local.xcconfig`. The redirect URI and registered custom scheme must exactly match the public-client registration at the IdP. The client must allow PKCE S256, token endpoint authentication method `none`, and public-client token exchange from the tenant resource to the event resource. No client secret belongs in either app.

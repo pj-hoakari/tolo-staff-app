@@ -24,6 +24,8 @@
 	<string>$(TOLO_FIRESTORE_PROJECT_ID)</string>
 	<key>ToloFirestoreDatabaseId</key>
 	<string>$(TOLO_FIRESTORE_DATABASE_ID)</string>
+	<key>ToloOidcEnabled</key>
+	<string>$(TOLO_OIDC_ENABLED)</string>
 	<key>ToloOidcIssuer</key>
 	<string>$(TOLO_OIDC_ISSUER)</string>
 	<key>ToloOidcClientId</key>

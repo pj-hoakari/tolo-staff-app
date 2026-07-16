@@ -11,6 +11,7 @@ data class AppRuntimeConfig(
     val firestorePort: Int = 8081,
     val firestoreProjectId: String = "tolo-communication-poc",
     val firestoreDatabaseId: String? = null,
+    val oidcLoginEnabled: Boolean = false,
     val oidcIssuer: String = "http://localhost:8080",
     val oidcClientId: String = "tolo-staff-mobile",
     val oidcRedirectUri: String = "dev.usbharu.tolostaff:/oauth2redirect",
@@ -24,13 +25,15 @@ data class AppRuntimeConfig(
         require(staffId.isNotBlank()) { "staffId must not be blank" }
         require(grpcHost.isNotBlank()) { "grpcHost must not be blank" }
         require(grpcPort in 1..65535) { "grpcPort must be between 1 and 65535" }
-        require(oidcIssuer.startsWith("https://") || oidcIssuer.startsWith("http://localhost") || oidcIssuer.startsWith("http://10.0.2.2")) {
-            "oidcIssuer must use HTTPS outside local development"
+        if (oidcLoginEnabled) {
+            require(oidcIssuer.startsWith("https://") || oidcIssuer.startsWith("http://localhost") || oidcIssuer.startsWith("http://10.0.2.2")) {
+                "oidcIssuer must use HTTPS outside local development"
+            }
+            require(oidcClientId.isNotBlank()) { "oidcClientId must not be blank" }
+            require(oidcRedirectUri.isNotBlank()) { "oidcRedirectUri must not be blank" }
+            require(oidcAudience.isNotBlank()) { "oidcAudience must not be blank" }
+            require(oidcResourceBaseUrl.startsWith("https://")) { "oidcResourceBaseUrl must use HTTPS" }
         }
-        require(oidcClientId.isNotBlank()) { "oidcClientId must not be blank" }
-        require(oidcRedirectUri.isNotBlank()) { "oidcRedirectUri must not be blank" }
-        require(oidcAudience.isNotBlank()) { "oidcAudience must not be blank" }
-        require(oidcResourceBaseUrl.startsWith("https://")) { "oidcResourceBaseUrl must use HTTPS" }
     }
 
     fun tenantResource(): String = "${oidcResourceBaseUrl.trimEnd('/')}/tenants/$tenantId"

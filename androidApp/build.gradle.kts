@@ -57,6 +57,7 @@ android {
         buildConfigField("int", "TOLO_FIRESTORE_PORT", project.stringProperty("tolo.firestorePort", "8081"))
         buildConfigField("String", "TOLO_FIRESTORE_PROJECT_ID", "\"${project.stringProperty("tolo.firestoreProjectId", "tolo-communication-poc")}\"")
         buildConfigField("String", "TOLO_FIRESTORE_DATABASE_ID", "\"${project.stringProperty("tolo.firestoreDatabaseId", "")}\"")
+        buildConfigField("boolean", "TOLO_OIDC_ENABLED", project.stringProperty("tolo.oidc.enabled", "false"))
         buildConfigField("String", "TOLO_OIDC_ISSUER", "\"${project.stringProperty("tolo.oidc.issuer", "http://10.0.2.2:8080")}\"")
         buildConfigField("String", "TOLO_OIDC_CLIENT_ID", "\"${project.stringProperty("tolo.oidc.clientId", "tolo-staff-mobile")}\"")
         buildConfigField("String", "TOLO_OIDC_REDIRECT_URI", "\"${project.stringProperty("tolo.oidc.redirectUri", "dev.usbharu.tolostaff:/oauth2redirect")}\"")

@@ -11,7 +11,7 @@ import dev.usbharu.tolo_staff.feature.appshell.AppShellViewModel
 @Composable
 fun ToloStaffAndroidApp(
     viewModel: AppShellViewModel = remember { KoinHelper().getAppShellViewModel() },
-    onLogout: () -> Unit = {},
+    onLogout: (() -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
 

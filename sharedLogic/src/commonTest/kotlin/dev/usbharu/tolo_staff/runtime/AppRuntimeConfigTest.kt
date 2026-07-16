@@ -7,6 +7,43 @@ import kotlin.test.assertTrue
 
 class AppRuntimeConfigTest {
     @Test
+    fun `oidc login is disabled by default`() {
+        val config = AppRuntimeConfig("tenant", "event", "staff", "localhost")
+
+        assertEquals(false, config.oidcLoginEnabled)
+    }
+
+    @Test
+    fun `disabled oidc accepts unfinished oidc configuration`() {
+        AppRuntimeConfig(
+            tenantId = "tenant",
+            eventId = "event",
+            staffId = "staff",
+            grpcHost = "localhost",
+            oidcLoginEnabled = false,
+            oidcIssuer = "",
+            oidcClientId = "",
+            oidcRedirectUri = "",
+            oidcAudience = "",
+            oidcResourceBaseUrl = "",
+        ).requireValid()
+    }
+
+    @Test
+    fun `enabled oidc rejects unfinished oidc configuration`() {
+        assertFailsWith<IllegalArgumentException> {
+            AppRuntimeConfig(
+                tenantId = "tenant",
+                eventId = "event",
+                staffId = "staff",
+                grpcHost = "localhost",
+                oidcLoginEnabled = true,
+                oidcIssuer = "",
+            ).requireValid()
+        }
+    }
+
+    @Test
     fun `valid runtime config creates fixed session context`() {
         val config = AppRuntimeConfig(
             tenantId = "tenant-1",

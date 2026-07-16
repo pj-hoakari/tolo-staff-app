@@ -1,6 +1,7 @@
 package dev.usbharu.tolo_staff.feature.auth
 
 import dev.usbharu.tolo_staff.runtime.AppSessionContext
+import dev.usbharu.tolo_staff.runtime.NoOpGrpcMetadataProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -66,6 +67,13 @@ class AuthRepositoryTest {
         assertEquals(mapOf("authorization" to "Bearer event-token"), metadata)
         assertFalse(metadata.toString().contains("tenant-token"))
         assertFalse(metadata.toString().contains("refresh-token"))
+    }
+
+    @Test
+    fun `disabled oidc metadata is empty`() = runTest {
+        repository.restore(validTokens().copy(eventExpiresAtEpochSeconds = Long.MAX_VALUE), nowEpochSeconds = 100)
+
+        assertTrue(NoOpGrpcMetadataProvider.metadata().isEmpty())
     }
 
     @Test

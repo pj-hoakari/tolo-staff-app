@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -51,6 +52,14 @@ class ToloStaffAndroidContentTest {
         composeRule.onNodeWithText("南口").assertExists()
         composeRule.onNodeWithText("到着").assertExists()
         composeRule.onAllNodesWithContentDescription("app_shell_home_map").assertCountEquals(0)
+    }
+
+    @Test
+    fun disabledOidcDoesNotExposeLogout() {
+        setTestContent()
+
+        composeRule.onAllNodesWithTag("auth_logout_button").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("auth_login_button").assertCountEquals(0)
     }
 
     @Test

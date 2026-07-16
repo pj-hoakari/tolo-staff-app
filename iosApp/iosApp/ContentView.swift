@@ -3,21 +3,29 @@ import SwiftUI
 
 @MainActor
 struct ContentView: View {
-    @State private var auth = AuthViewModelWrapper()
+    @State private var auth: AuthViewModelWrapper?
+
+    init(oidcLoginEnabled: Bool) {
+        _auth = State(initialValue: oidcLoginEnabled ? AuthViewModelWrapper() : nil)
+    }
 
     var body: some View {
         Group {
-            if auth.state.phase == .authenticated {
-                AppShellScreen(onLogout: auth.logout)
+            if let auth {
+                if auth.state.phase == .authenticated {
+                    AppShellScreen(onLogout: auth.logout)
+                } else {
+                    AuthScreen(state: auth.state, onLogin: auth.login)
+                }
             } else {
-                AuthScreen(state: auth.state, onLogin: auth.login)
+                AppShellScreen()
             }
         }
-        .task { auth.restore() }
-        .onDisappear { auth.clear() }
+        .task { auth?.restore() }
+        .onDisappear { auth?.clear() }
     }
 }
 
 #Preview {
-    AuthContentView(state: AuthUiState(phase: .signedOut, subject: nil, failure: nil))
+    ContentView(oidcLoginEnabled: false)
 }

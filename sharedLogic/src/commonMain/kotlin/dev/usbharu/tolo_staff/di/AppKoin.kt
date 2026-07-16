@@ -14,6 +14,7 @@ import dev.usbharu.tolo_staff.runtime.NoOpGrpcMetadataProvider
 import dev.usbharu.tolo_staff.runtime.toSessionContext
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.AuthenticatedCurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.FixedCurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepositoryImpl
 import org.koin.core.context.startKoin
@@ -24,9 +25,19 @@ fun coreModule(config: AppRuntimeConfig, metadataProvider: GrpcMetadataProvider)
     single { config.toSessionContext() }
     single { AuthRepository(get()) }
     single<GrpcMetadataProvider> {
-        if (metadataProvider === NoOpGrpcMetadataProvider) AuthGrpcMetadataProvider(get()) else metadataProvider
+        when {
+            !config.oidcLoginEnabled -> NoOpGrpcMetadataProvider
+            metadataProvider !== NoOpGrpcMetadataProvider -> metadataProvider
+            else -> AuthGrpcMetadataProvider(get())
+        }
     }
-    single<CurrentStaffSession> { AuthenticatedCurrentStaffSession(sessionContext = get(), dataSource = get()) }
+    single<CurrentStaffSession> {
+        if (config.oidcLoginEnabled) {
+            AuthenticatedCurrentStaffSession(sessionContext = get(), dataSource = get())
+        } else {
+            FixedCurrentStaffSession(staffId = config.staffId, dataSource = get())
+        }
+    }
     single<OperationsOverviewRepository> { OperationsOverviewRepositoryImpl(dataSource = get(), eventRepository = get()) }
     factory {
         AppShellViewModel(

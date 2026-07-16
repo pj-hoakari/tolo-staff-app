@@ -62,7 +62,7 @@ fun ToloStaffAndroidContent(
     onContactTargetSelected: (String) -> Unit = {},
     onContactDraftChanged: (String) -> Unit = {},
     onContactSendClicked: () -> Unit = {},
-    onLogout: () -> Unit = {},
+    onLogout: (() -> Unit)? = null,
 ) {
     MaterialTheme {
         val navController = rememberNavController()
@@ -156,7 +156,7 @@ fun ToloStaffAndroidContent(
                         }
                     },
                     actions = {
-                        if (isRootRoute(currentRoute)) {
+                        if (isRootRoute(currentRoute) && onLogout != null) {
                             TextButton(onClick = onLogout, modifier = Modifier.testTag("auth_logout_button")) {
                                 Text("ログアウト")
                             }

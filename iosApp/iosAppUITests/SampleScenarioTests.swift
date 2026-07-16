@@ -15,6 +15,8 @@ final class SampleScenarioTests: XCTestCase {
 
     func testFourTabNavigationKeepsNewContractScreens() {
         XCTAssertTrue(element("app_shell_placement_name").waitForExistence(timeout: 8))
+        XCTAssertFalse(element("auth_login_button").exists)
+        XCTAssertFalse(app.buttons["auth_logout_button"].exists)
         XCTAssertTrue(element("app_shell_home_event_card").waitForExistence(timeout: 3))
         XCTAssertTrue(element("app_shell_home_placement_card").waitForExistence(timeout: 3))
         XCTAssertFalse(element("app_shell_home_placement_map_card").exists)

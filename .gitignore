@@ -19,5 +19,5 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 /.gradle-local/
-/.derivedData/
+**/.derivedData/
 /.xcode-packages/

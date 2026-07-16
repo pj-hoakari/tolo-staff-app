@@ -6,6 +6,13 @@ import SharedLogic
 
 @MainActor
 final class AuthViewTests: XCTestCase {
+    func testDisabledOidcRootMatchesSnapshot() {
+        let controller = UIHostingController(rootView: ContentView(oidcLoginEnabled: false))
+        controller.overrideUserInterfaceStyle = .light
+
+        assertSnapshot(of: controller, as: .image(on: .iPhone13), named: "oidc-disabled")
+    }
+
     func testAuthStatesMatchSnapshots() {
         let states: [(String, AuthUiState)] = [
             ("restoring", AuthUiState(phase: .restoring, subject: nil, failure: nil)),

@@ -3,13 +3,17 @@ import SharedLogic
 
 @main
 struct iOSApp: App {
+    private let oidcLoginEnabled: Bool
+
     init() {
-        KoinInitializer.shared.start(config: Self.runtimeConfig)
+        let config = Self.runtimeConfig
+        oidcLoginEnabled = config.oidcLoginEnabled
+        KoinInitializer.shared.start(config: config)
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(oidcLoginEnabled: oidcLoginEnabled)
         }
     }
 
@@ -20,12 +24,18 @@ struct iOSApp: App {
         let firestoreEnabled = (info["ToloFirestoreEnabled"] as? String)
             .map { ($0 as NSString).boolValue } ?? false
         let firestoreDatabaseId = (info["ToloFirestoreDatabaseId"] as? String)?.nilIfBlank
+        let configuredOidcLoginEnabled = (info["ToloOidcEnabled"] as? String)
+            .map { ($0 as NSString).boolValue } ?? false
+#if DEBUG
+        let oidcLoginEnabled = configuredOidcLoginEnabled
+            || ProcessInfo.processInfo.arguments.contains("--uitesting-auth-flow")
+#else
+        let oidcLoginEnabled = configuredOidcLoginEnabled
+#endif
         return AppRuntimeConfig(
             tenantId: info["ToloTenantId"] as? String ?? "tenant-dev",
             eventId: info["ToloEventId"] as? String ?? "event-dev",
-            staffId: ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--uitesting") })
-                ? (info["ToloStaffId"] as? String ?? "tanaka")
-                : "unauthenticated",
+            staffId: oidcLoginEnabled ? "unauthenticated" : (info["ToloStaffId"] as? String ?? "tanaka"),
             grpcHost: info["ToloGrpcHost"] as? String ?? "127.0.0.1",
             grpcPort: port,
             firestoreEnabled: firestoreEnabled,
@@ -33,6 +43,7 @@ struct iOSApp: App {
             firestorePort: firestorePort,
             firestoreProjectId: info["ToloFirestoreProjectId"] as? String ?? "tolo-communication-poc",
             firestoreDatabaseId: firestoreDatabaseId,
+            oidcLoginEnabled: oidcLoginEnabled,
             oidcIssuer: info["ToloOidcIssuer"] as? String ?? "http://localhost:8080",
             oidcClientId: info["ToloOidcClientId"] as? String ?? "tolo-staff-mobile",
             oidcRedirectUri: info["ToloOidcRedirectUri"] as? String ?? "dev.usbharu.tolostaff:/oauth2redirect",
