@@ -23,4 +23,9 @@
     <string name="auth_login">ログイン</string>
     <string name="auth_retry">もう一度試す</string>
     <string name="auth_error">ログインを完了できませんでした。</string>
+    <string name="error_grpc_connection">サーバーに接続できません。通信環境を確認してください。</string>
+    <string name="error_firebase_connection">リアルタイム更新に接続できません。しばらくしてから再度お試しください。</string>
+    <string name="error_fatal_title">処理を完了できませんでした</string>
+    <string name="error_fatal_message">内容を確認し、もう一度操作してください。解決しない場合は管理者へお問い合わせください。</string>
+    <string name="error_confirm">確認</string>
 </resources>
