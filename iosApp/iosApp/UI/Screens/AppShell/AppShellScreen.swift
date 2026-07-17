@@ -44,7 +44,42 @@ struct AppShellScreen: View {
             onContactSendClicked: wrapper.onContactSendClicked,
             onLogout: onLogout
         )
+        .accessibilityHidden(wrapper.fatalError != nil)
+        .allowsHitTesting(wrapper.fatalError == nil)
+        .overlay(alignment: .top) {
+            if wrapper.fatalError == nil, let transientError = wrapper.transientError {
+                ErrorToastView(messageKey: transientError.messageKey)
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
+        .overlay {
+            if wrapper.fatalError != nil {
+                FatalErrorDialogView(onDismiss: wrapper.dismissFatalError)
+                    .zIndex(2)
+            }
+        }
+        .task(id: wrapper.transientError?.id) {
+            guard wrapper.transientError != nil else { return }
+            await Self.autoDismissTransientError(after: .seconds(4)) {
+                wrapper.dismissTransientError()
+            }
+        }
         .onDisappear { wrapper.clear() }
+    }
+
+    static func autoDismissTransientError(
+        after delay: Duration,
+        onElapsed: () -> Void
+    ) async {
+        do {
+            try await Task.sleep(for: delay)
+        } catch {
+            return
+        }
+
+        guard !Task.isCancelled else { return }
+        onElapsed()
     }
 }
 

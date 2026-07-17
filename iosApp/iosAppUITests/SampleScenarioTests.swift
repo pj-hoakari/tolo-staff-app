@@ -40,6 +40,49 @@ final class SampleScenarioTests: XCTestCase {
         XCTAssertFalse(app.buttons["instruction_detail_open_thread_button"].exists)
     }
 
+    func testConnectionFailureToastDoesNotBlockNavigation() {
+        app.terminate()
+        app.launchArguments = ["--uitesting", "--uitesting-error=grpc"]
+        app.launch()
+
+        let toast = element("connection_error_toast")
+        XCTAssertTrue(toast.waitForExistence(timeout: 3))
+
+        let tabs = app.tabBars.buttons
+        XCTAssertGreaterThanOrEqual(tabs.count, 4)
+        tabs.element(boundBy: 1).tap()
+        XCTAssertTrue(element("instruction_list").waitForExistence(timeout: 3))
+    }
+
+    func testFatalErrorDialogCanBeDismissed() {
+        app.terminate()
+        app.launchArguments = ["--uitesting", "--uitesting-error=fatal"]
+        app.launch()
+
+        let toast = element("connection_error_toast")
+        if toast.waitForExistence(timeout: 3) {
+            let toastDismissed = expectation(
+                for: NSPredicate(format: "exists == false"),
+                evaluatedWith: toast
+            )
+            wait(for: [toastDismissed], timeout: 5)
+        }
+
+        let dialog = element("fatal_error_dialog")
+        XCTAssertTrue(dialog.waitForExistence(timeout: 3))
+
+        let dismissButton = app.buttons.matching(identifier: "fatal_error_dismiss_button").firstMatch
+        XCTAssertTrue(dismissButton.waitForExistence(timeout: 3))
+        dismissButton.tap()
+
+        let dismissed = expectation(
+            for: NSPredicate(format: "exists == false"),
+            evaluatedWith: dialog
+        )
+        wait(for: [dismissed], timeout: 3)
+        XCTAssertTrue(element("app_shell_home_event_card").waitForExistence(timeout: 3))
+    }
+
     private func element(_ identifier: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }

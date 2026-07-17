@@ -1,6 +1,41 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "error_confirm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "確認" } }
+      }
+    },
+    "error_fatal_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Review the information and try the operation again. Contact an administrator if the problem continues." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "内容を確認し、もう一度操作してください。解決しない場合は管理者へお問い合わせください。" } }
+      }
+    },
+    "error_fatal_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The Operation Could Not Be Completed" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "処理を完了できませんでした" } }
+      }
+    },
+    "error_firebase_connection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Real-time updates are unavailable. Please try again shortly." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "リアルタイム更新に接続できません。しばらくしてから再度お試しください。" } }
+      }
+    },
+    "error_grpc_connection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The server is unavailable. Check your network connection." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "サーバーに接続できません。通信環境を確認してください。" } }
+      }
+    },
     "auth_description" : {
       "extractionState" : "manual",
       "localizations" : {

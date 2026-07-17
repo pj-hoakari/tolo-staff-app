@@ -8,13 +8,36 @@ struct iOSApp: App {
     init() {
         let config = Self.runtimeConfig
         oidcLoginEnabled = config.oidcLoginEnabled
-        KoinInitializer.shared.start(config: config)
+        KoinInitializer.shared.start(
+            config: config,
+            startupErrorScenario: Self.startupErrorScenario
+        )
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView(oidcLoginEnabled: oidcLoginEnabled)
         }
+    }
+
+    private static var startupErrorScenario: AppStartupErrorScenario {
+#if DEBUG
+        guard let value = ProcessInfo.processInfo.arguments
+            .first(where: { $0.hasPrefix("--uitesting-error=") })?
+            .split(separator: "=", maxSplits: 1)
+            .last
+        else {
+            return AppStartupErrorScenario.none
+        }
+
+        switch value {
+        case "grpc": return AppStartupErrorScenario.grpcConnection
+        case "fatal": return AppStartupErrorScenario.fatal
+        default: return AppStartupErrorScenario.none
+        }
+#else
+        return AppStartupErrorScenario.none
+#endif
     }
 
     private static var runtimeConfig: AppRuntimeConfig {
@@ -27,29 +50,55 @@ struct iOSApp: App {
         let configuredOidcLoginEnabled = (info["ToloOidcEnabled"] as? String)
             .map { ($0 as NSString).boolValue } ?? false
 #if DEBUG
+        let isDebugBuild = true
         let oidcLoginEnabled = configuredOidcLoginEnabled
             || ProcessInfo.processInfo.arguments.contains("--uitesting-auth-flow")
 #else
+        let isDebugBuild = false
         let oidcLoginEnabled = configuredOidcLoginEnabled
 #endif
+        let tenantId: String = info["ToloTenantId"] as? String ?? "tenant-dev"
+        let eventId: String = info["ToloEventId"] as? String ?? "event-dev"
+        let staffId: String = oidcLoginEnabled
+            ? "unauthenticated"
+            : (info["ToloStaffId"] as? String ?? "tanaka")
+        let grpcHost: String = info["ToloGrpcHost"] as? String ?? "127.0.0.1"
+        let firestoreHost: String = info["ToloFirestoreHost"] as? String ?? "127.0.0.1"
+        let firestoreProjectId: String = info["ToloFirestoreProjectId"] as? String ?? "tolo-communication-poc"
+        let oidcIssuer: String = info["ToloOidcIssuer"] as? String ?? "http://localhost:8080"
+        let oidcClientId: String = info["ToloOidcClientId"] as? String ?? "tolo-staff-mobile"
+        let oidcRedirectUri: String = info["ToloOidcRedirectUri"] as? String ?? "dev.usbharu.tolostaff:/oauth2redirect"
+        let oidcScopes: String = info["ToloOidcScopes"] as? String
+            ?? "openid profile offline_access tenant.read tenant.write events.read events.write"
+        let oidcAudience: String = info["ToloOidcAudience"] as? String ?? "backend-api"
+        let oidcResourceBaseUrl: String = info["ToloOidcResourceBaseUrl"] as? String ?? "https://api.example.com"
         return AppRuntimeConfig(
-            tenantId: info["ToloTenantId"] as? String ?? "tenant-dev",
-            eventId: info["ToloEventId"] as? String ?? "event-dev",
-            staffId: oidcLoginEnabled ? "unauthenticated" : (info["ToloStaffId"] as? String ?? "tanaka"),
-            grpcHost: info["ToloGrpcHost"] as? String ?? "127.0.0.1",
+            tenantId: tenantId,
+            eventId: eventId,
+            staffId: staffId,
+            grpcHost: grpcHost,
             grpcPort: port,
             firestoreEnabled: firestoreEnabled,
-            firestoreHost: info["ToloFirestoreHost"] as? String ?? "127.0.0.1",
+            firestoreHost: firestoreHost,
             firestorePort: firestorePort,
-            firestoreProjectId: info["ToloFirestoreProjectId"] as? String ?? "tolo-communication-poc",
+            firestoreProjectId: firestoreProjectId,
             firestoreDatabaseId: firestoreDatabaseId,
+            firestoreAccessMode: .disabled,
+            firestoreEmulatorEnabled: false,
+            firebaseAuthEmulatorEnabled: false,
+            firebaseAuthHost: "127.0.0.1",
+            firebaseAuthPort: 9099,
+            firebaseApplicationId: "",
+            firebaseApiKey: "",
+            firebaseGcmSenderId: "",
+            isDebugBuild: isDebugBuild,
             oidcLoginEnabled: oidcLoginEnabled,
-            oidcIssuer: info["ToloOidcIssuer"] as? String ?? "http://localhost:8080",
-            oidcClientId: info["ToloOidcClientId"] as? String ?? "tolo-staff-mobile",
-            oidcRedirectUri: info["ToloOidcRedirectUri"] as? String ?? "dev.usbharu.tolostaff:/oauth2redirect",
-            oidcScopes: info["ToloOidcScopes"] as? String ?? "openid profile offline_access tenant.read tenant.write events.read events.write",
-            oidcAudience: info["ToloOidcAudience"] as? String ?? "backend-api",
-            oidcResourceBaseUrl: info["ToloOidcResourceBaseUrl"] as? String ?? "https://api.example.com"
+            oidcIssuer: oidcIssuer,
+            oidcClientId: oidcClientId,
+            oidcRedirectUri: oidcRedirectUri,
+            oidcScopes: oidcScopes,
+            oidcAudience: oidcAudience,
+            oidcResourceBaseUrl: oidcResourceBaseUrl
         )
     }
 }

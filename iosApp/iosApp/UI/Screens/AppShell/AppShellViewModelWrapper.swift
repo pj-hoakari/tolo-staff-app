@@ -6,14 +6,17 @@ import SharedLogic
 @Observable
 final class AppShellViewModelWrapper {
     var state: AppShellUiState
+    var transientError: TransientErrorPresentation?
+    var fatalError: FatalErrorPresentation?
 
     private let viewModel: AppShellViewModel
     private var stateJob: Kotlinx_coroutines_coreJob?
+    private var effectJob: Kotlinx_coroutines_coreJob?
 
     init(viewModel: AppShellViewModel = KoinHelper().getAppShellViewModel()) {
         self.viewModel = viewModel
         guard let initialState = viewModel.uiState.value else {
-            fatalError("AppShellViewModel.uiState.value was unexpectedly nil")
+            Swift.fatalError("AppShellViewModel.uiState.value was unexpectedly nil")
         }
         self.state = initialState
 
@@ -23,6 +26,25 @@ final class AppShellViewModelWrapper {
                 self?.state = state
             }
         }
+
+        self.effectJob = viewModel.observeEffect { [weak self] effect in
+            guard let effect else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if effect.presentation == .transient {
+                    let key = effect.source == .firebase
+                        ? "error_firebase_connection"
+                        : "error_grpc_connection"
+                    self.transientError = TransientErrorPresentation(
+                        messageKey: key,
+                        eventId: effect.eventId
+                    )
+                } else {
+                    self.fatalError = FatalErrorPresentation(eventId: effect.eventId)
+                }
+            }
+        }
+        viewModel.onErrorPresentationReady()
     }
 
     func onTabSelected(_ tab: AppTab) {
@@ -109,8 +131,21 @@ final class AppShellViewModelWrapper {
         viewModel.onContactSendClicked()
     }
 
+    func dismissTransientError() {
+        guard let transientError else { return }
+        self.transientError = nil
+        viewModel.acknowledgeError(eventId: transientError.eventId)
+    }
+
+    func dismissFatalError() {
+        guard let fatalError else { return }
+        self.fatalError = nil
+        viewModel.acknowledgeError(eventId: fatalError.eventId)
+    }
+
     func clear() {
         stateJob?.cancel(cause: nil)
+        effectJob?.cancel(cause: nil)
         viewModel.clear()
     }
 }

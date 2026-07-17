@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E77000000000000000000001 /* AppErrorPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E77000000000000000000002 /* AppErrorPresentationTests.swift */; };
 		4C752CF1AE70B2C9D87C4687 /* SampleViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB5D137909EDF0D079A67484 /* SampleViewTests.swift */; };
 		D1A000000000000000000004 /* AuthViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000000000000000000005 /* AuthViewTests.swift */; };
 		D1A000000000000000000006 /* AuthScenarioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000000000000000000007 /* AuthScenarioTests.swift */; };
@@ -35,6 +36,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		E77000000000000000000002 /* AppErrorPresentationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppErrorPresentationTests.swift; sourceTree = "<group>"; };
 		0073F0E8E76CA354F137CAF9 /* ToloStaff.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ToloStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		51B008725EAF92AF2A9D7475 /* SampleScenarioTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleScenarioTests.swift; sourceTree = "<group>"; };
 		A1B02FCD6153D5B2F515CF70 /* iosAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -111,6 +113,7 @@
 		414E40024131703FF4FC36DE /* iosAppTests */ = {
 			isa = PBXGroup;
 			children = (
+				E77000000000000000000002 /* AppErrorPresentationTests.swift */,
 				D1A000000000000000000005 /* AuthViewTests.swift */,
 				CB5D137909EDF0D079A67484 /* SampleViewTests.swift */,
 			);
@@ -322,6 +325,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E77000000000000000000001 /* AppErrorPresentationTests.swift in Sources */,
 				D1A000000000000000000004 /* AuthViewTests.swift in Sources */,
 				4C752CF1AE70B2C9D87C4687 /* SampleViewTests.swift in Sources */,
 			);
