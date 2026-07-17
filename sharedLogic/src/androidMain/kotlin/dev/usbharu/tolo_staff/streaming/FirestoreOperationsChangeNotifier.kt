@@ -1,11 +1,15 @@
 package dev.usbharu.tolo_staff.streaming
 
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.app
 import dev.gitlive.firebase.firestore.DocumentSnapshot
 import dev.gitlive.firebase.firestore.FirebaseFirestore
 import dev.gitlive.firebase.firestore.firestore
 import dev.usbharu.tolo_staff.logging.AppLogger
+import dev.usbharu.tolo_staff.error.AppErrorReporter
+import dev.usbharu.tolo_staff.error.AppErrorSource
 import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +33,7 @@ class FirestoreOperationsChangeNotifier(
     private val config: OperationsStreamingConfig = defaultOperationsStreamingConfig(),
     private val session: AppSessionContext,
     private val firebaseSessionController: FirebaseSessionController,
+    private val errorReporter: AppErrorReporter,
     private val firestoreFactory: () -> FirebaseFirestore = {
         Firebase.firestore(Firebase.app, config.databaseId)
     },
@@ -36,6 +41,7 @@ class FirestoreOperationsChangeNotifier(
     private val logger = AppLogger.withTag("FirestoreOperationsChangeNotifier")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val staffFlows = mutableMapOf<String, Flow<OperationsChangeHead>>()
+    private val permissionRecoveryTracker = FirestorePermissionRecoveryTracker()
 
     private val globalFlow: Flow<OperationsChangeHead> by lazy {
         observeDocument(
@@ -73,8 +79,9 @@ class FirestoreOperationsChangeNotifier(
         collectionName: String,
         documentId: String,
         requiredStaffId: String?,
-    ): Flow<OperationsChangeHead> =
-        firebaseSessionController.state
+    ): Flow<OperationsChangeHead> {
+        val connectionKey = listenerConnectionKey(collectionName, documentId)
+        return firebaseSessionController.state
             .map { state ->
                 state.takeIf {
                     it.isReady &&
@@ -86,16 +93,19 @@ class FirestoreOperationsChangeNotifier(
             .distinctUntilChanged()
             .flatMapLatest { generation ->
                 if (generation == null) {
+                    errorReporter.reportBackendRecovered(AppErrorSource.FIREBASE, connectionKey)
                     emptyFlow()
                 } else {
-                    observeReadyDocument(collectionName, documentId, generation)
+                    observeReadyDocument(collectionName, documentId, generation, connectionKey)
                 }
             }
+    }
 
     private fun observeReadyDocument(
         collectionName: String,
         documentId: String,
         generation: Long,
+        connectionKey: String,
     ): Flow<OperationsChangeHead> {
         var lastVersion = INITIAL_VERSION
         val firestore = firestoreFactory()
@@ -109,7 +119,11 @@ class FirestoreOperationsChangeNotifier(
             .collection(collectionName)
             .document(documentId)
             .snapshots
-            .map { snapshot -> snapshot.toOperationsChangeHead() }
+            .map { snapshot ->
+                permissionRecoveryTracker.recordSuccess(connectionKey)
+                errorReporter.reportBackendRecovered(AppErrorSource.FIREBASE, connectionKey)
+                snapshot.toOperationsChangeHead()
+            }
             .mapNotNull { change ->
                 if (change.version <= lastVersion) {
                     logger.debug {
@@ -123,13 +137,36 @@ class FirestoreOperationsChangeNotifier(
                 }
             }
             .retryWhen { throwable, attempt ->
-                if (throwable.isPermissionDenied()) {
+                if (throwable.firestoreListenerFailureKind() == FirestoreListenerFailureKind.PERMISSION_DENIED) {
                     logger.warn(throwable) {
                         "Firestore permission denied: collection=$collectionName, documentId=$documentId, generation=$generation"
                     }
-                    firebaseSessionController.recoverFromPermissionDenied()
+                    if (permissionRecoveryTracker.shouldAttemptRecovery(connectionKey)) {
+                        val recoveryAccepted = firebaseSessionController.recoverFromPermissionDenied()
+                        if (!recoveryAccepted) {
+                            errorReporter.reportBackendFailure(
+                                source = AppErrorSource.FIREBASE,
+                                throwable = throwable,
+                                operation = "Observe Firestore change-head listener without an available session recovery",
+                                connectionKey = connectionKey,
+                            )
+                        }
+                    } else {
+                        errorReporter.reportBackendFailure(
+                            source = AppErrorSource.FIREBASE,
+                            throwable = throwable,
+                            operation = "Observe Firestore change-head listener after session recovery",
+                            connectionKey = connectionKey,
+                        )
+                    }
                     false
-                } else if (throwable.isTransientListenerFailure()) {
+                } else if (throwable.firestoreListenerFailureKind() == FirestoreListenerFailureKind.TRANSIENT) {
+                    errorReporter.reportConnectionFailure(
+                        source = AppErrorSource.FIREBASE,
+                        throwable = throwable,
+                        operation = "Observe Firestore change-head listener",
+                        connectionKey = connectionKey,
+                    )
                     val backoff = min(MAX_RETRY_MILLIS, BASE_RETRY_MILLIS shl attempt.coerceAtMost(4).toInt())
                     logger.debug {
                         "Retrying Firestore listener: collection=$collectionName, documentId=$documentId, " +
@@ -142,6 +179,14 @@ class FirestoreOperationsChangeNotifier(
                 }
             }
             .catch { throwable ->
+                if (throwable.firestoreListenerFailureKind() != FirestoreListenerFailureKind.PERMISSION_DENIED) {
+                    errorReporter.reportBackendFailure(
+                        source = AppErrorSource.FIREBASE,
+                        throwable = throwable,
+                        operation = "Observe Firestore change-head listener",
+                        connectionKey = connectionKey,
+                    )
+                }
                 logger.warn(throwable) {
                     "Firestore listener stopped: collection=$collectionName, documentId=$documentId, generation=$generation"
                 }
@@ -169,14 +214,6 @@ class FirestoreOperationsChangeNotifier(
             ?: runCatching { get<Double?>(fieldName)?.toLong() }.getOrNull()
             ?: 0L
 
-    private fun Throwable.isPermissionDenied(): Boolean =
-        "${this::class.simpleName}:$message".contains("PERMISSION_DENIED", ignoreCase = true)
-
-    private fun Throwable.isTransientListenerFailure(): Boolean {
-        val value = "${this::class.simpleName}:$message".uppercase()
-        return TRANSIENT_FAILURE_NAMES.any(value::contains)
-    }
-
     private companion object {
         const val STAFF_CHANGE_HEADS_COLLECTION = "operations_change_heads"
         const val GLOBAL_CHANGE_HEADS_COLLECTION = "operations_global_change_heads"
@@ -187,17 +224,56 @@ class FirestoreOperationsChangeNotifier(
         const val STOP_TIMEOUT_MILLIS = 5_000L
         const val BASE_RETRY_MILLIS = 500L
         const val MAX_RETRY_MILLIS = 10_000L
-        val TRANSIENT_FAILURE_NAMES = listOf(
-            "UNAVAILABLE",
-            "DEADLINE_EXCEEDED",
-            "RESOURCE_EXHAUSTED",
-            "ABORTED",
-            "INTERNAL",
-            "NETWORK",
-            "IOEXCEPTION",
-        )
     }
 }
+
+internal enum class FirestoreListenerFailureKind {
+    PERMISSION_DENIED,
+    TRANSIENT,
+    FATAL,
+}
+
+internal class FirestorePermissionRecoveryTracker {
+    private val attemptedConnectionKeys = mutableSetOf<String>()
+
+    fun shouldAttemptRecovery(connectionKey: String): Boolean = synchronized(attemptedConnectionKeys) {
+        attemptedConnectionKeys.add(connectionKey)
+    }
+
+    fun recordSuccess(connectionKey: String) {
+        synchronized(attemptedConnectionKeys) {
+            attemptedConnectionKeys.remove(connectionKey)
+        }
+    }
+}
+
+internal fun Throwable.firestoreListenerFailureKind(): FirestoreListenerFailureKind {
+    val causes = generateSequence<Throwable>(this) { it.cause }.toList()
+    val firestoreCodeValue = causes.filterIsInstance<FirebaseFirestoreException>()
+        .firstOrNull()
+        ?.code
+        ?.value()
+    return firestoreListenerFailureKind(
+        firestoreCodeValue = firestoreCodeValue,
+        hasNetworkCause = causes.any { it is FirebaseNetworkException },
+    )
+}
+
+internal fun firestoreListenerFailureKind(
+    firestoreCodeValue: Int?,
+    hasNetworkCause: Boolean = false,
+): FirestoreListenerFailureKind = when {
+    firestoreCodeValue == FIRESTORE_PERMISSION_DENIED -> FirestoreListenerFailureKind.PERMISSION_DENIED
+    hasNetworkCause || firestoreCodeValue in TRANSIENT_FIRESTORE_CODE_VALUES ->
+        FirestoreListenerFailureKind.TRANSIENT
+    else -> FirestoreListenerFailureKind.FATAL
+}
+
+private const val FIRESTORE_PERMISSION_DENIED = 7
+private val TRANSIENT_FIRESTORE_CODE_VALUES = setOf(4, 8, 10, 13, 14)
+
+internal fun listenerConnectionKey(collectionName: String, documentId: String): String =
+    "firestore.change-listener:$collectionName:$documentId"
 
 internal fun eventScopedChangeHeadPath(
     session: AppSessionContext,

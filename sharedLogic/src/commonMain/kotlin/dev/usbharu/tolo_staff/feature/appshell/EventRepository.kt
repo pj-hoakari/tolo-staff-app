@@ -5,6 +5,8 @@ import dev.usbharu.tolo.communication.v1.Event
 import dev.usbharu.tolo.communication.v1.GetEventRequest
 import dev.usbharu.tolo.communication.v1.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
+import dev.usbharu.tolo_staff.error.AppErrorReporter
+import dev.usbharu.tolo_staff.error.AppErrorSource
 import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
 import dev.usbharu.tolo_staff.streaming.toProtoScope
@@ -36,6 +38,7 @@ class NoOpEventRepository : EventRepository {
 class GrpcEventRepository(
     private val grpcClient: GrpcCommunicationClient,
     private val session: AppSessionContext,
+    private val errorReporter: AppErrorReporter = AppErrorReporter(),
 ) : EventRepository {
     private val logger = AppLogger.withTag("GrpcEventRepository")
 
@@ -45,13 +48,25 @@ class GrpcEventRepository(
                 GetEventRequest { scope = session.toProtoScope() }
             ).toOperationEvent()
         }.getOrElse { error ->
-            logger.warn(error) { "Failed to fetch current event via gRPC; falling back to default" }
+            errorReporter.reportBackendFailure(
+                AppErrorSource.GRPC,
+                error,
+                "Fetch current event via gRPC while falling back to default",
+                CURRENT_EVENT_CONNECTION_KEY,
+            )
             OperationEvent()
+        }
+        if (event.eventId.isNotBlank()) {
+            errorReporter.reportBackendRecovered(AppErrorSource.GRPC, CURRENT_EVENT_CONNECTION_KEY)
         }
         logger.debug {
             "Fetched current event via gRPC: eventId=${event.eventId}, name=${event.name}, venue=${event.venueName}"
         }
         emit(event)
+    }
+
+    private companion object {
+        const val CURRENT_EVENT_CONNECTION_KEY = "reference.current-event"
     }
 }
 

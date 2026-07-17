@@ -5,12 +5,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlin.coroutines.CoroutineContext
 
 abstract class StateEffectViewModel<S, E>(
@@ -25,21 +27,22 @@ abstract class StateEffectViewModel<S, E>(
     protected val currentState: S
         get() = _uiState.value
 
-    private val effects = MutableSharedFlow<E>(extraBufferCapacity = 16)
+    private val effects = Channel<E>(Channel.UNLIMITED)
+    val effectFlow: Flow<E> = effects.receiveAsFlow()
 
     protected fun updateState(reducer: (S) -> S) {
         _uiState.value = reducer(_uiState.value)
     }
 
     protected fun sendEffect(effect: E) {
-        effects.tryEmit(effect)
+        check(effects.trySend(effect).isSuccess) { "View model effect queue is closed" }
     }
 
     fun observeUiState(onChange: (S) -> Unit): Job =
         uiState.onEach(onChange).launchIn(viewModelScope)
 
     fun observeEffect(onChange: (E) -> Unit): Job =
-        effects.onEach(onChange).launchIn(viewModelScope)
+        effectFlow.onEach(onChange).launchIn(viewModelScope)
 
     open fun clear() {
         viewModelScope.cancel()

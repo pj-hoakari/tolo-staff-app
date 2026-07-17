@@ -1,10 +1,13 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
+import dev.usbharu.tolo_staff.error.AppErrorReporter
+import dev.usbharu.tolo_staff.error.AppErrorSource
+import dev.usbharu.tolo_staff.error.AppStartupErrorInjector
+import dev.usbharu.tolo_staff.error.NoOpAppStartupErrorInjector
 import dev.usbharu.tolo_staff.feature.contactchat.ChatThreadTarget
 import dev.usbharu.tolo_staff.feature.contactchat.ChatThreadTargetKind
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.NoOpContactChatService
-import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.NoOpOperationsStreamDataSource
@@ -31,13 +34,15 @@ class AppShellViewModel(
     private val currentStaffSession: CurrentStaffSession = MockCurrentStaffSession(),
     private val reportRepository: ReportRepository = NoOpReportRepository(),
     private val assignmentStatusService: AssignmentStatusService = NoOpAssignmentStatusService(),
+    private val errorReporter: AppErrorReporter = AppErrorReporter(),
+    private val startupErrorInjector: AppStartupErrorInjector = NoOpAppStartupErrorInjector,
     coroutineContext: CoroutineContext = Dispatchers.Default,
-) : StateEffectViewModel<AppShellUiState, Unit>(AppShellUiState(), coroutineContext) {
-    private val logger = AppLogger.withTag("AppShellViewModel")
+) : StateEffectViewModel<AppShellUiState, AppShellEffect>(AppShellUiState(), coroutineContext) {
     private var sessionJob: Job? = null
     private var overviewJob: Job? = null
     private var featureJob: Job? = null
     private var reportJob: Job? = null
+    private var errorJob: Job? = null
     private var observedStaffId: String? = null
     private var instructionDetails = emptyMap<String, InstructionDetailUiModel>()
     private var contactDetails = emptyMap<String, ContactThreadDetailUiModel>()
@@ -46,6 +51,9 @@ class AppShellViewModel(
     private var assignments = emptyList<OperationAssignment>()
 
     init {
+        errorJob = errorReporter.events
+            .onEach { sendEffect(AppShellEffect(it.source, it.presentation, it.eventId)) }
+            .launchIn(viewModelScope)
         sessionJob = combine(currentStaffSession.currentStaff, currentStaffSession.isReady) { current, ready -> current to ready }
             .onEach { (current, ready) ->
                 updateState {
@@ -64,6 +72,10 @@ class AppShellViewModel(
 
     fun onTabSelected(tab: AppTab) = updateState { it.copy(selectedTab = tab) }
 
+    fun acknowledgeError(eventId: Long) = errorReporter.acknowledge(eventId)
+
+    fun onErrorPresentationReady() = startupErrorInjector.inject(errorReporter)
+
     fun onHomeInstructionSelected() {
         currentState.homeOverview.currentInstructionId?.let(::onInstructionSelected)
         updateState { it.copy(selectedTab = AppTab.INSTRUCTIONS) }
@@ -75,6 +87,7 @@ class AppShellViewModel(
         viewModelScope.launch {
             runCatching { assignmentStatusService.activate(id, placement.expectedVersion) }
                 .onSuccess {
+                    errorReporter.reportBackendRecovered(AppErrorSource.GRPC, "app-shell.assignment.activate")
                     updateState { state ->
                         state.copy(
                             homeOverview = state.homeOverview.copy(
@@ -89,7 +102,7 @@ class AppShellViewModel(
                         )
                     }
                 }
-                .onFailure(::showError)
+                .onFailure { showError(it, "app-shell.assignment.activate", "Activate assignment") }
         }
     }
 
@@ -148,6 +161,7 @@ class AppShellViewModel(
             runCatching {
                 reportRepository.submit(type.id.toReportCategory(), reportState.draft.urgencyLabel.toReportSeverity(), pointId, description)
             }.onSuccess { report ->
+                errorReporter.reportBackendRecovered(AppErrorSource.GRPC, "app-shell.report.submit")
                 val ui = report.toUiModel(currentState.currentStaff.staffId, points, staff)
                 updateState { state ->
                     state.copy(
@@ -162,7 +176,8 @@ class AppShellViewModel(
                     )
                 }
             }.onFailure { error ->
-                updateState { it.copy(reportsTab = it.reportsTab.copy(isLoadingReports = false, reportsErrorMessage = error.message)) }
+                updateState { it.copy(reportsTab = it.reportsTab.copy(isLoadingReports = false, reportsErrorMessage = null)) }
+                showError(error, "app-shell.report.submit", "Submit report")
             }
         }
     }
@@ -218,6 +233,7 @@ class AppShellViewModel(
                     )
                 )
             }.onSuccess { room ->
+                errorReporter.reportBackendRecovered(AppErrorSource.GRPC, "app-shell.contact.create-thread")
                 val detail = ContactThreadDetailUiModel(room.id, room.title, target)
                 contactDetails = contactDetails + (room.id to detail)
                 updateState { state ->
@@ -228,7 +244,7 @@ class AppShellViewModel(
                         selectedTargetType = null,
                     ))
                 }
-            }.onFailure(::showError)
+            }.onFailure { showError(it, "app-shell.contact.create-thread", "Create contact thread") }
         }
     }
 
@@ -244,11 +260,15 @@ class AppShellViewModel(
         updateState { it.copy(contactsTab = it.contactsTab.copy(selectedThread = selected.copy(draftMessage = ""))) }
         viewModelScope.launch {
             runCatching { contactChatService.sendMessage(selected.id, body) }
+                .onSuccess {
+                    errorReporter.reportBackendRecovered(AppErrorSource.GRPC, "app-shell.contact.send-message")
+                }
                 .onFailure { error ->
                     updateState { state -> state.copy(
                         contactsTab = state.contactsTab.copy(selectedThread = state.contactsTab.selectedThread?.copy(draftMessage = body)),
-                        errorMessage = error.message,
+                        errorMessage = null,
                     ) }
+                    showError(error, "app-shell.contact.send-message", "Send contact message")
                 }
         }
     }
@@ -257,10 +277,13 @@ class AppShellViewModel(
         overviewJob?.cancel()
         featureJob?.cancel()
         overviewJob = overviewRepository.observeOverview(staffId)
-            .onEach { projection -> updateState {
-                it.copy(homeOverview = projection.homeOverview.copy(unreadContactCount = it.contactsTab.threads.sumOf { t -> t.unreadCount }), currentPlacementName = projection.currentPlacementName)
-            } }
-            .catch { showError(it) }
+            .onEach { projection ->
+                errorReporter.reportBackendRecovered(AppErrorSource.GRPC, "app-shell.overview")
+                updateState {
+                    it.copy(homeOverview = projection.homeOverview.copy(unreadContactCount = it.contactsTab.threads.sumOf { t -> t.unreadCount }), currentPlacementName = projection.currentPlacementName)
+                }
+            }
+            .catch { showError(it, "app-shell.overview", "Observe app overview") }
             .launchIn(viewModelScope)
 
         featureJob = combine(
@@ -272,6 +295,7 @@ class AppShellViewModel(
             dataSource.observeMessages(staffId),
         ) { values -> values }
             .onEach { values ->
+                errorReporter.reportBackendRecovered(AppErrorSource.GRPC, "app-shell.features")
                 @Suppress("UNCHECKED_CAST")
                 points = values[0] as List<OperationPoint>
                 @Suppress("UNCHECKED_CAST")
@@ -305,7 +329,7 @@ class AppShellViewModel(
                 ) }
                 observeReports(staffId)
             }
-            .catch { showError(it) }
+            .catch { showError(it, "app-shell.features", "Observe app features") }
             .launchIn(viewModelScope)
     }
 
@@ -313,20 +337,26 @@ class AppShellViewModel(
         val assignedPoints = assignments.assignedPointIds(staffId)
         reportJob?.cancel()
         reportJob = reportRepository.observeRelevantReports(staffId, assignedPoints)
-            .onEach { reports -> updateState { state -> state.copy(
-                reportsTab = state.reportsTab.copy(
-                    relatedReports = reports.map { it.toUiModel(staffId, points, staff) },
-                    isLoadingReports = false,
-                    reportsErrorMessage = null,
-                )
-            ) } }
-            .catch { error -> updateState { it.copy(reportsTab = it.reportsTab.copy(isLoadingReports = false, reportsErrorMessage = error.message)) } }
+            .onEach { reports ->
+                errorReporter.reportBackendRecovered(AppErrorSource.GRPC, "app-shell.reports")
+                updateState { state -> state.copy(
+                    reportsTab = state.reportsTab.copy(
+                        relatedReports = reports.map { it.toUiModel(staffId, points, staff) },
+                        isLoadingReports = false,
+                        reportsErrorMessage = null,
+                    )
+                ) }
+            }
+            .catch { error ->
+                updateState { it.copy(reportsTab = it.reportsTab.copy(isLoadingReports = false, reportsErrorMessage = null)) }
+                showError(error, "app-shell.reports", "Observe reports")
+            }
             .launchIn(viewModelScope)
     }
 
-    private fun showError(error: Throwable) {
-        logger.warn(error) { "App shell operation failed" }
-        updateState { it.copy(isLoading = false, errorMessage = error.message ?: "処理に失敗しました") }
+    private fun showError(error: Throwable, connectionKey: String, operation: String) {
+        updateState { it.copy(isLoading = false, errorMessage = null) }
+        errorReporter.reportBackendFailure(AppErrorSource.GRPC, error, operation, connectionKey)
     }
 
     override fun clear() {
@@ -334,6 +364,7 @@ class AppShellViewModel(
         overviewJob?.cancel()
         featureJob?.cancel()
         reportJob?.cancel()
+        errorJob?.cancel()
         super.clear()
     }
 }

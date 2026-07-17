@@ -1,5 +1,6 @@
 package dev.usbharu.tolo_staff.feature.contactchat
 
+import dev.usbharu.tolo_staff.error.AppErrorReporter
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.OperationsPollingConfig
 import dev.usbharu.tolo_staff.streaming.OperationsPollingRemoteDataSource
@@ -20,14 +21,15 @@ class PollingContactChatService(
     private val config: OperationsPollingConfig = defaultOperationsPollingConfig(),
     grpcClient: GrpcCommunicationClient,
     session: AppSessionContext,
+    errorReporter: AppErrorReporter = AppErrorReporter(),
 ) : ContactChatService {
     private val logger = AppLogger.withTag("PollingContactChatService")
     private val writer = GrpcContactChatWriter(grpcClient = grpcClient, session = session)
-    private val pollingFactory = SharedPollingFlowFactory(config.intervalMillis)
-    private val staffFlow by lazy { pollingFactory.create { remoteDataSource.listStaff() } }
-    private val threadsFlow by lazy { pollingFactory.create { remoteDataSource.listThreads() } }
+    private val pollingFactory = SharedPollingFlowFactory(config.intervalMillis, errorReporter)
+    private val staffFlow by lazy { pollingFactory.create("contact-chat.staff") { remoteDataSource.listStaff() } }
+    private val threadsFlow by lazy { pollingFactory.create("contact-chat.threads") { remoteDataSource.listThreads() } }
     private val messagesFlow by lazy {
-        pollingFactory.create { remoteDataSource.listMessages().sortedOperationMessages() }
+        pollingFactory.create("contact-chat.messages") { remoteDataSource.listMessages().sortedOperationMessages() }
     }
     private val roomMessagesFlows = mutableMapOf<String, Flow<List<OperationMessage>>>()
 
@@ -82,6 +84,8 @@ class PollingContactChatService(
     private fun roomMessagesFlow(roomId: String): Flow<List<OperationMessage>> =
         roomMessagesFlows.getOrPut(roomId) {
             logger.debug { "Creating room messages flow: roomId=$roomId" }
-            pollingFactory.create { remoteDataSource.listThreadMessages(roomId).sortedOperationMessages() }
+            pollingFactory.create("contact-chat.room-messages:$roomId") {
+                remoteDataSource.listThreadMessages(roomId).sortedOperationMessages()
+            }
         }
 }

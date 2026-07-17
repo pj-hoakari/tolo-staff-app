@@ -3,6 +3,9 @@ package dev.usbharu.tolo_staff.streaming
 import dev.usbharu.tolo_staff.feature.auth.AuthRefreshReason
 import dev.usbharu.tolo_staff.feature.auth.AuthRepository
 import dev.usbharu.tolo_staff.feature.auth.validTokens
+import dev.usbharu.tolo_staff.error.AppErrorPresentation
+import dev.usbharu.tolo_staff.error.AppErrorReporter
+import dev.usbharu.tolo_staff.error.AppErrorSource
 import dev.usbharu.tolo_staff.runtime.AppRuntimeConfig
 import dev.usbharu.tolo_staff.runtime.AppSessionContext
 import dev.usbharu.tolo_staff.runtime.FirestoreAccessMode
@@ -11,6 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -70,6 +74,35 @@ class FirebaseSessionControllerTest {
     }
 
     @Test
+    fun `transient Firebase sign in failure emits connection event and successful retry recovers`() = runTest {
+        val fixture = fixture(
+            signInFailures = 1,
+            signInFailure = FirebaseSessionOperationException(
+                FirebaseSessionFailure.UNAVAILABLE,
+                IllegalStateException("offline"),
+            ),
+        )
+
+        fixture.authRepository.authenticate(validTokens())
+        runCurrent()
+
+        assertEquals(FirebaseSessionPhase.READY, fixture.controller.state.value.phase)
+        val first = fixture.errorReporter.events.first()
+        assertEquals(AppErrorSource.FIREBASE, first.source)
+        assertEquals(AppErrorPresentation.TRANSIENT, first.presentation)
+        fixture.errorReporter.acknowledge(first.eventId)
+
+        fixture.errorReporter.reportConnectionFailure(
+            AppErrorSource.FIREBASE,
+            operation = "Reconnect Firebase",
+            connectionKey = "firebase.session",
+        )
+        val afterRecovery = fixture.errorReporter.events.first()
+        assertTrue(afterRecovery.eventId > first.eventId)
+        fixture.errorReporter.acknowledge(afterRecovery.eventId)
+    }
+
+    @Test
     fun `grant refresh leaves ready and requests oidc refresh`() = runTest {
         val fixture = fixture(grantExpiresAt = 1_120)
         val request = async { fixture.authRepository.refreshRequests.first() }
@@ -100,6 +133,66 @@ class FirebaseSessionControllerTest {
 
         assertEquals(FirebaseSessionPhase.READY, fixture.controller.state.value.phase)
         assertEquals(0, fixture.broker.exchangeCount)
+    }
+
+    @Test
+    fun `permission recovery is rejected in debug anonymous mode`() = runTest {
+        val fixture = fixture(
+            config = baseConfig().copy(
+                oidcLoginEnabled = false,
+                firestoreAccessMode = FirestoreAccessMode.DEBUG_EMULATOR_ANONYMOUS,
+                firestoreEmulatorEnabled = true,
+                isDebugBuild = true,
+            )
+        )
+        runCurrent()
+        assertEquals(FirebaseSessionPhase.READY, fixture.controller.state.value.phase)
+
+        assertFalse(fixture.controller.recoverFromPermissionDenied())
+        assertEquals(FirebaseSessionPhase.READY, fixture.controller.state.value.phase)
+    }
+
+    @Test
+    fun `permission recovery is rejected while authenticated session is not ready`() = runTest {
+        val fixture = fixture()
+        runCurrent()
+        assertEquals(FirebaseSessionPhase.SIGNED_OUT, fixture.controller.state.value.phase)
+
+        assertFalse(fixture.controller.recoverFromPermissionDenied())
+        assertEquals(FirebaseSessionPhase.SIGNED_OUT, fixture.controller.state.value.phase)
+    }
+
+    @Test
+    fun `permission recovery is accepted for ready authenticated session`() = runTest {
+        val fixture = fixture()
+        fixture.authRepository.authenticate(validTokens())
+        runCurrent()
+        assertEquals(FirebaseSessionPhase.READY, fixture.controller.state.value.phase)
+
+        assertTrue(fixture.controller.recoverFromPermissionDenied())
+        assertEquals(FirebaseSessionPhase.REFRESHING, fixture.controller.state.value.phase)
+    }
+
+    @Test
+    fun `concurrent listeners share an in flight permission recovery`() = runTest {
+        val fixture = fixture()
+        fixture.authRepository.authenticate(validTokens())
+        runCurrent()
+        val firstRequest = async(UnconfinedTestDispatcher(testScheduler)) {
+            fixture.authRepository.refreshRequests.first()
+        }
+
+        assertTrue(fixture.controller.recoverFromPermissionDenied())
+        assertEquals(AuthRefreshReason.FIRESTORE_PERMISSION_DENIED, firstRequest.await())
+
+        val unexpectedSecondRequest = async(UnconfinedTestDispatcher(testScheduler)) {
+            fixture.authRepository.refreshRequests.first()
+        }
+        assertTrue(fixture.controller.recoverFromPermissionDenied())
+        runCurrent()
+        assertFalse(unexpectedSecondRequest.isCompleted)
+        unexpectedSecondRequest.cancel()
+        assertEquals(FirebaseSessionPhase.REFRESHING, fixture.controller.state.value.phase)
     }
 
     @Test
@@ -141,13 +234,15 @@ class FirebaseSessionControllerTest {
         config: AppRuntimeConfig = baseConfig(),
         gatewayUid: String = "firebase-user",
         signInFailures: Int = 0,
+        signInFailure: Throwable = IllegalStateException("sign-in failed"),
         grantExpiresAt: Long = 4_600,
         revokeFailure: Throwable? = null,
     ): Fixture {
         val session = AppSessionContext("tenant-a", "event-1", "fallback")
         val authRepository = AuthRepository(session)
         val broker = FakeBroker(grantExpiresAt, revokeFailure)
-        val gateway = FakeGateway(gatewayUid, signInFailures)
+        val gateway = FakeGateway(gatewayUid, signInFailures, signInFailure)
+        val errorReporter = AppErrorReporter()
         val controller = FirebaseSessionController(
             config = config,
             session = session,
@@ -155,11 +250,12 @@ class FirebaseSessionControllerTest {
             broker = broker,
             authGateway = gateway,
             installationIdProvider = InstallationIdProvider { "installation-1" },
+            errorReporter = errorReporter,
             coroutineContext = StandardTestDispatcher(testScheduler),
             nowEpochSeconds = { 1_000 },
             randomJitterMillis = { 0 },
         )
-        return Fixture(authRepository, broker, gateway, controller)
+        return Fixture(authRepository, broker, gateway, controller, errorReporter)
     }
 
     private fun baseConfig() = AppRuntimeConfig(
@@ -183,6 +279,7 @@ class FirebaseSessionControllerTest {
         val broker: FakeBroker,
         val gateway: FakeGateway,
         val controller: FirebaseSessionController,
+        val errorReporter: AppErrorReporter,
     )
 
     private class FakeBroker(
@@ -214,6 +311,7 @@ class FirebaseSessionControllerTest {
     private class FakeGateway(
         private val uid: String,
         private var remainingSignInFailures: Int,
+        private val signInFailure: Throwable,
     ) : FirebaseAuthGateway {
         var signOutCount = 0
         var signInCount = 0
@@ -222,7 +320,7 @@ class FirebaseSessionControllerTest {
             signInCount += 1
             if (remainingSignInFailures > 0) {
                 remainingSignInFailures -= 1
-                error("sign-in failed")
+                throw signInFailure
             }
             return FirebaseSignInResult(uid)
         }

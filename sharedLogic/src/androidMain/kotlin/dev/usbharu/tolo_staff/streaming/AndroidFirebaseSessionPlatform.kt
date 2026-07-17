@@ -1,6 +1,9 @@
 package dev.usbharu.tolo_staff.streaming
 
 import android.content.Context
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
+import com.google.firebase.auth.FirebaseAuthException
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.app
 import dev.gitlive.firebase.auth.FirebaseAuth
@@ -11,7 +14,12 @@ class AndroidFirebaseAuthGateway(
     private val auth: FirebaseAuth = Firebase.auth(Firebase.app),
 ) : FirebaseAuthGateway {
     override suspend fun signInWithCustomToken(customToken: String): FirebaseSignInResult {
-        val result = auth.signInWithCustomToken(customToken)
+        val result = try {
+            auth.signInWithCustomToken(customToken)
+        } catch (throwable: Throwable) {
+            val failure = throwable.firebaseSessionFailureOrNull() ?: throw throwable
+            throw FirebaseSessionOperationException(failure, throwable)
+        }
         val uid = result.user?.uid ?: error("Firebase Custom Token sign-in returned no user")
         return FirebaseSignInResult(uid)
     }
@@ -22,6 +30,27 @@ class AndroidFirebaseAuthGateway(
         auth.signOut()
     }
 }
+
+internal fun Throwable.firebaseSessionFailureOrNull(): FirebaseSessionFailure? =
+    generateSequence<Throwable>(this) { it.cause }
+        .mapNotNull { cause ->
+            when (cause) {
+                is FirebaseNetworkException -> FirebaseSessionFailure.UNAVAILABLE
+
+                is FirebaseTooManyRequestsException -> FirebaseSessionFailure.RESOURCE_EXHAUSTED
+                is FirebaseAuthException -> firebaseAuthFailureForCode(cause.errorCode)
+
+                else -> null
+            }
+        }
+        .firstOrNull()
+
+internal fun firebaseAuthFailureForCode(errorCode: String): FirebaseSessionFailure? =
+    when (errorCode) {
+        "ERROR_NETWORK_REQUEST_FAILED" -> FirebaseSessionFailure.UNAVAILABLE
+        "ERROR_TOO_MANY_REQUESTS" -> FirebaseSessionFailure.RESOURCE_EXHAUSTED
+        else -> null
+    }
 
 class AndroidInstallationIdProvider(
     context: Context = AndroidFirebasePlatformRuntime.applicationContext,

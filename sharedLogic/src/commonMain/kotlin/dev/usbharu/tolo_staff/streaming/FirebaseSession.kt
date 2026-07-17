@@ -8,6 +8,8 @@ import dev.usbharu.tolo.communication.v1.invoke
 import dev.usbharu.tolo_staff.feature.auth.AuthPhase
 import dev.usbharu.tolo_staff.feature.auth.AuthRefreshReason
 import dev.usbharu.tolo_staff.feature.auth.AuthRepository
+import dev.usbharu.tolo_staff.error.AppErrorReporter
+import dev.usbharu.tolo_staff.error.AppErrorSource
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.runtime.AppRuntimeConfig
 import dev.usbharu.tolo_staff.runtime.AppSessionContext
@@ -28,6 +30,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.rpc.grpc.GrpcStatusCode
+import kotlinx.rpc.grpc.GrpcStatusException
+import kotlinx.rpc.grpc.status
+import kotlinx.rpc.grpc.statusCode
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.min
 import kotlin.random.Random
@@ -52,6 +58,11 @@ enum class FirebaseSessionFailure {
     SIGN_IN,
     UNKNOWN,
 }
+
+internal class FirebaseSessionOperationException(
+    val failure: FirebaseSessionFailure,
+    cause: Throwable,
+) : Exception("Firebase operation failed: $failure", cause)
 
 data class FirebaseSessionState(
     val phase: FirebaseSessionPhase,
@@ -165,6 +176,7 @@ class FirebaseSessionController(
     private val broker: FirebaseSessionBroker,
     private val authGateway: FirebaseAuthGateway,
     private val installationIdProvider: InstallationIdProvider,
+    private val errorReporter: AppErrorReporter = AppErrorReporter(),
     coroutineContext: CoroutineContext = Dispatchers.Default,
     private val nowEpochSeconds: () -> Long = { Clock.System.now().epochSeconds },
     private val randomJitterMillis: (Long) -> Long = { upper -> if (upper <= 0) 0 else Random.nextLong(upper) },
@@ -229,14 +241,27 @@ class FirebaseSessionController(
         isForeground.value = false
     }
 
-    fun recoverFromPermissionDenied() {
+    suspend fun recoverFromPermissionDenied(): Boolean = mutex.withLock {
+        if (config.firestoreAccessMode != FirestoreAccessMode.AUTHENTICATED) return@withLock false
         val current = state.value
-        if (!current.isReady || config.firestoreAccessMode != FirestoreAccessMode.AUTHENTICATED) return
-        if (permissionRecoveryGeneration == current.generation) return
+        if (permissionRecoveryGeneration == current.generation) return@withLock true
+        if (!current.isReady || permissionRecoveryGeneration != null) return@withLock false
         permissionRecoveryGeneration = current.generation
         logger.warn { "Firestore permission denied; requesting one Firebase session recovery: generation=${current.generation}" }
         leaveReady(FirebaseSessionPhase.REFRESHING)
-        requestOidcRefresh(AuthRefreshReason.FIRESTORE_PERMISSION_DENIED)
+        if (!authRepository.requestRefresh(AuthRefreshReason.FIRESTORE_PERMISSION_DENIED)) {
+            logger.warn { "Firestore permission recovery request could not be queued" }
+            transition(
+                state.value.copy(
+                    phase = FirebaseSessionPhase.ERROR,
+                    failure = FirebaseSessionFailure.UNAUTHENTICATED,
+                    retryCount = 0,
+                )
+            )
+            permissionRecoveryGeneration = null
+            return@withLock false
+        }
+        true
     }
 
     suspend fun logout() {
@@ -313,12 +338,25 @@ class FirebaseSessionController(
                     } catch (cancellation: CancellationException) {
                         throw cancellation
                     } catch (throwable: Throwable) {
-                        logger.warn {
+                        val failure = classifyFailure(throwable).let { classified ->
+                            if (classified == FirebaseSessionFailure.UNKNOWN) FirebaseSessionFailure.SIGN_IN else classified
+                        }
+                        logger.warn(throwable) {
                             "Firebase Custom Token sign-in failed: attempt=$signInAttempt, " +
-                                "exception=${throwable::class.simpleName}"
+                                "failure=$failure, exception=${throwable::class.simpleName}"
+                        }
+                        if (failure == FirebaseSessionFailure.UNAVAILABLE ||
+                            failure == FirebaseSessionFailure.RESOURCE_EXHAUSTED
+                        ) {
+                            errorReporter.reportConnectionFailure(
+                                source = AppErrorSource.FIREBASE,
+                                throwable = throwable,
+                                operation = "Firebase Custom Token sign-in: attempt=$signInAttempt",
+                                connectionKey = FIREBASE_SESSION_CONNECTION_KEY,
+                            )
                         }
                         if (signInAttempt == MAX_SIGN_IN_ATTEMPTS) {
-                            fail(FirebaseSessionFailure.SIGN_IN, signInAttempt - 1)
+                            fail(failure, signInAttempt - 1)
                             return@withLock
                         }
                         continue
@@ -350,6 +388,7 @@ class FirebaseSessionController(
                         grantExpiresAtEpochSeconds = grant.grantExpiresAtEpochSeconds,
                     )
                 )
+                errorReporter.reportBackendRecovered(AppErrorSource.FIREBASE, FIREBASE_SESSION_CONNECTION_KEY)
                 scheduleRefresh(grant.grantExpiresAtEpochSeconds)
             }
         }
@@ -421,6 +460,21 @@ class FirebaseSessionController(
 
     private fun fail(failure: FirebaseSessionFailure, retryCount: Int) {
         refreshJob?.cancel()
+        val operation = "Establish Firebase session: failure=$failure, retryCount=$retryCount"
+        if (failure == FirebaseSessionFailure.UNAVAILABLE || failure == FirebaseSessionFailure.RESOURCE_EXHAUSTED) {
+            errorReporter.reportConnectionFailure(
+                source = AppErrorSource.FIREBASE,
+                operation = operation,
+                connectionKey = FIREBASE_SESSION_CONNECTION_KEY,
+            )
+        } else {
+            errorReporter.reportBackendFailure(
+                AppErrorSource.FIREBASE,
+                IllegalStateException("Firebase session failure: $failure"),
+                operation,
+                FIREBASE_SESSION_CONNECTION_KEY,
+            )
+        }
         transition(state.value.copy(phase = FirebaseSessionPhase.ERROR, failure = failure, retryCount = retryCount))
     }
 
@@ -436,12 +490,20 @@ class FirebaseSessionController(
     }
 
     private fun classifyFailure(throwable: Throwable): FirebaseSessionFailure {
-        val value = "${throwable::class.simpleName}:${throwable.message}".uppercase()
-        return when {
-            "UNAUTHENTICATED" in value -> FirebaseSessionFailure.UNAUTHENTICATED
-            "PERMISSION_DENIED" in value -> FirebaseSessionFailure.PERMISSION_DENIED
-            "RESOURCE_EXHAUSTED" in value -> FirebaseSessionFailure.RESOURCE_EXHAUSTED
-            "UNAVAILABLE" in value -> FirebaseSessionFailure.UNAVAILABLE
+        val failures = generateSequence<Throwable>(throwable) { it.cause }
+        failures.filterIsInstance<FirebaseSessionOperationException>()
+            .firstOrNull()
+            ?.let { return it.failure }
+        val grpcStatus = generateSequence<Throwable>(throwable) { it.cause }
+            .filterIsInstance<GrpcStatusException>()
+            .firstOrNull()
+            ?.status
+            ?.statusCode
+        return when (grpcStatus) {
+            GrpcStatusCode.UNAUTHENTICATED -> FirebaseSessionFailure.UNAUTHENTICATED
+            GrpcStatusCode.PERMISSION_DENIED -> FirebaseSessionFailure.PERMISSION_DENIED
+            GrpcStatusCode.RESOURCE_EXHAUSTED -> FirebaseSessionFailure.RESOURCE_EXHAUSTED
+            GrpcStatusCode.UNAVAILABLE, GrpcStatusCode.DEADLINE_EXCEEDED -> FirebaseSessionFailure.UNAVAILABLE
             else -> FirebaseSessionFailure.UNKNOWN
         }
     }
@@ -452,6 +514,7 @@ class FirebaseSessionController(
         const val MAX_SIGN_IN_ATTEMPTS = 2
         const val BASE_BACKOFF_MILLIS = 500L
         const val MAX_BACKOFF_MILLIS = 5_000L
+        const val FIREBASE_SESSION_CONNECTION_KEY = "firebase.session"
     }
 }
 

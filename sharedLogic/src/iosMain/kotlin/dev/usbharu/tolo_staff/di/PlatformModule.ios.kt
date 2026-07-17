@@ -27,10 +27,10 @@ actual fun platformModule(): Module = module {
         GrpcCommunicationClient(config.grpcHost, config.grpcPort, get<GrpcMetadataProvider>(), get<AuthRepository>())
     }
     single<ReportRepository> { GrpcReportRepository(get(), get(), pollingIntervalMillis = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>().intervalMillis) }
-    single<EventRepository> { GrpcEventRepository(get(), get()) }
+    single<EventRepository> { GrpcEventRepository(get(), get(), get()) }
     single<AssignmentStatusService> { GrpcAssignmentStatusService(get(), get()) }
     single { GrpcOperationsPollingRemoteDataSource(get(), get()) }
     single<OperationsPollingRemoteDataSource> { get<GrpcOperationsPollingRemoteDataSource>() }
-    single<OperationsStreamDataSource> { PollingOperationsStreamDataSource(get(), get()) }
+    single<OperationsStreamDataSource> { PollingOperationsStreamDataSource(get(), get(), get()) }
     single<ContactChatService> { GrpcContactChatService(get(), get(), get()) }
 }

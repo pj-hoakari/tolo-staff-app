@@ -142,7 +142,7 @@ class ContactChatViewModel(
                 updateState { state ->
                     state.copy(
                         isSending = false,
-                        errorMessage = throwable.message ?: "メッセージ送信に失敗しました",
+                        errorMessage = "メッセージ送信に失敗しました",
                     )
                 }
             }
@@ -183,7 +183,7 @@ class ContactChatViewModel(
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        errorMessage = throwable.message ?: "チャット一覧の購読に失敗しました",
+                        errorMessage = "チャット一覧の購読に失敗しました",
                     )
                 }
             }
@@ -213,7 +213,7 @@ class ContactChatViewModel(
                         isLoading = false,
                         isRefreshing = false,
                         isSending = false,
-                        errorMessage = throwable.message ?: "チャットの読み込みに失敗しました",
+                        errorMessage = "チャットの読み込みに失敗しました",
                     )
                 }
             }

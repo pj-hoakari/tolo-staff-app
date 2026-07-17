@@ -37,7 +37,7 @@ class ConnectionFailureResilienceTest {
     @Test
     fun `polling emits an empty snapshot then retries after a connection failure`() = runTest {
         var attempts = 0
-        val snapshots = SharedPollingFlowFactory(intervalMillis = 1).create {
+        val snapshots = SharedPollingFlowFactory(intervalMillis = 1).create("test.polling") {
             attempts += 1
             if (attempts == 1) {
                 error("connection refused")

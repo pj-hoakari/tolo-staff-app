@@ -1,5 +1,7 @@
 package dev.usbharu.tolo_staff.streaming
 
+import dev.usbharu.tolo_staff.error.AppErrorReporter
+import dev.usbharu.tolo_staff.error.AppErrorSource
 import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +19,7 @@ import kotlin.coroutines.CoroutineContext
 open class GrpcBackedOperationsStreamDataSource(
     private val remoteDataSource: OperationsPollingRemoteDataSource,
     private val changeNotifier: OperationsChangeNotifier = NoOpOperationsChangeNotifier(),
+    private val errorReporter: AppErrorReporter = AppErrorReporter(),
     coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : OperationsStreamDataSource {
     private val logger = AppLogger.withTag("GrpcBackedOperationsStreamDataSource")
@@ -234,14 +237,19 @@ open class GrpcBackedOperationsStreamDataSource(
         target: String,
         refresh: suspend () -> Unit,
     ) {
+        val connectionKey = "operations.refresh:$target"
         try {
             refresh()
+            errorReporter.reportBackendRecovered(AppErrorSource.GRPC, connectionKey)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (throwable: Throwable) {
-            logger.warn(throwable) {
-                "Failed to refresh $target; keeping the last available data"
-            }
+            errorReporter.reportBackendFailure(
+                AppErrorSource.GRPC,
+                throwable,
+                "Refresh $target while keeping the last available data",
+                connectionKey,
+            )
         }
     }
 

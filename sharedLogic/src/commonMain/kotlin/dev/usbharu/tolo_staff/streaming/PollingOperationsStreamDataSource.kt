@@ -1,21 +1,27 @@
 package dev.usbharu.tolo_staff.streaming
 
+import dev.usbharu.tolo_staff.error.AppErrorReporter
 import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.coroutines.flow.Flow
 
 class PollingOperationsStreamDataSource(
     private val remoteDataSource: OperationsPollingRemoteDataSource,
     private val config: OperationsPollingConfig = defaultOperationsPollingConfig(),
+    errorReporter: AppErrorReporter = AppErrorReporter(),
 ) : OperationsStreamDataSource {
     private val logger = AppLogger.withTag("PollingOperationsStreamDataSource")
-    private val pollingFactory = SharedPollingFlowFactory(config.intervalMillis)
-    private val pointsFlow by lazy { pollingFactory.create { remoteDataSource.listPoints() } }
-    private val staffFlow by lazy { pollingFactory.create { remoteDataSource.listStaff() } }
-    private val assignmentsFlow by lazy { pollingFactory.create { remoteDataSource.listAssignments() } }
-    private val instructionsFlow by lazy { pollingFactory.create { remoteDataSource.listInstructions() } }
-    private val threadsFlow by lazy { pollingFactory.create { remoteDataSource.listThreads() } }
+    private val pollingFactory = SharedPollingFlowFactory(config.intervalMillis, errorReporter)
+    private val pointsFlow by lazy { pollingFactory.create("operations.points") { remoteDataSource.listPoints() } }
+    private val staffFlow by lazy { pollingFactory.create("operations.staff") { remoteDataSource.listStaff() } }
+    private val assignmentsFlow by lazy {
+        pollingFactory.create("operations.assignments") { remoteDataSource.listAssignments() }
+    }
+    private val instructionsFlow by lazy {
+        pollingFactory.create("operations.instructions") { remoteDataSource.listInstructions() }
+    }
+    private val threadsFlow by lazy { pollingFactory.create("operations.threads") { remoteDataSource.listThreads() } }
     private val messagesFlow by lazy {
-        pollingFactory.create {
+        pollingFactory.create("operations.messages") {
             remoteDataSource.listMessages().sortedOperationMessages()
         }
     }
@@ -32,7 +38,9 @@ class PollingOperationsStreamDataSource(
     override fun observeRelevantInstructions(currentStaffId: String): Flow<List<OperationInstruction>> =
         relevantInstructionsFlows.getOrPut(currentStaffId) {
             logger.info { "Creating relevant instructions flow: currentStaffId=$currentStaffId" }
-            pollingFactory.create { remoteDataSource.listRelevantInstructions(currentStaffId) }
+            pollingFactory.create("operations.relevant-instructions:$currentStaffId") {
+                remoteDataSource.listRelevantInstructions(currentStaffId)
+            }
         }
 
     override fun observeThreads(): Flow<List<OperationThread>> = threadsFlow

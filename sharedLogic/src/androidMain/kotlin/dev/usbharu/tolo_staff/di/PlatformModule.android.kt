@@ -60,6 +60,7 @@ actual fun platformModule(): Module = module {
             broker = get(),
             authGateway = get(),
             installationIdProvider = get(),
+            errorReporter = get(),
         )
     }
     single<OperationsChangeNotifier> {
@@ -67,16 +68,18 @@ actual fun platformModule(): Module = module {
             config = get(),
             session = get<AppSessionContext>(),
             firebaseSessionController = get<FirebaseSessionController>(),
+            errorReporter = get(),
         )
     }
     single<ReportRepository> { GrpcReportRepository(get(), get(), changeNotifier = get()) }
-    single<EventRepository> { GrpcEventRepository(get(), get()) }
+    single<EventRepository> { GrpcEventRepository(get(), get(), get()) }
     single<AssignmentStatusService> { GrpcAssignmentStatusService(get(), get()) }
     single<OperationsStreamDataSource> {
         FirestoreOperationsStreamDataSource(
             grpcClient = get(),
             session = get(),
             changeNotifier = get(),
+            errorReporter = get(),
         )
     }
     single<ContactChatService> { GrpcContactChatService(get(), get(), get()) }

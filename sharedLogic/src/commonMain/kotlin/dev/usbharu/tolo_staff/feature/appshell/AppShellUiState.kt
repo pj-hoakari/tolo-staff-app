@@ -1,6 +1,14 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
 import dev.usbharu.tolo_staff.streaming.unknownCurrentStaffMember
+import dev.usbharu.tolo_staff.error.AppErrorPresentation
+import dev.usbharu.tolo_staff.error.AppErrorSource
+
+data class AppShellEffect(
+    val source: AppErrorSource,
+    val presentation: AppErrorPresentation,
+    val eventId: Long,
+)
 
 data class AppShellUiState(
     val homeOverview: AppShellHomeOverview = AppShellHomeOverview(),
