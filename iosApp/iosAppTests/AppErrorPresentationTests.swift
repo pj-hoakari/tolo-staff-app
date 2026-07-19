@@ -19,6 +19,7 @@ final class AppErrorPresentationTests: XCTestCase {
         let view = ErrorToastView(messageKey: "error_grpc_connection")
             .frame(width: 390, height: 160, alignment: .top)
             .background(Color(.systemBackground))
+            .environment(\.locale, Locale(identifier: "ja"))
 
         assertSnapshot(
             of: view,

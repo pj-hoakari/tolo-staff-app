@@ -102,7 +102,14 @@ class AppShellViewModel(
                         )
                     }
                 }
-                .onFailure { showError(it, "app-shell.assignment.activate", "Activate assignment") }
+                .onFailure {
+                    showError(
+                        it,
+                        "app-shell.assignment.activate",
+                        "Activate assignment",
+                        deduplicateFatalUntilRecovery = false,
+                    )
+                }
         }
     }
 
@@ -177,7 +184,12 @@ class AppShellViewModel(
                 }
             }.onFailure { error ->
                 updateState { it.copy(reportsTab = it.reportsTab.copy(isLoadingReports = false, reportsErrorMessage = null)) }
-                showError(error, "app-shell.report.submit", "Submit report")
+                showError(
+                    error,
+                    "app-shell.report.submit",
+                    "Submit report",
+                    deduplicateFatalUntilRecovery = false,
+                )
             }
         }
     }
@@ -244,7 +256,14 @@ class AppShellViewModel(
                         selectedTargetType = null,
                     ))
                 }
-            }.onFailure { showError(it, "app-shell.contact.create-thread", "Create contact thread") }
+            }.onFailure {
+                showError(
+                    it,
+                    "app-shell.contact.create-thread",
+                    "Create contact thread",
+                    deduplicateFatalUntilRecovery = false,
+                )
+            }
         }
     }
 
@@ -268,7 +287,12 @@ class AppShellViewModel(
                         contactsTab = state.contactsTab.copy(selectedThread = state.contactsTab.selectedThread?.copy(draftMessage = body)),
                         errorMessage = null,
                     ) }
-                    showError(error, "app-shell.contact.send-message", "Send contact message")
+                    showError(
+                        error,
+                        "app-shell.contact.send-message",
+                        "Send contact message",
+                        deduplicateFatalUntilRecovery = false,
+                    )
                 }
         }
     }
@@ -354,9 +378,20 @@ class AppShellViewModel(
             .launchIn(viewModelScope)
     }
 
-    private fun showError(error: Throwable, connectionKey: String, operation: String) {
+    private fun showError(
+        error: Throwable,
+        connectionKey: String,
+        operation: String,
+        deduplicateFatalUntilRecovery: Boolean = true,
+    ) {
         updateState { it.copy(isLoading = false, errorMessage = null) }
-        errorReporter.reportBackendFailure(AppErrorSource.GRPC, error, operation, connectionKey)
+        errorReporter.reportBackendFailure(
+            source = AppErrorSource.GRPC,
+            throwable = error,
+            operation = operation,
+            connectionKey = connectionKey,
+            deduplicateFatalUntilRecovery = deduplicateFatalUntilRecovery,
+        )
     }
 
     override fun clear() {

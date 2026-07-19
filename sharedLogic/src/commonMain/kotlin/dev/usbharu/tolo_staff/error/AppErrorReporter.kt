@@ -2,6 +2,7 @@ package dev.usbharu.tolo_staff.error
 
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.logging.LogLevel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -104,11 +105,17 @@ class AppErrorReporter {
         throwable: Throwable,
         operation: String,
         connectionKey: String = operation,
+        deduplicateFatalUntilRecovery: Boolean = true,
     ) {
+        if (throwable is CancellationException) throw throwable
         if (throwable.isConnectionFailure()) {
             reportConnectionFailure(source, throwable, operation, connectionKey)
         } else {
-            reportFatal(throwable, operation, backendFailureKey(source, connectionKey))
+            reportFatal(
+                throwable = throwable,
+                operation = operation,
+                failureKey = backendFailureKey(source, connectionKey).takeIf { deduplicateFatalUntilRecovery },
+            )
         }
     }
 

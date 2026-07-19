@@ -1,6 +1,7 @@
 package dev.usbharu.tolo_staff.error
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -11,6 +12,7 @@ import kotlinx.rpc.grpc.asException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -118,6 +120,55 @@ class AppErrorReporterTest {
         val afterRecovery = reporter.events.first()
         assertEquals(AppErrorPresentation.DIALOG, afterRecovery.presentation)
         reporter.acknowledge(afterRecovery.eventId)
+    }
+
+    @Test
+    fun `user action fatal failure can be reported again after acknowledgement`() = runTest {
+        val reporter = AppErrorReporter()
+        val failure = GrpcStatusCode.INVALID_ARGUMENT.asException()
+
+        reporter.reportBackendFailure(
+            source = AppErrorSource.GRPC,
+            throwable = failure,
+            operation = "Submit report",
+            connectionKey = "report.submit",
+            deduplicateFatalUntilRecovery = false,
+        )
+        val first = reporter.events.first()
+        reporter.acknowledge(first.eventId)
+
+        reporter.reportBackendFailure(
+            source = AppErrorSource.GRPC,
+            throwable = failure,
+            operation = "Submit report",
+            connectionKey = "report.submit",
+            deduplicateFatalUntilRecovery = false,
+        )
+        val retried = reporter.events.first()
+
+        assertTrue(retried.eventId > first.eventId)
+        assertEquals(AppErrorPresentation.DIALOG, retried.presentation)
+        reporter.acknowledge(retried.eventId)
+    }
+
+    @Test
+    fun `coroutine cancellation is rethrown without emitting an error event`() = runTest {
+        val reporter = AppErrorReporter()
+
+        assertFailsWith<CancellationException> {
+            reporter.reportBackendFailure(
+                source = AppErrorSource.GRPC,
+                throwable = CancellationException("view model cleared"),
+                operation = "Submit report",
+                connectionKey = "report.submit",
+                deduplicateFatalUntilRecovery = false,
+            )
+        }
+
+        val unexpected = async(UnconfinedTestDispatcher(testScheduler)) { reporter.events.first() }
+        runCurrent()
+        assertFalse(unexpected.isCompleted)
+        unexpected.cancel()
     }
 
     @Test
