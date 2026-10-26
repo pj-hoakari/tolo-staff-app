@@ -1,17 +1,13 @@
 package dev.usbharu.tolo_staff.streaming
 
-import dev.usbharu.tolo.communication.grpc.AssignmentRpc
-import dev.usbharu.tolo.communication.grpc.ChangeHeadRpc
-import dev.usbharu.tolo.communication.grpc.EventRpc
-import dev.usbharu.tolo.communication.grpc.InstructionRpc
-import dev.usbharu.tolo.communication.grpc.MessageRpc
-import dev.usbharu.tolo.communication.grpc.PointRpc
-import dev.usbharu.tolo.communication.grpc.ReportRpc
-import dev.usbharu.tolo.communication.grpc.StaffRpc
-import dev.usbharu.tolo.communication.grpc.ThreadRpc
 import dev.usbharu.tolo_staff.logging.AppLogger
 import kotlinx.rpc.grpc.client.GrpcClient
 import kotlinx.rpc.withService
+import tolo.operation.v1.DeliveryCoordinationService
+import tolo.operation.v1.DigestService
+import tolo.operation.v1.OperationControlService
+import tolo.operation.v1.StaffCommunicationService
+import tolo.realtime.v1.RealtimeFetchService
 
 class GrpcCommunicationClient(
     host: String,
@@ -26,13 +22,19 @@ class GrpcCommunicationClient(
         logger.info { "Configured gRPC client: host=$host, port=$port" }
     }
 
-    val pointService: PointRpc by lazy { client.withService<PointRpc>() }
-    val staffService: StaffRpc by lazy { client.withService<StaffRpc>() }
-    val assignmentService: AssignmentRpc by lazy { client.withService<AssignmentRpc>() }
-    val instructionService: InstructionRpc by lazy { client.withService<InstructionRpc>() }
-    val threadService: ThreadRpc by lazy { client.withService<ThreadRpc>() }
-    val messageService: MessageRpc by lazy { client.withService<MessageRpc>() }
-    val reportService: ReportRpc by lazy { client.withService<ReportRpc>() }
-    val eventService: EventRpc by lazy { client.withService<EventRpc>() }
-    val changeHeadService: ChangeHeadRpc by lazy { client.withService<ChangeHeadRpc>() }
+    val staffCommunicationService: StaffCommunicationService by lazy {
+        client.withService<StaffCommunicationService>()
+    }
+    val operationControlService: OperationControlService by lazy {
+        client.withService<OperationControlService>()
+    }
+    val deliveryCoordinationService: DeliveryCoordinationService by lazy {
+        client.withService<DeliveryCoordinationService>()
+    }
+    val digestService: DigestService by lazy {
+        client.withService<DigestService>()
+    }
+    val realtimeFetchService: RealtimeFetchService by lazy {
+        client.withService<RealtimeFetchService>()
+    }
 }

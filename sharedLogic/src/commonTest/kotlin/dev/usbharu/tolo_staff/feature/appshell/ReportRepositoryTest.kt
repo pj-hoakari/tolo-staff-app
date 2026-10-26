@@ -1,6 +1,5 @@
 package dev.usbharu.tolo_staff.feature.appshell
 
-import dev.usbharu.tolo.communication.grpc.ReportPriority
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,22 +72,6 @@ class ReportRepositoryTest {
         assertEquals("2026-06-22T00:00:00Z", report.createdAtLabel)
     }
 
-    @Test
-    fun `create report request leaves server owned ids unset`() {
-        val request = buildCreateReportRequest(
-            currentStaffId = "tanaka",
-            title = "導線報告",
-            summary = "列整理を継続中",
-            priorityLabel = "高",
-        )
-
-        assertEquals("", request.report.reportId)
-        assertEquals("", request.report.threadId)
-        assertEquals("tanaka", request.report.staffId)
-        assertEquals("導線報告", request.report.title)
-        assertEquals("列整理を継続中", request.report.description)
-        assertEquals(ReportPriority.REPORT_PRIORITY_HIGH, request.report.priority)
-    }
 
     @Test
     fun `grpc report repository surfaces submission failures`() = runTest {

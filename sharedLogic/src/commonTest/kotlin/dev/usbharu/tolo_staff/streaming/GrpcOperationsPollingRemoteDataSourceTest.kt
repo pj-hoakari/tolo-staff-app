@@ -2,49 +2,86 @@ package dev.usbharu.tolo_staff.streaming
 
 import com.google.protobuf.kotlin.Timestamp
 import com.google.protobuf.kotlin.invoke
-import dev.usbharu.tolo.communication.grpc.Message
-import dev.usbharu.tolo.communication.grpc.SimpleMessagePayload
-import dev.usbharu.tolo.communication.grpc.Thread
-import dev.usbharu.tolo.communication.grpc.invoke
 import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import tolo.operation.v1.Audience
+import tolo.operation.v1.Reassignment
+import tolo.operation.v1.ReassignmentStatus
+import tolo.operation.v1.StaffMessage
+import tolo.operation.v1.invoke
 
 class GrpcOperationsPollingRemoteDataSourceTest {
     @Test
-    fun `thread mapping keeps proto display title`() {
-        val thread = Thread {
-            threadId = "thread-1"
-            memberStaffIds = listOf("tanaka", "sato")
-            displayTitle = "Aゲート連絡"
+    fun `reassignment maps directed status to pending assignment`() {
+        val reassignment = Reassignment {
+            reassignmentId = "reassignment-1"
+            eventId = "event-1"
+            staffUserId = "tanaka"
+            status = ReassignmentStatus.REASSIGNMENT_STATUS_DIRECTED
+            target = Reassignment.Target.ObservationPointId("point-1")
         }
 
-        val mapped = thread.toOperationThread()
+        val mapped = reassignment.toOperationAssignment()
 
-        assertEquals("Aゲート連絡", mapped.displayTitle)
-        assertEquals(listOf("tanaka", "sato"), mapped.members)
+        assertEquals("reassignment-1", mapped.assignId)
+        assertEquals("tanaka", mapped.staffId)
+        assertEquals("point-1", mapped.pointId)
+        assertEquals(OperationAssignmentStatus.PENDING, mapped.status)
     }
 
     @Test
-    fun `message mapping uses created at as iso updatedAt`() {
-        val message = Message {
+    fun `reassignment maps applied status to active assignment`() {
+        val reassignment = Reassignment {
+            reassignmentId = "reassignment-2"
+            staffUserId = "tanaka"
+            status = ReassignmentStatus.REASSIGNMENT_STATUS_APPLIED
+            target = Reassignment.Target.GatePointId("gate-1")
+        }
+
+        val mapped = reassignment.toOperationAssignment()
+
+        assertEquals("gate-1", mapped.pointId)
+        assertEquals(OperationAssignmentStatus.ACTIVE, mapped.status)
+    }
+
+    @Test
+    fun `staff message maps to active instruction for the requesting staff`() {
+        val message = StaffMessage {
             messageId = "message-1"
-            threadId = "thread-1"
-            staffId = "tanaka"
-            payload = Message.Payload.Simple(
-                SimpleMessagePayload {
-                    text = "了解です"
-                }
-            )
-            createdAt = Timestamp {
+            eventId = "event-1"
+            senderUserId = "headquarters"
+            audience = Audience.AUDIENCE_STAFF
+            body = "列整理を開始\nAゲート前に誘導してください"
+            sentAt = Timestamp {
                 seconds = 1_750_324_800L
                 nanos = 123_000_000
             }
         }
 
-        val mapped = message.toOperationMessage()
+        val mapped = message.toOperationInstruction(staffIds = listOf("tanaka"))
 
+        assertEquals("message-1", mapped.instructionId)
+        assertEquals(listOf("tanaka"), mapped.staffIds)
+        assertEquals("列整理を開始", mapped.title)
+        assertEquals("Aゲート前に誘導してください", mapped.description)
+        assertEquals(OperationInstructionStatus.ACTIVE, mapped.status)
         assertEquals(Instant.fromEpochSeconds(1_750_324_800L, 123_000_000).toString(), mapped.updatedAt)
-        assertEquals("了解です", mapped.text)
+    }
+
+    @Test
+    fun `single line staff message keeps full body as description`() {
+        val message = StaffMessage {
+            messageId = "message-2"
+            senderUserId = "headquarters"
+            audience = Audience.AUDIENCE_STAFF
+            body = "配置を確認してください"
+            sentAt = Timestamp { seconds = 1_750_324_800L }
+        }
+
+        val mapped = message.toOperationInstruction(staffIds = listOf("tanaka"))
+
+        assertEquals("本部からの連絡", mapped.title)
+        assertEquals("配置を確認してください", mapped.description)
     }
 }

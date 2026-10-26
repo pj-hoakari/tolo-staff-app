@@ -1,0 +1,12 @@
+version: '3'
+
+vars:
+  OUT: sharedLogic/src/commonMain/proto
+
+tasks:
+  proto:pull:
+    desc: Download proto file
+    cmds:
+      - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-realtime-proto:0.1.0-dev@sha256:d408bfe864b9181a1773d183698de45f403b8afd58635618cff0a8eb8ee8b8df
+      - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-operation-proto:0.3.0-dev
+      - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-kernel-proto:0.4.0

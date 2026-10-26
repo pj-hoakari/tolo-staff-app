@@ -1,0 +1,4 @@
+[tools]
+oras = "latest"
+task = "latest"
+go = "1.27.3"
