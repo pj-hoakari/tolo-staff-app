@@ -26,6 +26,14 @@ class GrpcOperationsPollingRemoteDataSource(
 ) : OperationsPollingRemoteDataSource {
     private val logger = AppLogger.withTag("GrpcOperationsPollingRemoteDataSource")
 
+    init {
+        if (eventId.isBlank() || tenantId.isBlank()) {
+            logger.warn {
+                "Operations scope is not configured: eventIdBlank=${eventId.isBlank()}, tenantIdBlank=${tenantId.isBlank()}"
+            }
+        }
+    }
+
     override suspend fun listPoints(): List<OperationPoint> = emptyList()
 
     override suspend fun listStaff(): List<OperationStaff> =
@@ -107,15 +115,19 @@ class GrpcOperationsPollingRemoteDataSource(
     ): PagedResult<OperationMessage> = PagedResult(items = emptyList())
 
     private suspend fun listStaffMessages(): List<StaffMessage> =
-        safeCall("ListStaffMessages") {
-            grpcClient.staffCommunicationService.ListStaffMessages(
-                ListStaffMessagesRequest {
-                    this.eventId = this@GrpcOperationsPollingRemoteDataSource.eventId
-                    this.tenantId = this@GrpcOperationsPollingRemoteDataSource.tenantId
-                    audience = Audience.AUDIENCE_STAFF
-                }
-            ).messages
-        }.orEmpty()
+        listOf(Audience.AUDIENCE_STAFF, Audience.AUDIENCE_BOTH)
+            .flatMap { audience ->
+                safeCall("ListStaffMessages[$audience]") {
+                    grpcClient.staffCommunicationService.ListStaffMessages(
+                        ListStaffMessagesRequest {
+                            this.eventId = this@GrpcOperationsPollingRemoteDataSource.eventId
+                            this.tenantId = this@GrpcOperationsPollingRemoteDataSource.tenantId
+                            this.audience = audience
+                        }
+                    ).messages
+                }.orEmpty()
+            }
+            .distinctBy { it.messageId }
 
     private suspend fun <T> safeCall(
         operation: String,

@@ -12,7 +12,6 @@ import kotlinx.coroutines.isActive
  * periodically emits a synthetic change to keep gRPC-backed streams refreshed.
  */
 class GrpcOperationsChangeNotifier(
-    grpcClient: GrpcCommunicationClient,
     private val config: OperationsPollingConfig = defaultOperationsPollingConfig(),
 ) : OperationsChangeNotifier {
     private val logger = AppLogger.withTag("GrpcOperationsChangeNotifier")

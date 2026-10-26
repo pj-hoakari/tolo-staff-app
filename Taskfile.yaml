@@ -8,5 +8,5 @@ tasks:
     desc: Download proto file
     cmds:
       - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-realtime-proto:0.1.0-dev@sha256:d408bfe864b9181a1773d183698de45f403b8afd58635618cff0a8eb8ee8b8df
-      - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-operation-proto:0.3.0-dev
-      - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-kernel-proto:0.4.0
+      - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-operation-proto:0.3.0-dev@sha256:46d30f4f5a1cbd52bffa597b9fb81b7e279aa186467a037fac92d0b291fba1b8
+      - oras pull -o {{.OUT}} ghcr.io/pj-hoakari/tolo-kernel-proto:0.4.0@sha256:097d0da430f143be7042629b3ee42052d7bdaaa3ec4bd0ae1a2d440bc3d8515e

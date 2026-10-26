@@ -1,7 +1,11 @@
 package dev.usbharu.tolo_staff.streaming
 
 import dev.usbharu.tolo_staff.logging.AppLogger
+import kotlinx.rpc.grpc.GrpcMetadata
+import kotlinx.rpc.grpc.append
+import kotlinx.rpc.grpc.client.GrpcCallCredentials
 import kotlinx.rpc.grpc.client.GrpcClient
+import kotlinx.rpc.grpc.client.plus
 import kotlinx.rpc.withService
 import tolo.operation.v1.DeliveryCoordinationService
 import tolo.operation.v1.DigestService
@@ -12,10 +16,11 @@ import tolo.realtime.v1.RealtimeFetchService
 class GrpcCommunicationClient(
     host: String,
     port: Int,
+    private val metadataProvider: GrpcMetadataProvider = NoOpGrpcMetadataProvider,
 ) {
     private val logger = AppLogger.withTag("GrpcCommunicationClient")
     private val client = GrpcClient(host, port) {
-        credentials = plaintext()
+        credentials = plaintext() + MetadataCallCredentials(metadataProvider)
     }
 
     init {
@@ -37,4 +42,17 @@ class GrpcCommunicationClient(
     val realtimeFetchService: RealtimeFetchService by lazy {
         client.withService<RealtimeFetchService>()
     }
+}
+
+private class MetadataCallCredentials(
+    private val provider: GrpcMetadataProvider,
+) : GrpcCallCredentials {
+    override suspend fun GrpcCallCredentials.Context.getRequestMetadata(): GrpcMetadata {
+        val values = provider.metadata()
+        return GrpcMetadata {
+            values.forEach { (name, value) -> append(name, value) }
+        }
+    }
+
+    override val requiresTransportSecurity: Boolean = false
 }

@@ -5,6 +5,8 @@ import com.google.protobuf.kotlin.invoke
 import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import tolo.kernel.v1.GraphAnchor
+import tolo.kernel.v1.invoke
 import tolo.operation.v1.Audience
 import tolo.operation.v1.Reassignment
 import tolo.operation.v1.ReassignmentStatus
@@ -43,6 +45,38 @@ class GrpcOperationsPollingRemoteDataSourceTest {
 
         assertEquals("gate-1", mapped.pointId)
         assertEquals(OperationAssignmentStatus.ACTIVE, mapped.status)
+    }
+
+    @Test
+    fun `reassignment anchor on a point maps to the anchor point id`() {
+        val reassignment = Reassignment {
+            reassignmentId = "reassignment-3"
+            staffUserId = "tanaka"
+            status = ReassignmentStatus.REASSIGNMENT_STATUS_DIRECTED
+            target = Reassignment.Target.Anchor(
+                GraphAnchor {
+                    target = GraphAnchor.Target.PointId("point-2")
+                }
+            )
+        }
+
+        assertEquals("point-2", reassignment.toOperationAssignment().pointId)
+    }
+
+    @Test
+    fun `reassignment anchor on a route leaves the point id empty`() {
+        val reassignment = Reassignment {
+            reassignmentId = "reassignment-4"
+            staffUserId = "tanaka"
+            status = ReassignmentStatus.REASSIGNMENT_STATUS_DIRECTED
+            target = Reassignment.Target.Anchor(
+                GraphAnchor {
+                    target = GraphAnchor.Target.RouteId("route-1")
+                }
+            )
+        }
+
+        assertEquals("", reassignment.toOperationAssignment().pointId)
     }
 
     @Test

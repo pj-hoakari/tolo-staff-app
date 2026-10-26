@@ -849,6 +849,7 @@ class AppShellViewModel(
         if (placementStatus.phase.priority >= targetPhase.priority) {
             return
         }
+        val previousPhase = placementStatus.phase
         placementPhaseOverridesByAssignId = placementPhaseOverridesByAssignId + (assignId to targetPhase)
         updateState { state ->
             state.copy(
@@ -870,8 +871,16 @@ class AppShellViewModel(
                     logger.warn(throwable) {
                         "Failed to update assignment status: assignId=$assignId, targetStatus=$targetStatus"
                     }
+                    placementPhaseOverridesByAssignId = placementPhaseOverridesByAssignId - assignId
                     updateState { state ->
                         state.copy(
+                            homeOverview = state.homeOverview.copy(
+                                placementStatus = placementStatusFor(
+                                    assignId = assignId,
+                                    placementName = placementStatus.placementName,
+                                    phase = previousPhase,
+                                )
+                            ),
                             errorMessage = throwable.message ?: "配置ステータスの更新に失敗しました",
                         )
                     }

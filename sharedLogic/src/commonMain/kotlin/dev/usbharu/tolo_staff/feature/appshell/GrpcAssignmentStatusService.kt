@@ -4,7 +4,6 @@ import com.google.protobuf.kotlin.invoke
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
 import dev.usbharu.tolo_staff.streaming.OperationAssignmentStatus
-import kotlinx.coroutines.CancellationException
 import tolo.operation.v1.ApplyReassignmentRequest
 import tolo.operation.v1.invoke
 
@@ -15,6 +14,14 @@ class GrpcAssignmentStatusService(
 ) : AssignmentStatusService {
     private val logger = AppLogger.withTag("GrpcAssignmentStatusService")
 
+    init {
+        if (eventId.isBlank() || tenantId.isBlank()) {
+            logger.warn {
+                "Operations scope is not configured: eventIdBlank=${eventId.isBlank()}, tenantIdBlank=${tenantId.isBlank()}"
+            }
+        }
+    }
+
     override suspend fun updateStatus(assignId: String, status: OperationAssignmentStatus) {
         logger.trace { "updateStatus started: assignId=$assignId, status=$status" }
         if (status != OperationAssignmentStatus.ACTIVE) {
@@ -23,19 +30,13 @@ class GrpcAssignmentStatusService(
             }
             return
         }
-        try {
-            grpcClient.operationControlService.ApplyReassignment(
-                ApplyReassignmentRequest {
-                    reassignmentId = assignId
-                    this.eventId = this@GrpcAssignmentStatusService.eventId
-                    this.tenantId = this@GrpcAssignmentStatusService.tenantId
-                }
-            )
-            logger.info { "updateStatus completed: assignId=$assignId, status=$status" }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (throwable: Throwable) {
-            logger.warn(throwable) { "Failed to apply reassignment: assignId=$assignId" }
-        }
+        grpcClient.operationControlService.ApplyReassignment(
+            ApplyReassignmentRequest {
+                reassignmentId = assignId
+                this.eventId = this@GrpcAssignmentStatusService.eventId
+                this.tenantId = this@GrpcAssignmentStatusService.tenantId
+            }
+        )
+        logger.info { "updateStatus completed: assignId=$assignId, status=$status" }
     }
 }
