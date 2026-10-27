@@ -12,7 +12,7 @@ class GrpcContactChatService(
     grpcClient: GrpcCommunicationClient,
 ) : ContactChatService {
     private val logger = AppLogger.withTag("GrpcContactChatService")
-    private val writer = GrpcContactChatWriter(grpcClient = grpcClient)
+    private val writer = GrpcContactChatWriter()
 
     override fun observeRooms(currentStaffId: String): Flow<List<ChatRoom>> {
         logger.info { "observeRooms started: currentStaffId=$currentStaffId" }

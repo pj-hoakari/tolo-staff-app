@@ -10,8 +10,13 @@ class FirestoreOperationsStreamDataSource(
         Firebase.firestore
     },
     grpcClient: GrpcCommunicationClient,
+    pollingConfig: OperationsPollingConfig = defaultOperationsPollingConfig(),
 ) : GrpcBackedOperationsStreamDataSource(
-    remoteDataSource = GrpcOperationsPollingRemoteDataSource(grpcClient),
+    remoteDataSource = GrpcOperationsPollingRemoteDataSource(
+        grpcClient = grpcClient,
+        eventId = pollingConfig.eventId,
+        tenantId = pollingConfig.tenantId,
+    ),
     changeNotifier = FirestoreOperationsChangeNotifier(
         config = config,
         firestoreFactory = firestoreFactory,
