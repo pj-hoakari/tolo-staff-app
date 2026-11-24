@@ -54,6 +54,7 @@ kotlinx-rpc-protobuf-core = { module = "org.jetbrains.kotlinx:kotlinx-rpc-protob
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 gitlive-firebase-firestore = { module = "dev.gitlive:firebase-firestore", version.ref = "gitliveFirebase" }
+gitlive-firebase-auth = { module = "dev.gitlive:firebase-auth", version.ref = "gitliveFirebase" }
 firebase-android-common = { module = "com.google.firebase:firebase-common", version = "21.0.0" }
 firebase-android-firestore = { module = "com.google.firebase:firebase-firestore", version = "25.1.4" }
 grpc-netty = { module = "io.grpc:grpc-netty", version.ref = "grpc" }

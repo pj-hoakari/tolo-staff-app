@@ -4,8 +4,8 @@ data class OperationsStreamingConfig(
     val enabled: Boolean,
     val host: String,
     val port: Int,
-    val projectId: String = "tolo-communication-poc",
-    val databaseId: String? = null,
+    val authPort: Int = 9099,
+    val projectId: String = "demo-tolo",
 )
 
 expect fun defaultOperationsStreamingConfig(): OperationsStreamingConfig
