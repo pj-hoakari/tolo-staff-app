@@ -1,55 +1,31 @@
 package dev.usbharu.tolo_staff.di
 
-import dev.usbharu.tolo_staff.feature.appshell.AssignmentStatusService
-import dev.usbharu.tolo_staff.feature.appshell.EventRepository
-import dev.usbharu.tolo_staff.feature.appshell.GrpcAssignmentStatusService
-import dev.usbharu.tolo_staff.feature.appshell.NoOpEventRepository
-import dev.usbharu.tolo_staff.feature.appshell.NoOpReportRepository
-import dev.usbharu.tolo_staff.feature.appshell.ReportRepository
-import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
-import dev.usbharu.tolo_staff.feature.contactchat.GrpcContactChatService
-import dev.usbharu.tolo_staff.streaming.FirestoreOperationsStreamDataSource
+import dev.usbharu.tolo_staff.streaming.FirestoreLatestDeliveryIds
 import dev.usbharu.tolo_staff.streaming.GrpcCommunicationClient
-import dev.usbharu.tolo_staff.streaming.OperationsChangeNotifier
-import dev.usbharu.tolo_staff.streaming.FirestoreOperationsChangeNotifier
-import dev.usbharu.tolo_staff.streaming.OperationsPollingConfig
-import dev.usbharu.tolo_staff.streaming.OperationsReadMode
-import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
-import dev.usbharu.tolo_staff.streaming.defaultOperationsPollingConfig
-import dev.usbharu.tolo_staff.streaming.defaultOperationsReadMode
-import dev.usbharu.tolo_staff.streaming.defaultOperationsStreamingConfig
+import dev.usbharu.tolo_staff.streaming.RealtimeDeliveryFeed
+import dev.usbharu.tolo_staff.streaming.RealtimeDeliveryRepository
+import dev.usbharu.tolo_staff.streaming.RealtimeFeedEvent
+import dev.usbharu.tolo_staff.streaming.RealtimeOperationsChangeNotifier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.shareIn
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 actual fun platformModule(): Module = module {
-    single { defaultOperationsReadMode() }
-    single { defaultOperationsPollingConfig() }
-    single {
-        val config = get<OperationsPollingConfig>()
-        GrpcCommunicationClient(
-            host = config.host,
-            port = config.port,
-            metadataProvider = get(),
-        )
+    includes(grpcOperationsModule(changeNotifier = { RealtimeOperationsChangeNotifier(get<SharedFlow<RealtimeFeedEvent>>()) }))
+    single<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+    single<SharedFlow<RealtimeFeedEvent>>(createdAtStart = true) {
+        val client = get<GrpcCommunicationClient>()
+        RealtimeDeliveryFeed(
+            realtime = client.realtimeFetchService,
+            deliveryCoordination = client.deliveryCoordinationService,
+            scope = get(),
+            latestDeliveryIds = FirestoreLatestDeliveryIds(client.realtimeFetchService)::observe,
+        ).events().shareIn(get(), SharingStarted.Eagerly)
     }
-    single<OperationsChangeNotifier> { FirestoreOperationsChangeNotifier(defaultOperationsStreamingConfig()) }
-    single<ReportRepository> { NoOpReportRepository() }
-    single<EventRepository> { NoOpEventRepository() }
-    single<AssignmentStatusService> {
-        val config = get<OperationsPollingConfig>()
-        GrpcAssignmentStatusService(
-            grpcClient = get(),
-            eventId = config.eventId,
-            tenantId = config.tenantId,
-        )
-    }
-    single<OperationsStreamDataSource> {
-        check(get<OperationsReadMode>() == OperationsReadMode.FIRESTORE)
-        FirestoreOperationsStreamDataSource(
-            config = defaultOperationsStreamingConfig(),
-            grpcClient = get(),
-            pollingConfig = get(),
-        )
-    }
-    single<ContactChatService> { GrpcContactChatService(dataSource = get(), grpcClient = get()) }
+    single(createdAtStart = true) { RealtimeDeliveryRepository(events = get<SharedFlow<RealtimeFeedEvent>>(), scope = get()) }
 }

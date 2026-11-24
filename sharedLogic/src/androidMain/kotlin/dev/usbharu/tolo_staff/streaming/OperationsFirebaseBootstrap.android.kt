@@ -3,6 +3,7 @@ package dev.usbharu.tolo_staff.streaming
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.apps
+import dev.gitlive.firebase.auth.auth
 import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.initialize
 import dev.usbharu.tolo_staff.logging.AppLogger
@@ -22,14 +23,15 @@ actual class OperationsFirebaseBootstrap {
             options = FirebaseOptions(
                 applicationId = "1:1234567890:tolostaff:streaming",
                 apiKey = "fake-api-key",
-                projectId = "tolo-communication-poc",
+                projectId = config.projectId,
                 gcmSenderId = "1234567890",
             )
         )
         if (config.enabled) {
             Firebase.firestore.useEmulator(config.host, config.port)
+            Firebase.auth.useEmulator(config.host, config.authPort)
             logger.info {
-                "Configured Firestore emulator during bootstrap: host=${config.host}, port=${config.port}"
+                "Configured Firebase emulators during bootstrap: host=${config.host}, firestorePort=${config.port}, authPort=${config.authPort}, projectId=${config.projectId}"
             }
         } else {
             logger.info { "Firestore emulator bootstrap skipped because streaming is disabled" }

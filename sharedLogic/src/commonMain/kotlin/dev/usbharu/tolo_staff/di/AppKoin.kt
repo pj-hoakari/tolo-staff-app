@@ -8,14 +8,15 @@ import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
 import dev.usbharu.tolo_staff.streaming.GrpcMetadataProvider
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
-import dev.usbharu.tolo_staff.streaming.NoOpGrpcMetadataProvider
+import dev.usbharu.tolo_staff.streaming.OperationsScope
+import dev.usbharu.tolo_staff.streaming.grpcMetadataProvider
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepositoryImpl
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
 val coreModule = module {
-    single<GrpcMetadataProvider> { NoOpGrpcMetadataProvider }
+    single<GrpcMetadataProvider> { get<OperationsScope>().grpcMetadataProvider() }
     single<CurrentStaffSession> { MockCurrentStaffSession(dataSource = get()) }
     single<OperationsOverviewRepository> { OperationsOverviewRepositoryImpl(dataSource = get(), eventRepository = get()) }
     factory {
@@ -36,15 +37,17 @@ object KoinInitializer {
     private val logger = AppLogger.withTag("KoinInitializer")
     private var started = false
 
-    fun start() {
+    fun start(scope: OperationsScope = OperationsScope()) {
         if (started) {
             logger.debug { "start skipped because Koin is already initialized" }
             return
         }
 
-        logger.info { "Starting Koin modules for shared logic" }
+        logger.info {
+            "Starting Koin modules for shared logic: eventIdBlank=${scope.eventId.isBlank()}, tenantIdBlank=${scope.tenantId.isBlank()}, accessTokenBlank=${scope.accessToken.isBlank()}"
+        }
         startKoin {
-            modules(coreModule, platformModule())
+            modules(module { single { scope } }, coreModule, platformModule())
         }
         started = true
         logger.info { "Koin started successfully" }
