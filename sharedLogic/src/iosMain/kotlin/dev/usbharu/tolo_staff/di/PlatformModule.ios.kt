@@ -3,8 +3,8 @@ package dev.usbharu.tolo_staff.di
 import dev.usbharu.tolo_staff.feature.appshell.AssignmentStatusService
 import dev.usbharu.tolo_staff.feature.appshell.EventRepository
 import dev.usbharu.tolo_staff.feature.appshell.GrpcAssignmentStatusService
-import dev.usbharu.tolo_staff.feature.appshell.GrpcEventRepository
-import dev.usbharu.tolo_staff.feature.appshell.GrpcReportRepository
+import dev.usbharu.tolo_staff.feature.appshell.NoOpEventRepository
+import dev.usbharu.tolo_staff.feature.appshell.NoOpReportRepository
 import dev.usbharu.tolo_staff.feature.appshell.ReportRepository
 import dev.usbharu.tolo_staff.feature.contactchat.ContactChatService
 import dev.usbharu.tolo_staff.feature.contactchat.GrpcContactChatService
@@ -26,13 +26,31 @@ actual fun platformModule(): Module = module {
     single { defaultOperationsPollingConfig() }
     single {
         val config = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>()
-        GrpcCommunicationClient(host = config.host, port = config.port)
+        GrpcCommunicationClient(
+            host = config.host,
+            port = config.port,
+            metadataProvider = get(),
+        )
     }
-    single<OperationsChangeNotifier> { GrpcOperationsChangeNotifier(grpcClient = get(), config = get()) }
-    single<ReportRepository> { GrpcReportRepository(grpcClient = get(), changeNotifier = get()) }
-    single<EventRepository> { GrpcEventRepository(grpcClient = get()) }
-    single<AssignmentStatusService> { GrpcAssignmentStatusService(grpcClient = get()) }
-    single { GrpcOperationsPollingRemoteDataSource(grpcClient = get()) }
+    single<OperationsChangeNotifier> { GrpcOperationsChangeNotifier(config = get()) }
+    single<ReportRepository> { NoOpReportRepository() }
+    single<EventRepository> { NoOpEventRepository() }
+    single<AssignmentStatusService> {
+        val config = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>()
+        GrpcAssignmentStatusService(
+            grpcClient = get(),
+            eventId = config.eventId,
+            tenantId = config.tenantId,
+        )
+    }
+    single {
+        val config = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>()
+        GrpcOperationsPollingRemoteDataSource(
+            grpcClient = get(),
+            eventId = config.eventId,
+            tenantId = config.tenantId,
+        )
+    }
     single<OperationsPollingRemoteDataSource> { get<GrpcOperationsPollingRemoteDataSource>() }
     single<OperationsStreamDataSource> {
         check(get<OperationsReadMode>() == OperationsReadMode.GRPC)

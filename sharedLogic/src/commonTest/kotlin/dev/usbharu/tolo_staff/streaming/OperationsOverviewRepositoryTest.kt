@@ -61,6 +61,30 @@ class OperationsOverviewRepositoryTest {
     }
 
     @Test
+    fun `overview falls back to the assignment point id when points are unavailable`() = runTest {
+        val dataSource = FakeOperationsStreamDataSource(
+            points = emptyList(),
+            assignments = listOf(
+                OperationAssignment(
+                    updatedAt = "",
+                    reason = "grpc.listReassignments",
+                    entityId = "assign-2",
+                    assignId = "assign-2",
+                    pointId = "gate-b",
+                    staffId = "tanaka",
+                    status = OperationAssignmentStatus.ACTIVE
+                )
+            )
+        )
+        val repository = OperationsOverviewRepositoryImpl(dataSource)
+
+        val projection = repository.observeOverview("tanaka").first()
+
+        assertEquals("gate-b", projection.currentPlacementName)
+        assertEquals("gate-b", projection.homeOverview.placementName)
+    }
+
+    @Test
     fun `relevant instructions include assigned area and direct mention only`() {
         val assignments = listOf(
             OperationAssignment(

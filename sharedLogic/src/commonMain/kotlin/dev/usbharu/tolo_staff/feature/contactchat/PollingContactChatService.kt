@@ -20,7 +20,7 @@ class PollingContactChatService(
     grpcClient: GrpcCommunicationClient,
 ) : ContactChatService {
     private val logger = AppLogger.withTag("PollingContactChatService")
-    private val writer = GrpcContactChatWriter(grpcClient = grpcClient)
+    private val writer = GrpcContactChatWriter()
     private val pollingFactory = SharedPollingFlowFactory(config.intervalMillis)
     private val staffFlow by lazy { pollingFactory.create { remoteDataSource.listStaff() } }
     private val threadsFlow by lazy { pollingFactory.create { remoteDataSource.listThreads() } }

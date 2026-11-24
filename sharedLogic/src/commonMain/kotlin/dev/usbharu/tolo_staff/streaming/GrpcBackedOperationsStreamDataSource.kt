@@ -117,6 +117,11 @@ open class GrpcBackedOperationsStreamDataSource(
                     OperationEntityType.POINT -> refreshPoints()
                     OperationEntityType.STAFF -> refreshStaff()
                     OperationEntityType.ASSIGNMENT -> refreshAssignments()
+                    OperationEntityType.UNKNOWN -> {
+                        refreshPoints()
+                        refreshStaff()
+                    }
+
                     else -> Unit
                 }
             }
@@ -154,8 +159,14 @@ open class GrpcBackedOperationsStreamDataSource(
                         refreshThreadsForStaff(currentStaffId, refreshMessages = false)
                     }
                     OperationEntityType.INSTRUCTION -> refreshRelevantInstructions(currentStaffId)
+                    OperationEntityType.UNKNOWN -> {
+                        refreshPoints()
+                        refreshStaff()
+                        refreshAssignments()
+                        refreshRelevantInstructions(currentStaffId)
+                        refreshThreadsForStaff(currentStaffId)
+                    }
                     OperationEntityType.REPORT,
-                    OperationEntityType.UNKNOWN,
                     -> Unit
                 }
             }

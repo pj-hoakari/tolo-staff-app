@@ -6,13 +6,16 @@ import dev.usbharu.tolo_staff.feature.contactchat.ContactChatViewModel
 import dev.usbharu.tolo_staff.feature.sample.SampleViewModel
 import dev.usbharu.tolo_staff.logging.AppLogger
 import dev.usbharu.tolo_staff.streaming.CurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.GrpcMetadataProvider
 import dev.usbharu.tolo_staff.streaming.MockCurrentStaffSession
+import dev.usbharu.tolo_staff.streaming.NoOpGrpcMetadataProvider
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepository
 import dev.usbharu.tolo_staff.streaming.OperationsOverviewRepositoryImpl
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
 val coreModule = module {
+    single<GrpcMetadataProvider> { NoOpGrpcMetadataProvider }
     single<CurrentStaffSession> { MockCurrentStaffSession(dataSource = get()) }
     single<OperationsOverviewRepository> { OperationsOverviewRepositoryImpl(dataSource = get(), eventRepository = get()) }
     factory {

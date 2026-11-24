@@ -73,7 +73,8 @@ class OperationsOverviewRepositoryImpl(
                     .thenBy { it.instructionId }
             )
 
-        val placementName = currentPoint?.name.orEmpty()
+        val placementName = currentPoint?.name?.takeIf { it.isNotBlank() }
+            ?: currentAssignment?.pointId.orEmpty()
         val placementDetail = currentPoint?.description.orEmpty()
         val instructionText = activeInstruction?.toDisplayText().orEmpty()
         val instructionTargetName = activeInstruction

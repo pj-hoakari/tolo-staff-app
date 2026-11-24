@@ -227,6 +227,10 @@ class AppShellViewModelTest {
             assignmentStatusService.updatedStatuses,
         )
         assertEquals("network error", viewModel.uiState.value.errorMessage)
+        assertEquals(
+            PlacementPhase.PENDING_CHANGE,
+            viewModel.uiState.value.homeOverview.placementStatus.phase,
+        )
 
         viewModel.clear()
     }
