@@ -36,19 +36,19 @@ actual fun platformModule(): Module = module {
     single<ReportRepository> { NoOpReportRepository() }
     single<EventRepository> { NoOpEventRepository() }
     single<AssignmentStatusService> {
-        val config = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>()
+        val scope = get<dev.usbharu.tolo_staff.streaming.OperationsScope>()
         GrpcAssignmentStatusService(
             grpcClient = get(),
-            eventId = config.eventId,
-            tenantId = config.tenantId,
+            eventId = scope.eventId,
+            tenantId = scope.tenantId,
         )
     }
     single {
-        val config = get<dev.usbharu.tolo_staff.streaming.OperationsPollingConfig>()
+        val scope = get<dev.usbharu.tolo_staff.streaming.OperationsScope>()
         GrpcOperationsPollingRemoteDataSource(
             grpcClient = get(),
-            eventId = config.eventId,
-            tenantId = config.tenantId,
+            eventId = scope.eventId,
+            tenantId = scope.tenantId,
         )
     }
     single<OperationsPollingRemoteDataSource> { get<GrpcOperationsPollingRemoteDataSource>() }

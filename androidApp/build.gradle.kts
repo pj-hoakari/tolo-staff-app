@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -43,6 +44,21 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val localProperties = Properties().apply {
+            rootProject.file("local.properties").takeIf { it.exists() }?.reader()?.use(::load)
+        }
+        listOf(
+            "TOLO_EVENT_ID" to "tolo.eventId",
+            "TOLO_TENANT_ID" to "tolo.tenantId",
+            "TOLO_ACCESS_TOKEN" to "tolo.accessToken",
+        ).forEach { (field, key) ->
+            val value = localProperties.getProperty(key).orEmpty()
+            buildConfigField("String", field, "\"$value\"")
+        }
+    }
+    buildFeatures {
+        buildConfig = true
     }
     packaging {
         resources {

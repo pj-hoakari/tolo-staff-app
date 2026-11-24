@@ -14,6 +14,7 @@ import dev.usbharu.tolo_staff.streaming.OperationsChangeNotifier
 import dev.usbharu.tolo_staff.streaming.FirestoreOperationsChangeNotifier
 import dev.usbharu.tolo_staff.streaming.OperationsPollingConfig
 import dev.usbharu.tolo_staff.streaming.OperationsReadMode
+import dev.usbharu.tolo_staff.streaming.OperationsScope
 import dev.usbharu.tolo_staff.streaming.OperationsStreamDataSource
 import dev.usbharu.tolo_staff.streaming.defaultOperationsPollingConfig
 import dev.usbharu.tolo_staff.streaming.defaultOperationsReadMode
@@ -36,11 +37,11 @@ actual fun platformModule(): Module = module {
     single<ReportRepository> { NoOpReportRepository() }
     single<EventRepository> { NoOpEventRepository() }
     single<AssignmentStatusService> {
-        val config = get<OperationsPollingConfig>()
+        val scope = get<OperationsScope>()
         GrpcAssignmentStatusService(
             grpcClient = get(),
-            eventId = config.eventId,
-            tenantId = config.tenantId,
+            eventId = scope.eventId,
+            tenantId = scope.tenantId,
         )
     }
     single<OperationsStreamDataSource> {
@@ -48,7 +49,7 @@ actual fun platformModule(): Module = module {
         FirestoreOperationsStreamDataSource(
             config = defaultOperationsStreamingConfig(),
             grpcClient = get(),
-            pollingConfig = get(),
+            scope = get(),
         )
     }
     single<ContactChatService> { GrpcContactChatService(dataSource = get(), grpcClient = get()) }
